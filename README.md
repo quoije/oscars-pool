@@ -3,4 +3,4 @@ Little nodejs + mongodb app that I hack together with ChatGPT to keep track of w
 
 ![Oscar Pool 2025](https://github.com/quoije/oscar-pool/blob/prod/img/preview.png)
 
-**nodejs .\index.js**
+**node .\index.js**
