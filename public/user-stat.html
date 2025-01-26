@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Statistics</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <style>
+    .navbar-custom {
+      background-color: black;
+      color: white;
+    }
+    .navbar-custom .navbar-brand,
+    .navbar-custom .nav-link {
+      color: white;
+    }
+    .navbar-custom .nav-link:hover {
+      color: #ddd;
+    }
+    .user-table {
+      margin-top: 20px;
+    }
+    .ratio {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body class="bg-light">
+
+<!-- Black banner with buttons and user info -->
+<nav class="navbar navbar-expand-lg navbar-custom">
+    <div class="container-fluid">
+      <div class="d-flex align-items-center">
+        <!-- Logo with max height and width control -->
+        <a class="navbar-brand" href="#">
+          <img src="img/logo_w.png" style="max-width: 180px; height: 70px; object-fit: contain;">
+        </a>
+        <a href="movies.html" class="btn btn-outline-light me-2">Films</a>
+        <a href="checklist.html" class="btn btn-outline-light me-2">Checklist</a>
+        <a href="user-stat.html" class="btn btn-outline-light">Statistique</a>
+      </div>
+      <div class="d-flex">
+        <span id="user-name" class="navbar-text me-3"></span>
+        <button id="log-off" class="btn btn-danger">Déconnexion</button>
+      </div>
+    </div>
+  </nav>
+
+<div class="container mt-5">
+  <h2>Statistiques des utilisateurs</h2>
+  <!-- Table for users and movies watched -->
+  <table class="table user-table">
+    <thead>
+      <tr>
+        <th scope="col">Nom</th>
+        <th scope="col">Total des films regardés</th>
+        <th scope="col"></th>
+      </tr>
+    </thead>
+    <tbody id="user-table-body">
+      <!-- User rows will be inserted here -->
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal for displaying movies watched -->
+<div class="modal fade" id="moviesModal" tabindex="-1" aria-labelledby="moviesModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="moviesModalLabel">Films regardés</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <ul id="movie-list" class="list-group">
+          <!-- Movie titles will be inserted here -->
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  window.onload = async function () {
+    const token = localStorage.getItem('auth_token');
+    // Check if token exists
+    if (token) {
+      try {
+        // Decode the token (using a library like jwt-decode or manually)
+        const decoded = JSON.parse(atob(token.split('.')[1])); // Manually decoding JWT
+        
+        // Access the user's name from the decoded token
+        const userName = decoded.name;
+
+        // Update the user name in the navbar
+        document.getElementById('user-name').textContent = userName;
+
+        // Verify JWT Token expiration
+        const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
+        if (decoded.exp && decoded.exp < currentTime) {
+          console.warn("Token is expired");
+          localStorage.removeItem('auth_token'); // Remove the expired token
+          window.location.href = '/'; // Redirect to the login page
+        }
+      } catch (error) {
+        console.error("Error decoding token:", error);
+        localStorage.removeItem('auth_token'); // Remove invalid token
+        window.location.href = '/'; // Redirect to the login page
+      }
+    } else {
+      // Handle case if no token is available
+      window.location.href = '/';  // Redirect to the login page if no token
+    }
+
+    try {
+      // Fetch user stats from the new endpoint
+      const statsRes = await fetch('/api/users/stats', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!statsRes.ok) {
+        throw new Error('Failed to fetch user stats');
+      }
+
+      const stats = await statsRes.json();
+      const userTableBody = document.getElementById('user-table-body');
+
+      // Populate table rows with user stats
+      stats.forEach(userStat => {
+        const userRow = document.createElement('tr');
+
+        userRow.innerHTML = `
+          <td>
+            <a href="#" class="user-link" data-movies='${JSON.stringify(userStat.watchedMovies)}'>${userStat.name}</a>
+          </td>
+          <td>${userStat.watchedCount}</td>
+          <td>${userStat.watchedRatio}</td>
+        `;
+
+        userTableBody.appendChild(userRow);
+      });
+
+      // Add event listener for user links
+      document.querySelectorAll('.user-link').forEach(link => {
+        link.addEventListener('click', function (event) {
+          event.preventDefault();
+          const datasetMovies = this.dataset.movies
+          console.log(datasetMovies)
+          const movies = JSON.parse(datasetMovies);
+
+          // Clear the current movie list in the modal
+          const movieList = document.getElementById('movie-list');
+          movieList.innerHTML = '';
+
+          // Populate the modal with the movies the user has watched
+          movies.forEach(movie => {
+            const movieItem = document.createElement('li');
+            movieItem.classList.add('list-group-item');
+            movieItem.textContent = movie.movieTitle;
+            movieList.appendChild(movieItem);
+          });
+
+          // Show the modal
+          const modal = new bootstrap.Modal(document.getElementById('moviesModal'));
+          modal.show();
+        });
+      });
+    } catch (error) {
+      console.error('Error loading user statistics:', error);
+      // localStorage.removeItem('auth_token');
+      // window.location.href = '/';
+    }
+
+    // Log-off functionality
+    document.getElementById('log-off').addEventListener('click', function() {
+      localStorage.removeItem('auth_token');
+      window.location.href = '/';
+    });
+  };
+</script>
+
+</body>
+</html>
