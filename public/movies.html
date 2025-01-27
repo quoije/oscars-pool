@@ -40,6 +40,10 @@
       position: relative;
     }
 
+    #movies-list {
+      margin-top: 10px;
+    }
+
     /* Style for the filter button */
     #filter-button {
       margin-left: 15px;
@@ -96,12 +100,13 @@
 
   <h3 class="fs-6">Temps avant les Oscars (2 mars 2025) - <span id="time-left"></span></h3>
   <h3 class="fs-6 mb-0">
-    <div class="form-check form-switch">
-      <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault">
-      <label class="form-check-label" for="flexSwitchCheckDefault">Films non regardés seulement</label>
-    </div>
+
   </h3>
   <br>
+  <div class="form-check form-switch">
+    <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault">
+    <label class="form-check-label" for="flexSwitchCheckDefault">Films non regardés seulement</label>
+  </div>
   <div id="movies-list" class="row">
     <!-- Movies will be displayed here -->
   </div>
