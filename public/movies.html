@@ -191,7 +191,7 @@
       movieDiv.innerHTML = `
         <div class="card">
           ${isChecked ? '<div class="watched-banner">REGARDÉ</div>' : ''}
-          <img src="${movie.poster}" class="card-img-top" alt="${movie.title}" style="width: 75%; display: block; margin: 0 auto; padding: 10px;">
+          <a href="${movie.vod_link}"><img src="${movie.poster}" class="card-img-top" alt="${movie.title}" style="width: 75%; display: block; margin: 0 auto; padding: 10px;"></a>
           <div class="card-body">
             <h5 class="card-title d-flex justify-content-between align-items-center">
             ${movie.title} 
@@ -200,7 +200,7 @@
             <p class="fw-bold fst-italic card-text" style="font-size: 0.75rem;">${movie.category}</p>
             <p class="card-text">${movie.description}</p>
             ${isChecked ? `<p class="card-text"><strong>Regardé le:</strong> ${watchedDate}</p>` : ''} <!-- Display watched date and time if movie is watched -->
-            <p class="card-text">🎥 ${movie.vod_link}</p>
+            <p class="card-text">🎥 <a href="${movie.vod_link}"></p>
           </div>
         </div>
       `;
