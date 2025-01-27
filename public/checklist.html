@@ -18,17 +18,33 @@
       color: #ddd;
     }
     .movie-table {
-      margin-top: 20px;
+    margin-top: 20px;
+    }
+
+    /* New styles for the first column */
+    .movie-table th:first-child,
+    .movie-table td:first-child {
+      width: 1%; /* Shrink to fit the content */
+      white-space: nowrap; /* Prevent wrapping */
+    }
+
+    .movie-table {
+      table-layout: auto; /* Allow the browser to size columns automatically */
     }
     .ratio {
       font-weight: bold;
       margin-top: 10px;
     }
     .navbar-toggler {
-      border-color: white; /* Make the border white */
+      border-color: white;
     }
     .navbar-toggler-icon {
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+    }
+    /* New styles for table */
+    .table-hover tbody tr:hover {
+      background-color: #f1f1f1;
+      cursor: pointer;
     }
   </style>
 </head>
@@ -65,12 +81,12 @@
     <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%; background-color: red;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
   </div>
   <!-- Table for movies -->
-  <table class="table movie-table">
+  <table class="table table-hover movie-table">
     <thead>
       <tr>
-        <th scope="col">Titre</th>
         <th scope="col">Regardé</th>
-        <th scope="col">Date du visionnage</th> <!-- New column for watched date -->
+        <th scope="col">Titre</th>
+        <th scope="col">Date du visionnage</th>
       </tr>
     </thead>
     <tbody id="movie-table-body">
@@ -93,30 +109,20 @@
 
     if (token) {
       try {
-        // Decode the token (using a library like jwt-decode or manually)
-        const decoded = JSON.parse(atob(token.split('.')[1])); // Manually decoding JWT
-        
-        // Access the user's name from the decoded token
+        const decoded = JSON.parse(atob(token.split('.')[1]));
         const userName = decoded.name;
-
-        // Update the user name in the navbar
         document.getElementById('user-name').textContent = userName;
-
-        // Verify JWT Token expiration
-        const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
+        const currentTime = Math.floor(Date.now() / 1000);
         if (decoded.exp && decoded.exp < currentTime) {
-          console.warn("Token is expired");
-          localStorage.removeItem('auth_token'); // Remove the expired token
-          window.location.href = '/'; // Redirect to the login page
+          localStorage.removeItem('auth_token');
+          window.location.href = '/';
         }
       } catch (error) {
-        console.error("Error decoding token:", error);
-        localStorage.removeItem('auth_token'); // Remove invalid token
-        window.location.href = '/'; // Redirect to the login page
+        localStorage.removeItem('auth_token');
+        window.location.href = '/';
       }
     } else {
-      // Handle case if no token is available
-      window.location.href = '/';  // Redirect to the login page if no token
+      window.location.href = '/';
     }
 
     const res = await fetch('/api/movies', {
@@ -167,13 +173,22 @@
       const watchedDate = watchedMovie ? new Date(watchedMovie.watchedDate).toLocaleString() : '';
       const movieRow = document.createElement('tr');
       movieRow.innerHTML = `
-        <td>${movie.title}</td>
         <td>
           <input type="checkbox" class="form-check-input" id="movie-${movie.imdb_id}" ${watchedMovie ? 'checked' : ''} />
         </td>
+        <td>${movie.title}</td>
         <td id="watched-date-${movie.imdb_id}">${watchedDate}</td>
       `;
+
       movieTableBody.appendChild(movieRow);
+
+      movieRow.addEventListener('click', (event) => {
+        const checkbox = document.getElementById(`movie-${movie.imdb_id}`);
+        if (event.target.tagName !== 'INPUT') {
+          checkbox.checked = !checkbox.checked;
+          checkbox.dispatchEvent(new Event('change'));
+        }
+      });
 
       const checkbox = document.getElementById(`movie-${movie.imdb_id}`);
       checkbox.addEventListener('change', async (event) => {

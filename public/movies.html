@@ -87,9 +87,6 @@
 <div class="container mt-5">
   <div class="d-flex justify-content-between align-items-center">
     <h2>Films</h2>
-    <h3 class="fs-6 mb-0">
-    <img src="/img/filter.png" style="height: 25px;"><button id="filter-button" class="btn btn-primary btn-sm"></button>
-    </h3>
   </div>
 
   <!-- Displaying the ratio of watched movies -->
@@ -98,6 +95,13 @@
   </div>
 
   <h3 class="fs-6">Temps avant les Oscars (2 mars 2025) - <span id="time-left"></span></h3>
+  <h3 class="fs-6 mb-0">
+    <div class="form-check form-switch">
+      <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault">
+      <label class="form-check-label" for="flexSwitchCheckDefault">Films non regardés seulement</label>
+    </div>
+  </h3>
+  <br>
   <div id="movies-list" class="row">
     <!-- Movies will be displayed here -->
   </div>
@@ -106,95 +110,65 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 <script>
   window.onload = async function () {
-    // Calculate the time left until March 2, 2025
     const targetDate = new Date('March 2, 2025');
     const currentDate = new Date();
-    
-    // Calculate the difference in milliseconds
     const timeDifference = targetDate - currentDate;
-
-    // Convert milliseconds to days
     const daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
-
-    // Update the "Time Left" text
     document.getElementById('time-left').textContent = `${daysLeft} jours`;
 
-    // Get token from localStorage (assuming it's set after login)
     const token = localStorage.getItem('auth_token');
-    // Check if token exists
     if (token) {
       try {
-        // Decode the token (using a library like jwt-decode or manually)
-        const decoded = JSON.parse(atob(token.split('.')[1])); // Manually decoding JWT
-        
-        // Access the user's name from the decoded token
+        const decoded = JSON.parse(atob(token.split('.')[1]));
         const userName = decoded.name;
-
-        // Update the user name in the navbar
         document.getElementById('user-name').textContent = userName;
 
-        // Verify JWT Token expiration
-        const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
+        const currentTime = Math.floor(Date.now() / 1000);
         if (decoded.exp && decoded.exp < currentTime) {
-          console.warn("Token is expired");
-          localStorage.removeItem('auth_token'); // Remove the expired token
-          window.location.href = '/'; // Redirect to the login page
+          localStorage.removeItem('auth_token');
+          window.location.href = '/';
         }
       } catch (error) {
-        console.error("Error decoding token:", error);
-        localStorage.removeItem('auth_token'); // Remove invalid token
-        window.location.href = '/'; // Redirect to the login page
+        localStorage.removeItem('auth_token');
+        window.location.href = '/';
       }
     } else {
-      // Handle case if no token is available
-      window.location.href = '/';  // Redirect to the login page if no token
+      window.location.href = '/';
     }
 
-    // Fetching the movies from your API with Authorization header
     const res = await fetch('/api/movies', {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}` // Send the token in the Authorization header
-      }
+      headers: { 'Authorization': `Bearer ${token}` },
     });
 
     if (!res.ok) {
-      // If unauthorized or any error, log out the user
-      localStorage.removeItem('auth_token'); // Clear the token
-      window.location.href = '/'; // Redirect to login page
+      localStorage.removeItem('auth_token');
+      window.location.href = '/';
       return;
     }
 
     const movies = await res.json();
-    
-    // Fetch watched movies for the logged-in user
+
     const watchedRes = await fetch('/api/movies/watchedMovies', {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}` // Send the token to verify the user
-      }
+      headers: { 'Authorization': `Bearer ${token}` },
     });
 
     let watchedMovies = [];
     if (watchedRes.ok) {
-      watchedMovies = await watchedRes.json(); // Get the list of watched movies from the user's profile
+      watchedMovies = await watchedRes.json();
     }
 
     const moviesList = document.getElementById('movies-list');
-    
-    // Calculate the watched-to-total ratio
     const totalMoviesCount = movies.length;
     const watchedMoviesCount = watchedMovies.length;
     const ratioText = `Regardé: ${watchedMoviesCount} / ${totalMoviesCount} (${((watchedMoviesCount / totalMoviesCount) * 100).toFixed(1)}%)`;
-    
-    // Display the ratio below the Movies heading
     document.getElementById('watched-ratio').innerText = ratioText;
 
-    // Loop through the movies and create cards for them
     movies.forEach(movie => {
-      const isChecked = watchedMovies.some(watchedMovie => watchedMovie.imdb_id === movie.imdb_id); // Check if the movie is watched
+      const isChecked = watchedMovies.some(watchedMovie => watchedMovie.imdb_id === movie.imdb_id);
       const watchedMovie = watchedMovies.find(wm => wm.imdb_id === movie.imdb_id);
-      const watchedDate = watchedMovie ? new Date(watchedMovie.watchedDate).toLocaleString() : ''; // Get the watched date if available
+      const watchedDate = watchedMovie ? new Date(watchedMovie.watchedDate).toLocaleString() : '';
 
       const movieDiv = document.createElement('div');
       movieDiv.classList.add('col-md-4', 'mb-4', 'movie-card');
@@ -205,74 +179,41 @@
           <a href="${movie.vod_link}"><img src="${movie.poster}" class="card-img-top" alt="${movie.title}" style="width: 75%; display: block; margin: 0 auto; padding: 10px;"></a>
           <div class="card-body">
             <h5 class="card-title d-flex justify-content-between align-items-center">
-            ${movie.title} 
-            <span>⭐ ${movie.rating}   <a href="https://www.imdb.com/title/${movie.imdb_id}/"><img src="/img/imdb.png"></a></span>
+              ${movie.title}
+              <span>⭐ ${movie.rating} <a href="https://www.imdb.com/title/${movie.imdb_id}/"><img src="/img/imdb.png"></a></span>
             </h5>
             <p class="fw-bold fst-italic card-text" style="font-size: 0.75rem;">${movie.category}</p>
             <p class="card-text">${movie.description}</p>
-            ${isChecked ? `<p class="card-text"><strong>Regardé le:</strong> ${watchedDate}</p>` : ''} <!-- Display watched date and time if movie is watched -->
+            ${isChecked ? `<p class="card-text"><strong>Regardé le:</strong> ${watchedDate}</p>` : ''}
           </div>
-        </div>
-      `;
+        </div>`;
       moviesList.appendChild(movieDiv);
     });
 
-    // Log off functionality
-    document.getElementById('log-off').addEventListener('click', function() {
-      localStorage.removeItem('auth_token');  // Remove token from localStorage
-      window.location.href = '/';  // Redirect to login page
+    document.getElementById('log-off').addEventListener('click', function () {
+      localStorage.removeItem('auth_token');
+      window.location.href = '/';
     });
 
-    // Retrieve filter state from localStorage
+    const filterSwitch = document.getElementById('flexSwitchCheckDefault');
     const savedFilterState = localStorage.getItem('filter-checkbox');
-    let isFilterActive = savedFilterState === 'checked';
+    const isFilterActive = savedFilterState === 'checked';
+    filterSwitch.checked = isFilterActive;
 
-    // Update button text and color based on the filter state
-    const filterButton = document.getElementById('filter-button');
-    filterButton.textContent = isFilterActive ? 'Tous les films' : 'Films non regardé';
-    
-    // Change the button color to red when "Tous les films" is displayed
-    if (isFilterActive) {
-      filterButton.classList.remove('btn-danger');
-      filterButton.classList.add('btn-primary');
-    } else {
-      filterButton.classList.remove('btn-primary');
-      filterButton.classList.add('btn-danger');
-    }
-
-    // Event listener for the button
-    filterButton.addEventListener('click', function () {
-      // Toggle the filter state
-      isFilterActive = !isFilterActive;
-
-      // Update the button text and color based on the new state
-      filterButton.textContent = isFilterActive ? 'Tous les films' : 'Films non regardé';
-      if (isFilterActive) {
-        filterButton.classList.remove('btn-danger');
-        filterButton.classList.add('btn-primary');
-      } else {
-        filterButton.classList.remove('btn-primary');
-        filterButton.classList.add('btn-danger');
-      }
-
-      // Save the filter state to localStorage
-      const filterState = isFilterActive ? 'checked' : 'unchecked';
+    filterSwitch.addEventListener('change', function () {
+      const filterState = filterSwitch.checked ? 'checked' : 'unchecked';
       localStorage.setItem('filter-checkbox', filterState);
-
-      // Apply the filter to the movie cards
       filterMovies();
     });
 
-    // Function to filter the movies based on the button state
     function filterMovies() {
-      const showUnwatchedOnly = isFilterActive;
+      const showUnwatchedOnly = filterSwitch.checked;
       const movieCards = document.querySelectorAll('.movie-card');
 
       movieCards.forEach(card => {
         const imdbId = card.getAttribute('data-imdb-id');
         const isWatched = watchedMovies.some(watchedMovie => watchedMovie.imdb_id === imdbId);
 
-        // Hide the movie card if it's watched and the filter is on
         if (showUnwatchedOnly && isWatched) {
           card.style.display = 'none';
         } else {
@@ -281,7 +222,6 @@
       });
     }
 
-    // Initial filter application
     filterMovies();
   };
 </script>
