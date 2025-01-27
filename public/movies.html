@@ -27,7 +27,7 @@
       font-weight: bold;
       position: absolute;
       top: 10px;
-      right: 10px;
+      width: 100%;
       z-index: 1;
     }
 
@@ -162,7 +162,7 @@
     const moviesList = document.getElementById('movies-list');
     const totalMoviesCount = movies.length;
     const watchedMoviesCount = watchedMovies.length;
-    const ratioText = `Regardé: ${watchedMoviesCount} / ${totalMoviesCount} (${((watchedMoviesCount / totalMoviesCount) * 100).toFixed(1)}%)`;
+    const ratioText = `Vu: ${watchedMoviesCount} / ${totalMoviesCount} (${((watchedMoviesCount / totalMoviesCount) * 100).toFixed(1)}%)`;
     document.getElementById('watched-ratio').innerText = ratioText;
 
     movies.forEach(movie => {
@@ -175,7 +175,7 @@
       movieDiv.setAttribute('data-imdb-id', movie.imdb_id);
       movieDiv.innerHTML = `
         <div class="card">
-          ${isChecked ? '<div class="watched-banner">REGARDÉ</div>' : ''}
+          ${isChecked ? '<div class="watched-banner">VISIONNÉ</div>' : ''}
           <a href="${movie.vod_link}"><img src="${movie.poster}" class="card-img-top" alt="${movie.title}" style="width: 75%; display: block; margin: 0 auto; padding: 10px;"></a>
           <div class="card-body">
             <h5 class="card-title d-flex justify-content-between align-items-center">

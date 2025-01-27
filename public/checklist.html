@@ -84,7 +84,7 @@
   <table class="table table-hover movie-table">
     <thead>
       <tr>
-        <th scope="col">Regardé</th>
+        <th scope="col">Vu</th>
         <th scope="col">Titre</th>
         <th scope="col">Date du visionnage</th>
       </tr>
@@ -149,7 +149,7 @@
 
     const totalMoviesCount = movies.length;
     const watchedMoviesCount = watchedMovies.length;
-    document.getElementById('watched-ratio').innerText = `Regardé: ${watchedMoviesCount} / ${totalMoviesCount} (${((watchedMoviesCount / totalMoviesCount) * 100).toFixed(1)}%)`;
+    document.getElementById('watched-ratio').innerText = `Vu: ${watchedMoviesCount} / ${totalMoviesCount} (${((watchedMoviesCount / totalMoviesCount) * 100).toFixed(1)}%)`;
 
     function updateProgressBar(watchedCount, totalCount) {
       const progressBar = document.getElementById('progress-bar');
@@ -217,7 +217,7 @@
         if (updatedWatchedMoviesRes.ok) {
           const updatedWatchedMovies = await updatedWatchedMoviesRes.json();
           const updatedWatchedCount = updatedWatchedMovies.length;
-          document.getElementById('watched-ratio').innerText = `Regardé: ${updatedWatchedCount} / ${totalMoviesCount} (${((updatedWatchedCount / totalMoviesCount) * 100).toFixed(1)}%)`;
+          document.getElementById('watched-ratio').innerText = `Vu: ${updatedWatchedCount} / ${totalMoviesCount} (${((updatedWatchedCount / totalMoviesCount) * 100).toFixed(1)}%)`;
           updateProgressBar(updatedWatchedCount, totalMoviesCount);
         }
       });
