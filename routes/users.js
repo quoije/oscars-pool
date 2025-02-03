@@ -7,6 +7,10 @@ const axios = require("axios");
 
 const router = express.Router();
 
+// Set password for verification
+
+const woof = process.env.DOG_NAMES ? process.env.DOG_NAMES.split(",") : [];
+
 // Fetch movie details from OMDb API
 async function fetchMovieDetailsFromOmdb(imdb_id) {
   const apiKey = process.env.OMDB_API;  // Replace with your actual OMDb API key
