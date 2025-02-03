@@ -11,13 +11,11 @@ const router = express.Router();
 async function fetchLatestCommitFromGitHub() {
   const githubOwner = process.env.GITHUB_OWNER;  // Your GitHub username or org
   const githubRepo = process.env.GITHUB_REPO;    // Your repository name
-  const githubToken = process.env.GITHUB_TOKEN;  // A GitHub personal access token for authentication (optional)
+  const githubToken = "";  // A GitHub personal access token for authentication (optional)
 
   try {
     const url = `https://api.github.com/repos/${githubOwner}/${githubRepo}/commits`;
-    const headers = githubToken ? { Authorization: `token ${githubToken}` } : {}; // Add token if available
-
-    const response = await axios.get(url, { headers });
+    const response = await axios.get(url);
 
     if (response.data && response.data.length > 0) {
       const latestCommit = response.data[0];
