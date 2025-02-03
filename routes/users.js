@@ -7,6 +7,50 @@ const axios = require("axios");
 
 const router = express.Router();
 
+// Fetch the latest commit from a GitHub repository
+async function fetchLatestCommitFromGitHub() {
+  const githubOwner = process.env.GITHUB_OWNER;  // Your GitHub username or org
+  const githubRepo = process.env.GITHUB_REPO;    // Your repository name
+  const githubToken = process.env.GITHUB_TOKEN;  // A GitHub personal access token for authentication (optional)
+
+  try {
+    const url = `https://api.github.com/repos/${githubOwner}/${githubRepo}/commits`;
+    const headers = githubToken ? { Authorization: `token ${githubToken}` } : {}; // Add token if available
+
+    const response = await axios.get(url, { headers });
+
+    if (response.data && response.data.length > 0) {
+      const latestCommit = response.data[0];
+      return {
+        sha: latestCommit.sha,
+        message: latestCommit.commit.message,
+        author: latestCommit.commit.author.name,
+        date: latestCommit.commit.author.date,
+      };
+    } else {
+      throw new Error('No commits found.');
+    }
+  } catch (error) {
+    throw new Error(`Error fetching commit: ${error.message}`);
+  }
+}
+
+// Route to get the version (latest commit from GitHub)
+router.get("/version", async (req, res) => {
+  try {
+    const latestCommit = await fetchLatestCommitFromGitHub();
+    res.json({
+      version: latestCommit.sha,
+      message: latestCommit.message,
+      author: latestCommit.author,
+      date: latestCommit.date,
+    });
+  } catch (error) {
+    console.error("Error fetching latest commit:", error);
+    res.status(500).json({ message: "Error retrieving version information" });
+  }
+});
+
 // Set password for verification
 
 const woof = process.env.DOG_NAMES ? process.env.DOG_NAMES.split(",") : [];
