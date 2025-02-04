@@ -71,7 +71,7 @@
       <tr>
         <th scope="col">Nom</th>
         <th scope="col">Total des films regardés</th>
-        <th scope="col"></th>
+        <th scope="col">Ratio</th>
       </tr>
     </thead>
     <tbody id="user-table-body">
@@ -102,33 +102,27 @@
 <script>
   window.onload = async function () {
     const token = localStorage.getItem('auth_token');
-    // Check if token exists
+
     if (token) {
       try {
-        // Decode the token (using a library like jwt-decode or manually)
         const decoded = JSON.parse(atob(token.split('.')[1])); // Manually decoding JWT
-        
-        // Access the user's name from the decoded token
         const userName = decoded.name;
-
-        // Update the user name in the navbar
         document.getElementById('user-name').textContent = userName;
 
-        // Verify JWT Token expiration
-        const currentTime = Math.floor(Date.now() / 1000); // Current time in seconds
+        // Verify JWT expiration
+        const currentTime = Math.floor(Date.now() / 1000);
         if (decoded.exp && decoded.exp < currentTime) {
           console.warn("Token is expired");
-          localStorage.removeItem('auth_token'); // Remove the expired token
-          window.location.href = '/'; // Redirect to the login page
+          localStorage.removeItem('auth_token');
+          window.location.href = '/';
         }
       } catch (error) {
         console.error("Error decoding token:", error);
-        localStorage.removeItem('auth_token'); // Remove invalid token
-        window.location.href = '/'; // Redirect to the login page
+        localStorage.removeItem('auth_token');
+        window.location.href = '/';
       }
     } else {
-      // Handle case if no token is available
-      window.location.href = '/';  // Redirect to the login page if no token
+      window.location.href = '/';
     }
 
     try {
@@ -147,6 +141,12 @@
       const userTableBody = document.getElementById('user-table-body');
       const table = document.querySelector('.user-table');
       const spinner = document.getElementById('loading-spinner');
+
+      // Ensure watchedRatio is treated as a number and sort in descending order
+      stats.sort((a, b) => parseFloat(b.watchedRatio) - parseFloat(a.watchedRatio));
+
+      // Clear previous rows to prevent duplication
+      userTableBody.innerHTML = '';
 
       stats.forEach(userStat => {
         const userRow = document.createElement('tr');
@@ -168,8 +168,8 @@
       document.querySelectorAll('.user-link').forEach(link => {
         link.addEventListener('click', function (event) {
           event.preventDefault();
-          const datasetMovies = this.dataset.movies
-          console.log(datasetMovies)
+          const datasetMovies = this.dataset.movies;
+          console.log(datasetMovies);
           const movies = JSON.parse(datasetMovies);
 
           // Clear the current movie list in the modal
