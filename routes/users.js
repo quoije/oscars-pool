@@ -38,7 +38,7 @@ router.get("/version", async (req, res) => {
   try {
     const latestCommit = await fetchLatestCommitFromGitHub();
     res.json({
-      version: latestCommit.sha,
+      version: (latestCommit.sha).substring(0,5),
       message: latestCommit.message,
       author: latestCommit.author,
       date: latestCommit.date,

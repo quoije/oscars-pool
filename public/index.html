@@ -21,9 +21,25 @@
 
     footer {
       margin-top: auto;
-      padding: 10px;
+      padding: 15px;
       background-color: #f8f9fa;
       text-align: center;
+      font-family: "Helvetica Neue", "Arial";
+    }
+    #footer-text {
+      margin: -5px;
+    }
+
+    #footer-copy {
+      margin: -5px;
+      font-family:monospace;
+      font-size: small;
+      padding-top: 10px;
+    }
+
+    #copy {
+      text-decoration: none;
+      
     }
   </style>
 </head>
@@ -51,6 +67,7 @@
   <!-- Footer Section  -->
   <footer>
     <p id="footer-text"></p>
+    <p id="footer-copy"><a id="copy" href="https://github.com/quoije/oscars-pool">quoije</a> - deux mille vingt-cinq</p>
   </footer>
  
 </div>
@@ -93,7 +110,7 @@
     if (res.ok) {
       const data = await res.json();
       // Update footer with the fetched version info
-      const footerText = `${data.author} - version: ${data.version} - ${data.message}`;
+      const footerText = `version: ${data.version} - ${data.message}`;
       document.getElementById('footer-text').textContent = footerText;
     } else {
       document.getElementById('footer-text').textContent = '';
