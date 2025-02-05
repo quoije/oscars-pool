@@ -16,8 +16,6 @@ async function fetchLatestCommitFromGitHub() {
     const url = `https://api.github.com/repos/${githubOwner}/${githubRepo}/commits`;
     const response = await axios.get(url);
 
-    console.log(response);
-
     if (response.data && response.data.length > 0) {
       const latestCommit = response.data[0];
       return {
