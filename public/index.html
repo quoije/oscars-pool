@@ -101,7 +101,7 @@
       window.location.href = '/movies.html';  // Redirect to movies page on success
     } else {
       const error = await res.json();
-      alert(`Login failed: ${error.message}`);
+      alert(`${error.message}`);
     }
   });
 

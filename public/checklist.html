@@ -185,6 +185,13 @@
         <td id="watched-date-${movie.imdb_id}">${watchedDate}</td>
       `;
 
+      // Set initial row color based on watched state
+        if (watchedMovie) {
+        movieRow.style.backgroundColor = 'rgba(144, 238, 144, 0.6)'; // Lighter light green with transparency
+      } else {
+        movieRow.style.backgroundColor = 'rgba(255, 99, 71, 0.6)'; // Lighter light red with transparency
+      }
+
       movieTableBody.appendChild(movieRow);
 
       movieRow.addEventListener('click', (event) => {
@@ -199,10 +206,14 @@
       checkbox.addEventListener('change', async (event) => {
         const isChecked = event.target.checked;
         const watchedDateCell = document.getElementById(`watched-date-${movie.imdb_id}`);
+        const row = event.target.closest('tr'); // Get the parent row
+
         if (isChecked) {
           watchedDateCell.textContent = new Date().toLocaleString();
+          row.style.backgroundColor = 'rgba(144, 238, 144, 0.6)'; // Apply light green with transparency
         } else {
           watchedDateCell.textContent = '';
+          row.style.backgroundColor = 'rgba(255, 99, 71, 0.6)'; // Apply light red with transparency
         }
 
         await fetch('/api/movies/users/updateWatchedMovies', {

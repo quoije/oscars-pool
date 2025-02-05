@@ -91,54 +91,43 @@ function verifyToken(req, res, next) {
   });
 }
 
-// Get user stats with watched movie titles and details from OMDb
+// Get user stats with watched movie titles and details from the movies collection
 router.get("/stats", verifyToken, async (req, res) => {
   try {
     // Fetch all users
     const users = await User.find();
     
-    // Fetch all movies
+     // Fetch all movies from the database
     const allMovies = await Movie.find();
     const totalMoviesCount = allMovies.length;
 
     if (totalMoviesCount === 0) {
-      return res.status(400).json({ message: "No movies available in the database." });
+      return res.status(400).json({ message: "Aucun films disponible." });
     }
 
     // Build stats for each user
-    const userStats = await Promise.all(users.map(async (user) => {
-      // Get watched movie IMDb IDs
+    const userStats = users.map((user) => {
+      // Get watched movies with details from the database
       const watchedMovies = user.watchedMovies
-        .map((wm) => wm.imdb_id) // Extract IMDb ID
-        .filter((imdb_id) => allMovies.some((m) => m.imdb_id === imdb_id)); // Ensure the movie exists in the database
+      .map((wm) => allMovies.find((m) => m.imdb_id === wm.imdb_id)) // Match movie details
+      .filter(Boolean); // Remove any `undefined` values (if movie is not found)
 
       const watchedCount = watchedMovies.length;
       const watchedRatio = ((watchedCount / totalMoviesCount) * 100).toFixed(1);
 
-      // Fetch movie details from OMDb for each watched movie
-      const movieDetailsPromises = watchedMovies.map(async (imdb_id) => {
-        try {
-          const movieTitle = (await fetchMovieDetailsFromOmdb(imdb_id)).title;
-          return {
-            imdb_id,
-            movieTitle
-          };
-        } catch (err) {
-          console.error(`Error fetching details for movie with IMDb ID: ${imdb_id}`);
-          return { imdb_id, error: err.message };
-        }
-      });
-
-      const movieTitle = await Promise.all(movieDetailsPromises);
+      const watchedMoviesDetails = watchedMovies.map((movie) => ({
+        imdb_id: movie.imdb_id,
+        title: movie.title
+      }));
 
       return {
         name: user.name,
         watchedCount,
         totalMoviesCount,
         watchedRatio: `${watchedRatio}%`,
-        watchedMovies: movieTitle // Include movie details
+        watchedMovies: watchedMoviesDetails // Include movie details
       };
-    }));
+    });
 
     res.json(userStats);
   } catch (err) {
@@ -149,12 +138,30 @@ router.get("/stats", verifyToken, async (req, res) => {
 
 // Register User
 router.post("/register", async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { name, email, password, role, verifoof } = req.body;
+  function registerVerification() {
+    return woof.includes(verifoof);
+  }
+  console.log("Verification input:", verifoof);
 
   try {
     if (!password) {
-        throw new Error("Le mot de passe est obligatoire et ne peut être indéfini");
+      throw new Error("Le mot de passe est obligatoire et ne peut être indéfini");
     }
+    if (!verifoof) {
+      throw new Error("Le nom du chien doit être défini" );
+    }
+    if (!registerVerification()) {
+      console.log("Invalid dog name:", verifoof);
+      return res.status(201).json({ message: "Mauvais nom de chien" });
+    }
+
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(201).json({ message: "L'email existe déjà, veuillez en choisir un autre." });
+    }
+    
+    // Hash password and create user
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = new User({ name, email, password: hashedPassword, role });
     await user.save();
@@ -165,6 +172,7 @@ router.post("/register", async (req, res) => {
     res.status(201).json({ message: "L'utilisateur s'est enregistré avec succès !" });
   } catch (err) {
     res.status(400).json({ error: err.message });
+    res.status(403).json({ message: "Erreur interne lmao" });
   }
 });
 
