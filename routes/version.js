@@ -1,6 +1,7 @@
 const axios = require("axios");
 const express = require("express");
 const router = express.Router();
+const moment = require('moment-timezone');
 
 // Fetch the latest commit from a GitHub repository
 async function fetchLatestCommitFromGitHub() {
@@ -41,7 +42,7 @@ async function fetchLatestCommitFromGitHub() {
         version: (latestCommit.sha).substring(0,5),
         message: latestCommit.message,
         author: latestCommit.author,
-        date: latestCommit.date,
+        date: moment(latestCommit.date).tz('America/New_York').format('YYYY-MM-DD HH:mm:ss'),
       });
     } catch (error) {
       console.error("Error fetching latest commit:", error);
