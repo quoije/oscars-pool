@@ -1,0 +1,23 @@
+footer {
+    margin-top: auto;
+    padding: 25px;
+    background-color: #f8f9fa;
+    text-align: center;
+    
+  }
+  #footer-text {
+    margin: -5px;
+    font-family:monospace;
+    font-size: small;
+  }
+
+  #footer-copy {
+    margin: -5px;
+    font-family:monospace;
+    font-size: smaller;
+    padding-top: 10px;
+  }
+
+  #copy {
+    text-decoration: none;
+  }
