@@ -7,6 +7,27 @@ const axios = require("axios");
 
 const router = express.Router();
 
+let date_time = new Date();
+
+// get current date
+// adjust 0 before single digit date
+let date = ("0" + date_time.getDate()).slice(-2);
+
+// get current month
+let month = ("0" + (date_time.getMonth() + 1)).slice(-2);
+
+// get current year
+let year = date_time.getFullYear();
+
+// get current hours
+let hours = date_time.getHours();
+
+// get current minutes
+let minutes = date_time.getMinutes();
+
+// get current seconds
+let seconds = date_time.getSeconds();
+
 // Set password for verification
 
 const woof = process.env.DOG_NAMES ? process.env.DOG_NAMES.split(",") : [];
@@ -100,7 +121,6 @@ router.post("/register", async (req, res) => {
   function registerVerification() {
     return woof.includes(verifoof);
   }
-  console.log("Verification input:", verifoof);
 
   try {
     if (!password) {
@@ -110,7 +130,6 @@ router.post("/register", async (req, res) => {
       throw new Error("Le nom du chien doit être défini" );
     }
     if (!registerVerification()) {
-      console.log("Invalid dog name:", verifoof);
       return res.status(201).json({ message: "Mauvais nom de chien" });
     }
 
@@ -141,6 +160,8 @@ router.post("/login", async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Informations d'identification non valides" });
+
+    console.log("[" + year + "-" + month + "-" + date + " " + hours + ":" + minutes + ":" + seconds + "] " + user.name + " logged in")
 
     // Check if the user role is 69 and set the admin flag
     const isAdmin = user.role === 69;

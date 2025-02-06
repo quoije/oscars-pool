@@ -45,8 +45,6 @@ router.get("/watchedMovies", async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify token
-    console.log("Decoded token:", decoded);
-    console.log("Decoded decoded.userId:", decoded.id);
     const user = await User.findById(decoded.id); // Get user by ID
     if (!user) return res.status(404).json({ message: "User not found" });
 
