@@ -38,8 +38,8 @@
 <nav class="navbar navbar-expand-lg navbar-custom">
   <div class="container">
     <a class="navbar-brand" style="margin-left: -7px;">
-      <img src="img/logo_w.png" style="max-width: 220px; height: 70px; object-fit: contain;">    
-      </a>
+      <img src="img/logo_w.png" style="max-width: 220px; height: 70px; object-fit: contain;">
+    </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
@@ -47,12 +47,13 @@
       <div class="navbar-nav">
         <a href="movies.html" class="nav-link btn btn-outline-light me-2">Films</a>
         <a href="checklist.html" class="nav-link btn btn-outline-light me-2">Checklist</a>
-        <a href="user-stat.html" class="nav-link btn btn-outline-light">Statistiques</a>
+        <a href="user-stat.html" class="nav-link btn btn-outline-light me-lg-2 mb-2 mb-lg-0">Statistiques</a>
       </div>
-    </div>
-    <div class="d-flex">
-      <span id="user-name" class="navbar-text me-3"></span>
-      <button id="log-off" class="btn btn-danger">Déconnexion</button>
+      <!-- Move user info inside collapsible navbar and align it properly -->
+      <div class="d-flex ms-auto mt-2 mt-lg-0 align-items-center">
+        <span id="user-name" class="navbar-text me-3"></span>
+        <button id="log-off" class="btn btn-danger">Déconnexion</button>
+      </div>
     </div>
   </div>
 </nav>
