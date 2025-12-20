@@ -1,6 +1,81 @@
 window.onload = async function () {
     const token = localStorage.getItem('auth_token');
 
+    const DEFAULT_COMPLETION_MODAL = Object.freeze({
+      title: 'Félicitations! very nice 🎉🎉🎉',
+      bodyText: '',
+      videoSrc: 'video/reward.mp4',
+      bodyHtml: ''
+    });
+
+    function sanitizeHtml(raw) {
+      const html = String(raw || '');
+      const withoutScripts = html.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+      const withoutOnAttrs = withoutScripts
+        .replace(/\son\w+="[^"]*"/gi, '')
+        .replace(/\son\w+='[^']*'/gi, '')
+        .replace(/\son\w+=\S+/gi, '');
+      return withoutOnAttrs.trim();
+    }
+
+    async function fetchCompletionModalContent() {
+      try {
+        const res = await fetch('/api/settings/completion-modal', { method: 'GET' });
+        if (!res.ok) throw new Error('Failed to fetch completion modal');
+        const data = await res.json();
+        return {
+          title: typeof data?.title === 'string' ? data.title : DEFAULT_COMPLETION_MODAL.title,
+          bodyText: typeof data?.bodyText === 'string' ? data.bodyText : DEFAULT_COMPLETION_MODAL.bodyText,
+          videoSrc: typeof data?.videoSrc === 'string' ? data.videoSrc : DEFAULT_COMPLETION_MODAL.videoSrc,
+          bodyHtml: typeof data?.bodyHtml === 'string' ? data.bodyHtml : DEFAULT_COMPLETION_MODAL.bodyHtml,
+        };
+      } catch (_) {
+        return DEFAULT_COMPLETION_MODAL;
+      }
+    }
+
+    function applyCompletionModalContent(content) {
+      const titleEl = document.getElementById('videoModalLabel');
+      const bodyTextEl = document.getElementById('completion-modal-text');
+      const bodyCustomEl = document.getElementById('completion-modal-custom');
+      const videoEl = document.getElementById('rewardVideo');
+      const videoSourceEl = document.getElementById('rewardVideoSource');
+
+      const title = String(content?.title || '').trim() || DEFAULT_COMPLETION_MODAL.title;
+      const bodyText = String(content?.bodyText || '');
+      const bodyHtml = sanitizeHtml(String(content?.bodyHtml || ''));
+      const videoSrc = String(content?.videoSrc || '').trim();
+
+      if (titleEl) titleEl.textContent = title;
+
+      if (bodyCustomEl) {
+        if (bodyHtml) {
+          bodyCustomEl.innerHTML = bodyHtml;
+          bodyCustomEl.classList.remove('d-none');
+        } else {
+          bodyCustomEl.innerHTML = '';
+          bodyCustomEl.classList.add('d-none');
+        }
+      }
+
+      if (bodyTextEl) {
+        bodyTextEl.textContent = bodyText || '';
+        bodyTextEl.classList.toggle('d-none', !bodyText);
+      }
+
+      if (videoEl && videoSourceEl) {
+        if (videoSrc) {
+          videoSourceEl.setAttribute('src', videoSrc);
+          // reload source (so updated src is used)
+          try { videoEl.load(); } catch (_) {}
+          videoEl.classList.remove('d-none');
+        } else {
+          try { videoEl.pause(); } catch (_) {}
+          videoEl.classList.add('d-none');
+        }
+      }
+    }
+
     async function fetchActiveYear() {
       try {
         const res = await fetch('/api/settings/year', { method: 'GET' });
@@ -17,6 +92,10 @@ window.onload = async function () {
     document.title = `Pool Oscars ${activeYear} - Checklist`;
     const oscarYearEl = document.getElementById('oscar-year');
     if (oscarYearEl) oscarYearEl.textContent = String(activeYear);
+
+    // Load (public) "100% completion" modal content at runtime.
+    const completionModalContent = await fetchCompletionModalContent();
+    applyCompletionModalContent(completionModalContent);
 
     const targetDate = new Date(`March 15, ${activeYear}`);
     const currentDate = new Date();
@@ -128,7 +207,11 @@ window.onload = async function () {
       if (percentage === 100) {
         videoModal.show();
         launchConfetti();
-        document.getElementById("rewardVideo").play();
+        const rewardVideo = document.getElementById("rewardVideo");
+        // Only attempt autoplay if we actually have a visible <video>.
+        if (rewardVideo && !rewardVideo.classList.contains('d-none')) {
+          rewardVideo.play().catch(() => {});
+        }
       }
     }
 
@@ -221,6 +304,7 @@ window.onload = async function () {
     const videoModal = document.getElementById("videoModal");
     const rewardVideo = document.getElementById("rewardVideo");
     videoModal.addEventListener("hidden.bs.modal", function () {
+      if (!rewardVideo) return;
       rewardVideo.pause();
       rewardVideo.currentTime = 0;
     });
