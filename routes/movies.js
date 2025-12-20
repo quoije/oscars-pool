@@ -73,7 +73,10 @@ router.get("/last-update", async (req, res) => {
   try {
     jwt.verify(token, process.env.JWT_SECRET);
 
-    const latestMovie = await Movie.findOne().sort({ updatedAt: -1, createdAt: -1, _id: -1 });
+    const year = parseOscarYear(req.query.year);
+    const filter = year ? { year } : {};
+
+    const latestMovie = await Movie.findOne(filter).sort({ updatedAt: -1, createdAt: -1, _id: -1 });
     if (!latestMovie) {
       return res.status(200).json({ lastUpdated: null });
     }
