@@ -11,6 +11,30 @@ window.onload = async function () {
       }
     }
 
+    async function fetchMoviesLastUpdated(year, token) {
+      const el = document.getElementById('movies-last-updated');
+      if (!el) return;
+
+      try {
+        const res = await fetch(`/api/movies/last-update?year=${encodeURIComponent(String(year))}`, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+
+        const data = await res.json();
+        const lastUpdatedIso = data?.lastUpdated;
+        if (!lastUpdatedIso) return;
+
+        const d = new Date(lastUpdatedIso);
+        if (Number.isNaN(d.getTime())) return;
+
+        el.textContent = d.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+      } catch (_) {
+        // Keep the default placeholder (—)
+      }
+    }
+
     const activeYear = await fetchActiveYear();
     document.title = `Pool Oscars ${activeYear} - Films`;
     const oscarYearEl = document.getElementById('oscar-year');
@@ -45,6 +69,9 @@ window.onload = async function () {
     } else {
       window.location.href = '/';
     }
+
+    // Populate "Dernière mise à jour des films" banner (per active year)
+    await fetchMoviesLastUpdated(activeYear, token);
 
     const res = await fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}`, {
       method: 'GET',
