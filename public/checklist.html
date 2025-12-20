@@ -112,8 +112,11 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body text-center">
-        <video id="rewardVideo" width="75%" controls>
-          <source src="video/reward.mp4" type="video/mp4">
+        <div id="completion-modal-custom" class="text-start d-none"></div>
+        <div id="completion-modal-text" class="text-start mb-3" style="white-space: pre-wrap;"></div>
+
+        <video id="rewardVideo" width="75%" controls class="d-none">
+          <source id="rewardVideoSource" src="video/reward.mp4" type="video/mp4">
           Votre navigateur ne supporte pas la vidéo.
         </video>
       </div>
