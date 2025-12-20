@@ -38,6 +38,33 @@ router.get("/", async (req, res) => {
   }
 });
 
+// Get latest movie update/add timestamp
+router.get("/last-update", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Token is required" });
+
+  try {
+    jwt.verify(token, process.env.JWT_SECRET);
+
+    const latestMovie = await Movie.findOne().sort({ updatedAt: -1, createdAt: -1, _id: -1 });
+    if (!latestMovie) {
+      return res.status(200).json({ lastUpdated: null });
+    }
+
+    const lastUpdated =
+      latestMovie.updatedAt ||
+      latestMovie.createdAt ||
+      (typeof latestMovie._id?.getTimestamp === "function" ? latestMovie._id.getTimestamp() : null);
+
+    return res.status(200).json({ lastUpdated: lastUpdated ? new Date(lastUpdated).toISOString() : null });
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // Get watched movies for the user
 router.get("/watchedMovies", async (req, res) => {
   const token = req.headers.authorization?.split(" ")[1]; // Get token from header
