@@ -40,6 +40,24 @@ window.onload = async function () {
   const selectAllBox = document.getElementById('select-all-movies');
   const selectedCountEl = document.getElementById('selected-count');
 
+  const editMovieModalEl = document.getElementById('editMovieModal');
+  const editMovieModal = editMovieModalEl ? new bootstrap.Modal(editMovieModalEl) : null;
+  const editMovieModalTitleEl = document.getElementById('editMovieModalTitle');
+  const saveMovieChangesBtn = document.getElementById('save-movie-changes');
+
+  const editMovieIdEl = document.getElementById('edit_movie_id');
+  const editImdbIdEl = document.getElementById('edit_imdb_id');
+  const editYearEl = document.getElementById('edit_year');
+  const editCategoryEl = document.getElementById('edit_category');
+  const editVodLinkEl = document.getElementById('edit_vod_link');
+  const editRefreshOmdbEl = document.getElementById('edit_refresh_omdb');
+  const editTitleEl = document.getElementById('edit_title');
+  const editRatingEl = document.getElementById('edit_rating');
+  const editPosterEl = document.getElementById('edit_poster');
+  const editDescriptionEl = document.getElementById('edit_description');
+
+  let moviesById = new Map();
+
   function showResponse(kind, message) {
     responseEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
     responseEl.classList.add(kind === 'success' ? 'alert-success' : kind === 'warning' ? 'alert-warning' : 'alert-danger');
@@ -51,6 +69,10 @@ window.onload = async function () {
     if (!Number.isInteger(n)) return null;
     if (n < 1900 || n > 3000) return null;
     return n;
+  }
+
+  function isValidImdbId(value) {
+    return /^tt\d{5,}$/.test(String(value || '').trim());
   }
 
   document.getElementById('reset-form').addEventListener('click', function () {
@@ -117,17 +139,23 @@ window.onload = async function () {
       const yearsRes = await fetch('/api/movies/years');
       const years = yearsRes.ok ? await yearsRes.json() : [];
 
-      // Populate both the add form (default) and manage dropdown
-      const existingValues = new Set([...manageYearSelect.options].map((o) => o.value));
+      // Rebuild manage dropdown from scratch (so removed years disappear)
+      const previousSelection = manageYearSelect.value;
+      manageYearSelect.innerHTML = '';
+      const allOpt = document.createElement('option');
+      allOpt.value = '';
+      allOpt.textContent = 'Toutes';
+      manageYearSelect.appendChild(allOpt);
+
       years.forEach((y) => {
-        const value = String(y);
-        if (!existingValues.has(value)) {
-          const opt = document.createElement('option');
-          opt.value = value;
-          opt.textContent = value;
-          manageYearSelect.appendChild(opt);
-        }
+        const opt = document.createElement('option');
+        opt.value = String(y);
+        opt.textContent = String(y);
+        manageYearSelect.appendChild(opt);
       });
+
+      const stillExists = years.map(String).includes(previousSelection);
+      manageYearSelect.value = stillExists ? previousSelection : '';
 
       // Default add-year to latest year if empty
       if (years.length > 0 && !yearInput.value) {
@@ -155,22 +183,140 @@ window.onload = async function () {
     selectAllBox.checked = allBoxes.length > 0 && checked === allBoxes.length;
   }
 
+  function openEditModal(movieId) {
+    if (!editMovieModal) return;
+    const movie = moviesById.get(movieId);
+    if (!movie) return;
+
+    editMovieIdEl.value = movie._id || '';
+    editImdbIdEl.value = movie.imdb_id || '';
+    editYearEl.value = movie.year ? String(movie.year) : '';
+    editCategoryEl.value = movie.category || '';
+    editVodLinkEl.value = movie.vod_link || '';
+    editRefreshOmdbEl.checked = false;
+
+    editTitleEl.value = movie.title || '';
+    editRatingEl.value = movie.rating || '';
+    editPosterEl.value = movie.poster || '';
+    editDescriptionEl.value = movie.description || '';
+
+    if (editMovieModalTitleEl) {
+      const label = movie.title ? `Modifier: ${movie.title}` : 'Modifier le film';
+      editMovieModalTitleEl.textContent = label;
+    }
+
+    editMovieModal.show();
+  }
+
+  async function saveMovieChanges() {
+    const movieId = (editMovieIdEl.value || '').trim();
+    if (!movieId) return;
+
+    const imdb_id = (editImdbIdEl.value || '').trim();
+    const yearRaw = (editYearEl.value || '').trim();
+    const category = (editCategoryEl.value || '').trim();
+    const vod_link = (editVodLinkEl.value || '').trim();
+    const refreshOmdb = !!editRefreshOmdbEl.checked;
+
+    const title = editTitleEl.value;
+    const rating = editRatingEl.value;
+    const poster = editPosterEl.value;
+    const description = editDescriptionEl.value;
+
+    if (!isValidImdbId(imdb_id)) {
+      showResponse('warning', 'IMDB ID invalide. Exemple attendu: tt1234567');
+      return;
+    }
+
+    let year = null;
+    if (yearRaw !== '') {
+      year = parseYear(yearRaw);
+      if (!year) {
+        showResponse('warning', 'Année invalide. Exemple attendu: 2026');
+        return;
+      }
+    }
+
+    if (!category) {
+      showResponse('warning', 'Catégorie invalide.');
+      return;
+    }
+
+    if (!vod_link) {
+      showResponse('warning', 'Lien VOD invalide.');
+      return;
+    }
+
+    const body = {
+      imdb_id,
+      year: yearRaw === '' ? null : year,
+      category,
+      vod_link,
+      refreshOmdb
+    };
+
+    // Only send manual fields if we're not refreshing from OMDb
+    if (!refreshOmdb) {
+      body.title = title;
+      body.description = description;
+      body.rating = rating;
+      body.poster = poster;
+    }
+
+    try {
+      saveMovieChangesBtn.disabled = true;
+      saveMovieChangesBtn.textContent = 'Enregistrement...';
+
+      const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+
+      if (!res.ok) {
+        let msg = `Erreur (${res.status})`;
+        try {
+          const data = await res.json();
+          msg = data.message || data.error || msg;
+        } catch (_) {}
+        showResponse('danger', msg);
+        return;
+      }
+
+      const updated = await res.json();
+      moviesById.set(updated._id, updated);
+      showResponse('success', 'Film mis à jour avec succès.');
+      editMovieModal.hide();
+      await refreshYears();
+      await loadMoviesForManagement();
+    } catch (err) {
+      showResponse('danger', err.message || 'Erreur réseau');
+    } finally {
+      saveMovieChangesBtn.disabled = false;
+      saveMovieChangesBtn.textContent = 'Enregistrer';
+    }
+  }
+
   async function loadMoviesForManagement() {
     const year = manageYearSelect.value;
     const url = year ? `/api/movies?year=${encodeURIComponent(year)}` : '/api/movies';
-    adminMoviesBody.innerHTML = `<tr><td colspan="4" class="text-muted">Chargement…</td></tr>`;
+    adminMoviesBody.innerHTML = `<tr><td colspan="5" class="text-muted">Chargement…</td></tr>`;
 
     try {
       const res = await fetch(url, { method: 'GET' });
       if (!res.ok) {
-        adminMoviesBody.innerHTML = `<tr><td colspan="4" class="text-danger">Erreur lors du chargement (${res.status})</td></tr>`;
+        adminMoviesBody.innerHTML = `<tr><td colspan="5" class="text-danger">Erreur lors du chargement (${res.status})</td></tr>`;
         return;
       }
       const movies = await res.json();
       movies.sort((a, b) => (a.title || '').localeCompare((b.title || ''), 'fr', { sensitivity: 'base' }));
+      moviesById = new Map(movies.map((m) => [m._id, m]));
 
       if (!movies.length) {
-        adminMoviesBody.innerHTML = `<tr><td colspan="4" class="text-muted">Aucun film.</td></tr>`;
+        adminMoviesBody.innerHTML = `<tr><td colspan="5" class="text-muted">Aucun film.</td></tr>`;
         updateSelectionUI();
         return;
       }
@@ -188,6 +334,11 @@ window.onload = async function () {
           </td>
           <td>${m.category || ''}</td>
           <td>${m.year || ''}</td>
+          <td class="text-end">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-edit-movie-id="${m._id}">
+              Éditer
+            </button>
+          </td>
         `;
         adminMoviesBody.appendChild(tr);
       });
@@ -196,9 +347,13 @@ window.onload = async function () {
         cb.addEventListener('change', updateSelectionUI);
       });
 
+      adminMoviesBody.querySelectorAll('button[data-edit-movie-id]').forEach((btn) => {
+        btn.addEventListener('click', () => openEditModal(btn.getAttribute('data-edit-movie-id')));
+      });
+
       updateSelectionUI();
     } catch (err) {
-      adminMoviesBody.innerHTML = `<tr><td colspan="4" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
+      adminMoviesBody.innerHTML = `<tr><td colspan="5" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
     }
   }
 
@@ -248,6 +403,10 @@ window.onload = async function () {
       showResponse('danger', err.message || 'Erreur réseau');
     }
   });
+
+  if (saveMovieChangesBtn) {
+    saveMovieChangesBtn.addEventListener('click', saveMovieChanges);
+  }
 
   // Initial load
   await refreshYears();
