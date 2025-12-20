@@ -1,7 +1,24 @@
 window.onload = async function () {
     const token = localStorage.getItem('auth_token');
 
-    const targetDate = new Date('March 15, 2026');
+    async function fetchActiveYear() {
+      try {
+        const res = await fetch('/api/settings/year', { method: 'GET' });
+        if (!res.ok) throw new Error('Failed to fetch active year');
+        const data = await res.json();
+        const year = Number(data?.year);
+        return Number.isInteger(year) ? year : new Date().getFullYear();
+      } catch (_) {
+        return new Date().getFullYear();
+      }
+    }
+
+    const activeYear = await fetchActiveYear();
+    document.title = `Pool Oscars ${activeYear} - Checklist`;
+    const oscarYearEl = document.getElementById('oscar-year');
+    if (oscarYearEl) oscarYearEl.textContent = String(activeYear);
+
+    const targetDate = new Date(`March 15, ${activeYear}`);
     const currentDate = new Date();
     const timeDifference = targetDate - currentDate;
     const daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
@@ -29,7 +46,7 @@ window.onload = async function () {
       window.location.href = '/';
     }
 
-    const res = await fetch('/api/movies', {
+    const res = await fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}`, {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${token}` }
     });
@@ -55,9 +72,13 @@ window.onload = async function () {
       watchedMovies = await watchedRes.json();
     }
 
+    const movieImdbIds = new Set(movies.map((m) => m.imdb_id).filter(Boolean));
+    let watchedMoviesInYear = watchedMovies.filter((wm) => movieImdbIds.has(wm.imdb_id));
+
     const totalMoviesCount = movies.length;
-    const watchedMoviesCount = watchedMovies.length;
-    document.getElementById('watched-ratio').innerText = `Vu: ${watchedMoviesCount} / ${totalMoviesCount} (${((watchedMoviesCount / totalMoviesCount) * 100).toFixed(1)}%)`;
+    const watchedMoviesCount = watchedMoviesInYear.length;
+    const ratioPct = totalMoviesCount > 0 ? ((watchedMoviesCount / totalMoviesCount) * 100).toFixed(1) : '0.0';
+    document.getElementById('watched-ratio').innerText = `Vu: ${watchedMoviesCount} / ${totalMoviesCount} (${ratioPct}%)`;
 
     function launchConfetti() {
       const duration = 3 * 1000; // 3 seconds
@@ -111,7 +132,7 @@ window.onload = async function () {
 
     const movieTableBody = document.getElementById('movie-table-body');
     movies.forEach(movie => {
-      const watchedMovie = watchedMovies.find(wm => wm.imdb_id === movie.imdb_id);
+      const watchedMovie = watchedMoviesInYear.find(wm => wm.imdb_id === movie.imdb_id);
       const watchedDate = watchedMovie ? new Date(watchedMovie.watchedDate).toLocaleString() : '';
       const movieRow = document.createElement('tr');
       movieRow.innerHTML = `
@@ -169,8 +190,10 @@ window.onload = async function () {
 
         if (updatedWatchedMoviesRes.ok) {
           const updatedWatchedMovies = await updatedWatchedMoviesRes.json();
-          const updatedWatchedCount = updatedWatchedMovies.length;
-          document.getElementById('watched-ratio').innerText = `Vu: ${updatedWatchedCount} / ${totalMoviesCount} (${((updatedWatchedCount / totalMoviesCount) * 100).toFixed(1)}%)`;
+          watchedMoviesInYear = updatedWatchedMovies.filter((wm) => movieImdbIds.has(wm.imdb_id));
+          const updatedWatchedCount = watchedMoviesInYear.length;
+          const updatedPct = totalMoviesCount > 0 ? ((updatedWatchedCount / totalMoviesCount) * 100).toFixed(1) : '0.0';
+          document.getElementById('watched-ratio').innerText = `Vu: ${updatedWatchedCount} / ${totalMoviesCount} (${updatedPct}%)`;
           updateProgressBar(updatedWatchedCount, totalMoviesCount);
 
           // Recalculate and update movies per day
