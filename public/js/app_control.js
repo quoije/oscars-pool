@@ -21,6 +21,11 @@ window.onload = async function () {
     return;
   }
 
+  if (decoded.mustChangePassword) {
+    window.location.href = '/change-password.html';
+    return;
+  }
+
   document.getElementById('user-name').textContent = decoded.name || '';
 
   // Admin-only page: if token doesn't contain admin flag, bounce.
@@ -66,6 +71,17 @@ window.onload = async function () {
     responseEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
     responseEl.classList.add(kind === 'success' ? 'alert-success' : kind === 'warning' ? 'alert-warning' : 'alert-danger');
     responseEl.textContent = message;
+  }
+
+  const userResetResponseEl = document.getElementById('user-reset-response');
+  const userResetForm = document.getElementById('reset-user-password-form');
+  const userResetEmailEl = document.getElementById('reset_user_email');
+
+  function showUserResetResponse(kind, message) {
+    if (!userResetResponseEl) return;
+    userResetResponseEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
+    userResetResponseEl.classList.add(kind === 'success' ? 'alert-success' : kind === 'warning' ? 'alert-warning' : 'alert-danger');
+    userResetResponseEl.textContent = message;
   }
 
   function parseYear(value) {
@@ -122,6 +138,41 @@ window.onload = async function () {
     localStorage.removeItem('auth_token');
     window.location.href = '/';
   });
+
+  if (userResetForm && userResetEmailEl) {
+    userResetForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const email = (userResetEmailEl.value || '').trim();
+      if (!email) {
+        showUserResetResponse('warning', 'Email invalide.');
+        return;
+      }
+
+      try {
+        showUserResetResponse('warning', 'Génération du mot de passe temporaire...');
+        const res = await fetch('/api/users/admin/reset-temp-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ email }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          showUserResetResponse('danger', data.message || data.error || `Erreur (${res.status})`);
+          return;
+        }
+
+        const label = data?.user?.name ? `${data.user.name} (${data.user.email})` : email;
+        const expiresAt = data?.expiresAt ? ` Expire: ${data.expiresAt}` : '';
+        showUserResetResponse('success', `Temp password pour ${label}: ${data.tempPassword}.${expiresAt}`);
+      } catch (err) {
+        showUserResetResponse('danger', err.message || 'Erreur réseau');
+      }
+    });
+  }
 
   form.addEventListener('submit', async function (e) {
     e.preventDefault();

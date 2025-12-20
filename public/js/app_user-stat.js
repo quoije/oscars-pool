@@ -16,6 +16,10 @@ window.onload = async function () {
     if (token) {
       try {
         const decoded = JSON.parse(atob(token.split('.')[1])); // Manually decoding JWT
+        if (decoded.mustChangePassword) {
+          window.location.href = '/change-password.html';
+          return;
+        }
         const userName = decoded.name;
         document.getElementById('user-name').textContent = userName;
         if (decoded.admin) {
