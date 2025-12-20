@@ -6,6 +6,10 @@ window.onload = async function () {
         const decoded = JSON.parse(atob(token.split('.')[1])); // Manually decoding JWT
         const userName = decoded.name;
         document.getElementById('user-name').textContent = userName;
+        if (decoded.admin) {
+          const adminLink = document.getElementById('admin-control-link');
+          if (adminLink) adminLink.classList.remove('d-none');
+        }
 
         // Verify JWT expiration
         const currentTime = Math.floor(Date.now() / 1000);

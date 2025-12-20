@@ -1,5 +1,5 @@
 window.onload = async function () {
-    const targetDate = new Date('March 2, 2025');
+    const targetDate = new Date('March 15, 2026');
     const currentDate = new Date();
     const timeDifference = targetDate - currentDate;
     const daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
@@ -11,6 +11,10 @@ window.onload = async function () {
         const decoded = JSON.parse(atob(token.split('.')[1]));
         const userName = decoded.name;
         document.getElementById('user-name').textContent = userName;
+        if (decoded.admin) {
+          const adminLink = document.getElementById('admin-control-link');
+          if (adminLink) adminLink.classList.remove('d-none');
+        }
 
         const currentTime = Math.floor(Date.now() / 1000);
         if (decoded.exp && decoded.exp < currentTime) {
