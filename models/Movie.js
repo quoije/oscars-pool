@@ -6,6 +6,8 @@ const movieSchema = new mongoose.Schema({
   description: { type: String, required: false },
   rating: { type: String, required: false },
   poster: { type: String, required: false },
+  // Oscar pool year / edition (used to segment movies + stats)
+  year: { type: Number, required: false, index: true },
   category: { type: String, required: true },
   vod_link: { type: String, required: true },
   watchedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]

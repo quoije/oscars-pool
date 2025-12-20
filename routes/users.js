@@ -49,14 +49,24 @@ function verifyToken(req, res, next) {
   });
 }
 
+function parseOscarYear(raw) {
+  if (raw === undefined || raw === null || raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isInteger(n)) return null;
+  if (n < 1900 || n > 3000) return null;
+  return n;
+}
+
 // Get user stats with watched movie titles and details from the movies collection
 router.get("/stats", verifyToken, async (req, res) => {
   try {
     // Fetch all users
     const users = await User.find();
     
-     // Fetch all movies from the database
-    const allMovies = await Movie.find();
+    const year = parseOscarYear(req.query.year);
+
+    // Fetch movies (optionally filtered by year)
+    const allMovies = await Movie.find(year ? { year } : {});
     const totalMoviesCount = allMovies.length;
 
     if (totalMoviesCount === 0) {
@@ -65,10 +75,12 @@ router.get("/stats", verifyToken, async (req, res) => {
 
     // Build stats for each user
     const userStats = users.map((user) => {
+      const movieByImdbId = new Map(allMovies.map((m) => [m.imdb_id, m]));
+
       // Get watched movies with details from the database
       const watchedMovies = user.watchedMovies
-      .map((wm) => allMovies.find((m) => m.imdb_id === wm.imdb_id)) // Match movie details
-      .filter(Boolean); // Remove any `undefined` values (if movie is not found)
+        .map((wm) => movieByImdbId.get(wm.imdb_id)) // Match movie details
+        .filter(Boolean); // Remove any `undefined` values (if movie is not found)
 
       const watchedCount = watchedMovies.length;
       const watchedRatio = ((watchedCount / totalMoviesCount) * 100).toFixed(1);
@@ -80,6 +92,7 @@ router.get("/stats", verifyToken, async (req, res) => {
 
       return {
         name: user.name,
+        year: year || null,
         watchedCount,
         totalMoviesCount,
         watchedRatio: `${watchedRatio}%`,
