@@ -195,6 +195,35 @@
             </form>
           </div>
         </div>
+
+        <div class="col-12">
+          <div class="card p-3">
+            <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
+              <div>
+                <h4 class="mb-1">Liste des utilisateurs</h4>
+                <div class="text-muted">
+                  <span id="admin-users-count">—</span> utilisateur(s)
+                </div>
+              </div>
+              <button type="button" id="refresh-users" class="btn btn-outline-primary btn-sm">Rafraîchir</button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Nom</th>
+                    <th>Email</th>
+                    <th style="width: 1%;">Statut</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-users-body">
+                  <tr><td colspan="3" class="text-muted">Charge la liste…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
