@@ -9,6 +9,6 @@ const movieSchema = new mongoose.Schema({
   category: { type: String, required: true },
   vod_link: { type: String, required: true },
   watchedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
-});
+}, { timestamps: true });
 
 module.exports = mongoose.model("Movie", movieSchema);
