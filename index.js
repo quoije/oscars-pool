@@ -20,11 +20,13 @@ mongoose
 const userRoutes = require("./routes/users");
 const movieRoutes = require("./routes/movies");
 const versionRoutes = require("./routes/version");
+const settingsRoutes = require("./routes/settings");
 
 app.use(express.static('public'));
 app.use("/api/users", userRoutes);
 app.use("/api/movies", movieRoutes);
 app.use("/api/version", versionRoutes);
+app.use("/api/settings", settingsRoutes);
 
 // Start Server
 const PORT = process.env.PORT || 5000;
