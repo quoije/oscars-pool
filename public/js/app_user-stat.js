@@ -1,6 +1,18 @@
 window.onload = async function () {
     const token = localStorage.getItem('auth_token');
 
+    async function fetchActiveYear() {
+      try {
+        const res = await fetch('/api/settings/year', { method: 'GET' });
+        if (!res.ok) throw new Error('Failed to fetch active year');
+        const data = await res.json();
+        const year = Number(data?.year);
+        return Number.isInteger(year) ? year : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
     if (token) {
       try {
         const decoded = JSON.parse(atob(token.split('.')[1])); // Manually decoding JWT
@@ -28,7 +40,15 @@ window.onload = async function () {
     }
 
     try {
-      const statsRes = await fetch('/api/users/stats', {
+      const activeYear = await fetchActiveYear();
+      if (activeYear) {
+        document.title = `Pool Oscars ${activeYear} - Statistiques des utilisateurs`;
+        const h2 = document.querySelector('h2');
+        if (h2) h2.textContent = `Statistiques des utilisateurs (${activeYear})`;
+      }
+
+      const statsUrl = activeYear ? `/api/users/stats?year=${encodeURIComponent(String(activeYear))}` : '/api/users/stats';
+      const statsRes = await fetch(statsUrl, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`

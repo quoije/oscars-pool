@@ -3,6 +3,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 const Movie = require("../models/Movie");
+const Setting = require("../models/Setting");
 const axios = require("axios");
 
 const router = express.Router();
@@ -10,6 +11,8 @@ const router = express.Router();
 // Set password for verification
 
 const woof = process.env.DOG_NAMES ? process.env.DOG_NAMES.split(",") : [];
+
+const ACTIVE_YEAR_KEY = "active_oscar_year";
 
 // Fetch movie details from OMDb API
 async function fetchMovieDetailsFromOmdb(imdb_id) {
@@ -57,16 +60,38 @@ function parseOscarYear(raw) {
   return n;
 }
 
+async function getOrInitActiveYear() {
+  const existing = await Setting.findOne({ key: ACTIVE_YEAR_KEY });
+  if (existing && typeof existing.value === "number") return existing.value;
+
+  // Initialize from latest movie year if available, else from current year.
+  const latestMovie = await Movie.findOne({ year: { $type: "number" } })
+    .sort({ year: -1 })
+    .select("year");
+
+  const fallbackYear = latestMovie?.year || new Date().getFullYear();
+  const year = parseOscarYear(fallbackYear) || new Date().getFullYear();
+
+  await Setting.findOneAndUpdate(
+    { key: ACTIVE_YEAR_KEY },
+    { $set: { value: year } },
+    { upsert: true, new: true }
+  );
+
+  return year;
+}
+
 // Get user stats with watched movie titles and details from the movies collection
 router.get("/stats", verifyToken, async (req, res) => {
   try {
     // Fetch all users
     const users = await User.find();
     
-    const year = parseOscarYear(req.query.year);
+    // If a year is explicitly provided, use it; otherwise default to the global active year.
+    const year = parseOscarYear(req.query.year) || await getOrInitActiveYear();
 
     // Fetch movies (optionally filtered by year)
-    const allMovies = await Movie.find(year ? { year } : {});
+    const allMovies = await Movie.find({ year });
     const totalMoviesCount = allMovies.length;
 
     if (totalMoviesCount === 0) {
@@ -92,7 +117,7 @@ router.get("/stats", verifyToken, async (req, res) => {
 
       return {
         name: user.name,
-        year: year || null,
+        year,
         watchedCount,
         totalMoviesCount,
         watchedRatio: `${watchedRatio}%`,

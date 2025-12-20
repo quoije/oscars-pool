@@ -33,6 +33,9 @@ window.onload = async function () {
   const form = document.getElementById('add-movie-form');
   const yearInput = document.getElementById('oscar_year');
 
+  const activeYearInput = document.getElementById('active_oscar_year');
+  const saveActiveYearBtn = document.getElementById('save-active-year');
+
   const manageYearSelect = document.getElementById('manage_year');
   const adminMoviesBody = document.getElementById('admin-movies-body');
   const refreshMoviesBtn = document.getElementById('refresh-movies');
@@ -57,6 +60,7 @@ window.onload = async function () {
   const editDescriptionEl = document.getElementById('edit_description');
 
   let moviesById = new Map();
+  let activeYear = null;
 
   function showResponse(kind, message) {
     responseEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
@@ -69,6 +73,40 @@ window.onload = async function () {
     if (!Number.isInteger(n)) return null;
     if (n < 1900 || n > 3000) return null;
     return n;
+  }
+
+  async function fetchActiveYear() {
+    try {
+      const res = await fetch('/api/settings/year', { method: 'GET' });
+      if (!res.ok) throw new Error('Failed to fetch active year');
+      const data = await res.json();
+      const year = Number(data?.year);
+      return Number.isInteger(year) ? year : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function setActiveYear(newYear) {
+    const res = await fetch('/api/settings/year', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ year: newYear })
+    });
+    if (!res.ok) {
+      let msg = `Erreur (${res.status})`;
+      try {
+        const data = await res.json();
+        msg = data.message || data.error || msg;
+      } catch (_) {}
+      throw new Error(msg);
+    }
+    const data = await res.json();
+    const year = Number(data?.year);
+    return Number.isInteger(year) ? year : newYear;
   }
 
   function isValidImdbId(value) {
@@ -157,9 +195,19 @@ window.onload = async function () {
       const stillExists = years.map(String).includes(previousSelection);
       manageYearSelect.value = stillExists ? previousSelection : '';
 
-      // Default add-year to latest year if empty
-      if (years.length > 0 && !yearInput.value) {
-        yearInput.value = String(years[0]);
+      // Prefer defaulting UI to active year (if selection is empty/invalid).
+      const hasSelection = !!manageYearSelect.value;
+      if (!hasSelection && activeYear && years.map(String).includes(String(activeYear))) {
+        manageYearSelect.value = String(activeYear);
+      }
+
+      // Default add-year to active year (or latest year) if empty
+      if (!yearInput.value) {
+        if (activeYear) {
+          yearInput.value = String(activeYear);
+        } else if (years.length > 0) {
+          yearInput.value = String(years[0]);
+        }
       }
     } catch (_) {
       // ignore
@@ -409,6 +457,39 @@ window.onload = async function () {
   }
 
   // Initial load
+  activeYear = await fetchActiveYear();
+  if (activeYearInput && activeYear) {
+    activeYearInput.value = String(activeYear);
+    document.title = `Pool Oscars ${activeYear} - Admin`;
+  }
+
+  if (saveActiveYearBtn && activeYearInput) {
+    saveActiveYearBtn.addEventListener('click', async () => {
+      const y = parseYear(activeYearInput.value);
+      if (!y) {
+        showResponse('warning', 'Année invalide. Exemple attendu: 2026');
+        return;
+      }
+      saveActiveYearBtn.disabled = true;
+      const oldText = saveActiveYearBtn.textContent;
+      saveActiveYearBtn.textContent = 'Application...';
+      try {
+        activeYear = await setActiveYear(y);
+        activeYearInput.value = String(activeYear);
+        yearInput.value = String(activeYear);
+        document.title = `Pool Oscars ${activeYear} - Admin`;
+        showResponse('success', `Année active appliquée: ${activeYear}`);
+        await refreshYears();
+        await loadMoviesForManagement();
+      } catch (err) {
+        showResponse('danger', err.message || 'Erreur réseau');
+      } finally {
+        saveActiveYearBtn.disabled = false;
+        saveActiveYearBtn.textContent = oldText;
+      }
+    });
+  }
+
   await refreshYears();
   await loadMoviesForManagement();
 };
