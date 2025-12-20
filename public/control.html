@@ -122,12 +122,81 @@
             <th>Titre</th>
             <th style="width: 20%;">Catégorie</th>
             <th style="width: 12%;">Année</th>
+            <th style="width: 1%;">Actions</th>
           </tr>
         </thead>
         <tbody id="admin-movies-body">
-          <tr><td colspan="4" class="text-muted">Charge la liste…</td></tr>
+          <tr><td colspan="5" class="text-muted">Charge la liste…</td></tr>
         </tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- Edit movie modal -->
+<div class="modal fade" id="editMovieModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editMovieModalTitle">Modifier le film</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit_movie_id">
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label for="edit_imdb_id" class="form-label">IMDB ID (ex: tt1234567)</label>
+            <input type="text" class="form-control" id="edit_imdb_id" placeholder="tt..." required>
+          </div>
+          <div class="col-md-6">
+            <label for="edit_year" class="form-label">Oscar year</label>
+            <input type="number" class="form-control" id="edit_year" placeholder="2026" min="1900" max="3000">
+          </div>
+
+          <div class="col-md-6">
+            <label for="edit_category" class="form-label">Catégorie</label>
+            <input type="text" class="form-control" id="edit_category" placeholder="Best Picture, etc." required>
+          </div>
+          <div class="col-md-6">
+            <label for="edit_vod_link" class="form-label">Lien VOD</label>
+            <input type="url" class="form-control" id="edit_vod_link" placeholder="https://..." required>
+          </div>
+
+          <div class="col-12">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" id="edit_refresh_omdb">
+              <label class="form-check-label" for="edit_refresh_omdb">
+                Recharger depuis OMDb (écrase titre / plot / rating / poster)
+              </label>
+            </div>
+            <div class="form-text">Si coché, le serveur refait un appel OMDb via l’IMDB ID au moment de l’enregistrement.</div>
+          </div>
+
+          <div class="col-md-6">
+            <label for="edit_title" class="form-label">Titre</label>
+            <input type="text" class="form-control" id="edit_title" placeholder="Title">
+          </div>
+          <div class="col-md-6">
+            <label for="edit_rating" class="form-label">Rating (imdbRating)</label>
+            <input type="text" class="form-control" id="edit_rating" placeholder="7.9">
+          </div>
+
+          <div class="col-12">
+            <label for="edit_poster" class="form-label">Poster URL</label>
+            <input type="url" class="form-control" id="edit_poster" placeholder="https://...">
+          </div>
+
+          <div class="col-12">
+            <label for="edit_description" class="form-label">Description (Plot)</label>
+            <textarea class="form-control" id="edit_description" rows="4" placeholder="Plot..."></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="save-movie-changes">Enregistrer</button>
+      </div>
     </div>
   </div>
 </div>

@@ -14,6 +14,10 @@ function parseOscarYear(raw) {
   return n;
 }
 
+function isValidImdbId(value) {
+  return typeof value === "string" && /^tt\d{5,}$/.test(value.trim());
+}
+
 // Fetch movie details from OMDb API
 async function fetchMovieDetailsFromOmdb(imdb_id) {
   const apiKey = process.env.OMDB_API;  // Replace with your actual OMDb API key
@@ -225,6 +229,87 @@ router.delete("/delete", async (req, res) => {
       message: "Movies deleted successfully",
       deletedCount: result.deletedCount || 0,
     });
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: update a movie (edit fields, optionally refresh from OMDb)
+router.put("/:id", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+
+    const { id } = req.params;
+    const {
+      imdb_id,
+      title,
+      description,
+      rating,
+      poster,
+      year,
+      category,
+      vod_link,
+      refreshOmdb,
+    } = req.body || {};
+
+    if (imdb_id !== undefined && imdb_id !== null && !isValidImdbId(imdb_id)) {
+      return res.status(400).json({ message: "IMDB ID invalide. Exemple attendu: tt1234567" });
+    }
+
+    if (year !== undefined && year !== null && year !== "") {
+      const parsedYear = parseOscarYear(year);
+      if (!parsedYear) {
+        return res.status(400).json({ message: "Année invalide (ex: 2026)" });
+      }
+    }
+
+    if (typeof category === "string" && category.trim() === "") {
+      return res.status(400).json({ message: "Catégorie invalide." });
+    }
+
+    if (typeof vod_link === "string" && vod_link.trim() === "") {
+      return res.status(400).json({ message: "Lien VOD invalide." });
+    }
+
+    const movie = await Movie.findById(id);
+    if (!movie) return res.status(404).json({ message: "Movie not found" });
+
+    if (imdb_id !== undefined) movie.imdb_id = String(imdb_id).trim();
+    if (category !== undefined) movie.category = String(category).trim();
+    if (vod_link !== undefined) movie.vod_link = String(vod_link).trim();
+
+    if (year !== undefined && year !== null && year !== "") {
+      movie.year = parseOscarYear(year);
+    } else if (year === null || year === "") {
+      // allow clearing the year explicitly
+      movie.year = null;
+    }
+
+    // If refreshOmdb is true, overwrite OMDb-derived fields from the imdb_id
+    if (refreshOmdb) {
+      const details = await fetchMovieDetailsFromOmdb(movie.imdb_id);
+      movie.title = details.title;
+      movie.description = details.description;
+      movie.rating = details.rating;
+      movie.poster = details.poster;
+    } else {
+      if (title !== undefined) movie.title = title;
+      if (description !== undefined) movie.description = description;
+      if (rating !== undefined) movie.rating = rating;
+      if (poster !== undefined) movie.poster = poster;
+    }
+
+    await movie.save();
+    return res.status(200).json(movie);
   } catch (err) {
     if (err instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Invalid or expired token" });
