@@ -41,6 +41,20 @@ window.onload = async function () {
   const activeYearInput = document.getElementById('active_oscar_year');
   const saveActiveYearBtn = document.getElementById('save-active-year');
 
+  // Modal 100% elements
+  const completionModalTitleEl = document.getElementById('completion_modal_title');
+  const completionModalBodyTextEl = document.getElementById('completion_modal_body_text');
+  const completionModalBodyHtmlEl = document.getElementById('completion_modal_body_html');
+  const completionModalVideoSrcEl = document.getElementById('completion_modal_video_src');
+  const completionModalReloadBtn = document.getElementById('completion_modal_reload');
+  const completionModalSaveBtn = document.getElementById('completion_modal_save');
+
+  const completionModalPreviewTitleEl = document.getElementById('completion_modal_preview_title');
+  const completionModalPreviewTextEl = document.getElementById('completion_modal_preview_text');
+  const completionModalPreviewCustomEl = document.getElementById('completion_modal_preview_custom');
+  const completionModalPreviewVideoEl = document.getElementById('completion_modal_preview_video');
+  const completionModalPreviewVideoSourceEl = document.getElementById('completion_modal_preview_video_source');
+
   const manageYearSelect = document.getElementById('manage_year');
   const adminMoviesBody = document.getElementById('admin-movies-body');
   const refreshMoviesBtn = document.getElementById('refresh-movies');
@@ -67,10 +81,132 @@ window.onload = async function () {
   let moviesById = new Map();
   let activeYear = null;
 
+  const DEFAULT_COMPLETION_MODAL = Object.freeze({
+    title: 'Félicitations! very nice 🎉🎉🎉',
+    bodyText: '',
+    videoSrc: 'video/reward.mp4',
+    bodyHtml: '',
+  });
+
   function showResponse(kind, message) {
     responseEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
     responseEl.classList.add(kind === 'success' ? 'alert-success' : kind === 'warning' ? 'alert-warning' : 'alert-danger');
     responseEl.textContent = message;
+  }
+
+  function sanitizeHtml(raw) {
+    const html = String(raw || '');
+    const withoutScripts = html.replace(/<script\b[\s\S]*?<\/script>/gi, '');
+    const withoutOnAttrs = withoutScripts
+      .replace(/\son\w+="[^"]*"/gi, '')
+      .replace(/\son\w+='[^']*'/gi, '')
+      .replace(/\son\w+=\S+/gi, '');
+    return withoutOnAttrs.trim();
+  }
+
+  function normalizeCompletionModal(value) {
+    const v = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const title = typeof v.title === 'string' ? v.title : DEFAULT_COMPLETION_MODAL.title;
+    const bodyText = typeof v.bodyText === 'string' ? v.bodyText : DEFAULT_COMPLETION_MODAL.bodyText;
+    const videoSrc = typeof v.videoSrc === 'string' ? v.videoSrc : DEFAULT_COMPLETION_MODAL.videoSrc;
+    const bodyHtml = typeof v.bodyHtml === 'string' ? v.bodyHtml : DEFAULT_COMPLETION_MODAL.bodyHtml;
+    return {
+      title: String(title || '').trim().slice(0, 200) || DEFAULT_COMPLETION_MODAL.title,
+      bodyText: String(bodyText || '').slice(0, 8000),
+      videoSrc: String(videoSrc || '').trim().slice(0, 2048),
+      bodyHtml: String(bodyHtml || '').slice(0, 20000),
+    };
+  }
+
+  async function fetchCompletionModal() {
+    const res = await fetch('/api/settings/completion-modal', { method: 'GET' });
+    if (!res.ok) throw new Error(`Erreur (${res.status})`);
+    const data = await res.json().catch(() => ({}));
+    return normalizeCompletionModal(data);
+  }
+
+  async function saveCompletionModal(payload) {
+    const res = await fetch('/api/settings/completion-modal', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return normalizeCompletionModal(data);
+  }
+
+  function setCompletionModalForm(value) {
+    if (!completionModalTitleEl || !completionModalBodyTextEl || !completionModalBodyHtmlEl || !completionModalVideoSrcEl) return;
+    completionModalTitleEl.value = value.title || '';
+    completionModalBodyTextEl.value = value.bodyText || '';
+    completionModalBodyHtmlEl.value = value.bodyHtml || '';
+    completionModalVideoSrcEl.value = value.videoSrc || '';
+  }
+
+  function getCompletionModalFormValue() {
+    return normalizeCompletionModal({
+      title: completionModalTitleEl ? completionModalTitleEl.value : '',
+      bodyText: completionModalBodyTextEl ? completionModalBodyTextEl.value : '',
+      bodyHtml: completionModalBodyHtmlEl ? completionModalBodyHtmlEl.value : '',
+      videoSrc: completionModalVideoSrcEl ? completionModalVideoSrcEl.value : '',
+    });
+  }
+
+  function updateCompletionModalPreview(value) {
+    if (completionModalPreviewTitleEl) {
+      completionModalPreviewTitleEl.textContent = value.title || DEFAULT_COMPLETION_MODAL.title;
+    }
+
+    const text = String(value.bodyText || '');
+    if (completionModalPreviewTextEl) {
+      completionModalPreviewTextEl.textContent = text;
+      completionModalPreviewTextEl.classList.toggle('d-none', !text);
+    }
+
+    const safeHtml = sanitizeHtml(value.bodyHtml || '');
+    if (completionModalPreviewCustomEl) {
+      if (safeHtml) {
+        completionModalPreviewCustomEl.innerHTML = safeHtml;
+        completionModalPreviewCustomEl.classList.remove('d-none');
+      } else {
+        completionModalPreviewCustomEl.innerHTML = '';
+        completionModalPreviewCustomEl.classList.add('d-none');
+      }
+    }
+
+    const videoSrc = String(value.videoSrc || '').trim();
+    if (completionModalPreviewVideoEl && completionModalPreviewVideoSourceEl) {
+      if (videoSrc) {
+        completionModalPreviewVideoSourceEl.setAttribute('src', videoSrc);
+        try { completionModalPreviewVideoEl.load(); } catch (_) {}
+        completionModalPreviewVideoEl.classList.remove('d-none');
+      } else {
+        try { completionModalPreviewVideoEl.pause(); } catch (_) {}
+        completionModalPreviewVideoEl.classList.add('d-none');
+      }
+    }
+  }
+
+  async function loadCompletionModalIntoUi() {
+    // If the tab isn't in DOM (older HTML), just skip gracefully.
+    if (!completionModalTitleEl) return;
+    try {
+      const value = await fetchCompletionModal();
+      setCompletionModalForm(value);
+      updateCompletionModalPreview(getCompletionModalFormValue());
+    } catch (err) {
+      // Still show defaults so admin can edit even if network hiccups.
+      setCompletionModalForm(DEFAULT_COMPLETION_MODAL);
+      updateCompletionModalPreview(getCompletionModalFormValue());
+      showResponse('warning', err.message || 'Impossible de charger le contenu du modal.');
+    }
   }
 
   const userResetResponseEl = document.getElementById('user-reset-response');
@@ -138,6 +274,55 @@ window.onload = async function () {
     localStorage.removeItem('auth_token');
     window.location.href = '/';
   });
+
+  // Modal 100% live preview wiring
+  function hookModal100Inputs() {
+    if (!completionModalTitleEl) return;
+    const inputs = [completionModalTitleEl, completionModalBodyTextEl, completionModalBodyHtmlEl, completionModalVideoSrcEl].filter(Boolean);
+    inputs.forEach((el) => {
+      el.addEventListener('input', () => {
+        updateCompletionModalPreview(getCompletionModalFormValue());
+      });
+    });
+
+    if (completionModalReloadBtn) {
+      completionModalReloadBtn.addEventListener('click', async () => {
+        completionModalReloadBtn.disabled = true;
+        const oldText = completionModalReloadBtn.textContent;
+        completionModalReloadBtn.textContent = 'Chargement...';
+        try {
+          await loadCompletionModalIntoUi();
+          showResponse('success', 'Contenu rechargé.');
+        } catch (_) {
+          // loadCompletionModalIntoUi already handles messaging
+        } finally {
+          completionModalReloadBtn.disabled = false;
+          completionModalReloadBtn.textContent = oldText;
+        }
+      });
+    }
+
+    if (completionModalSaveBtn) {
+      completionModalSaveBtn.addEventListener('click', async () => {
+        completionModalSaveBtn.disabled = true;
+        const oldText = completionModalSaveBtn.textContent;
+        completionModalSaveBtn.textContent = 'Enregistrement...';
+        try {
+          const value = getCompletionModalFormValue();
+          // send raw HTML; server sanitizes/caps it
+          const saved = await saveCompletionModal(value);
+          setCompletionModalForm(saved);
+          updateCompletionModalPreview(getCompletionModalFormValue());
+          showResponse('success', 'Modal 100% enregistré.');
+        } catch (err) {
+          showResponse('danger', err.message || 'Erreur réseau');
+        } finally {
+          completionModalSaveBtn.disabled = false;
+          completionModalSaveBtn.textContent = oldText;
+        }
+      });
+    }
+  }
 
   if (userResetForm && userResetEmailEl) {
     userResetForm.addEventListener('submit', async function (e) {
@@ -513,6 +698,9 @@ window.onload = async function () {
     activeYearInput.value = String(activeYear);
     document.title = `Pool Oscars ${activeYear} - Admin`;
   }
+
+  hookModal100Inputs();
+  await loadCompletionModalIntoUi();
 
   if (saveActiveYearBtn && activeYearInput) {
     saveActiveYearBtn.addEventListener('click', async () => {
