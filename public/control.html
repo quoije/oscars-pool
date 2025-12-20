@@ -70,6 +70,30 @@
     </div>
   </div>
 
+  <h2>Admin - Réinitialiser mot de passe utilisateur</h2>
+  <p class="text-muted mb-3">
+    Génère un mot de passe temporaire aléatoire. L'utilisateur devra choisir un nouveau mot de passe à sa prochaine connexion.
+  </p>
+
+  <div id="user-reset-response" class="alert d-none" role="alert"></div>
+
+  <form id="reset-user-password-form" class="card p-3 mb-4">
+    <div class="row g-2 align-items-end">
+      <div class="col-md-8">
+        <label for="reset_user_email" class="form-label">Email utilisateur</label>
+        <input type="email" class="form-control" id="reset_user_email" placeholder="user@email.com" required>
+      </div>
+      <div class="col-md-4">
+        <button type="submit" class="btn btn-danger w-100">Reset</button>
+      </div>
+      <div class="col-12">
+        <div class="form-text">
+          Important: le mot de passe temporaire est affiché une seule fois ici. Copie-le et envoie-le à l'utilisateur.
+        </div>
+      </div>
+    </div>
+  </form>
+
   <h2>Admin - Ajouter un film</h2>
   <p class="text-muted mb-4">
     Ajoute un film via l’API (<code>/api/movies/add</code>). Le serveur récupère automatiquement le titre/plot/affiche depuis OMDb avec l’<code>imdb_id</code>.

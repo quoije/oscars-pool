@@ -1,6 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const User = require("../models/User");
 const Movie = require("../models/Movie");
 const Setting = require("../models/Setting");
@@ -59,6 +60,31 @@ function parseOscarYear(raw) {
   if (n < 1900 || n > 3000) return null;
   return n;
 }
+
+function isAdminFromDecoded(decoded) {
+  return !!decoded?.admin;
+}
+
+function signUserToken(user) {
+  const isAdmin = user.role === 69;
+  return jwt.sign(
+    {
+      id: user._id,
+      name: user.name,
+      admin: isAdmin,
+      mustChangePassword: !!user.mustChangePassword,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: "1h" }
+  );
+}
+
+function generateTempPassword() {
+  // 12 chars, URL-safe (no spaces/specials that break copy/paste)
+  return crypto.randomBytes(9).toString("base64url");
+}
+
+const TEMP_PASSWORD_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
 async function getOrInitActiveYear() {
   const existing = await Setting.findOne({ key: ACTIVE_YEAR_KEY });
@@ -175,24 +201,90 @@ router.post("/login", async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: "L'utilisateur n'a pas été trouvé" });
 
+    // If this account is in "temp password" mode and the temp password has expired, block login.
+    if (user.mustChangePassword && user.tempPasswordExpiresAt && user.tempPasswordExpiresAt instanceof Date) {
+      if (Date.now() > user.tempPasswordExpiresAt.getTime()) {
+        return res.status(401).json({
+          message: "Le mot de passe temporaire a expiré. Demandez à un admin de réinitialiser votre mot de passe.",
+        });
+      }
+    }
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ message: "Informations d'identification non valides" });
 
     console.log("[debug] " + user.name + " logged in")
 
-    // Check if the user role is 69 and set the admin flag
-    const isAdmin = user.role === 69;
-
-    // Create a token with the user ID, name, and admin flag if the user is an admin
-    const token = jwt.sign(
-      { id: user._id, name: user.name, admin: isAdmin },  // Include name in the token payload
-      process.env.JWT_SECRET,
-      { expiresIn: "1h" }
-    );
-
-    res.status(200).json({ token });
+    const token = signUserToken(user);
+    res.status(200).json({ token, mustChangePassword: !!user.mustChangePassword });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin: reset a user's password to a random temp password and force change on next login.
+router.post("/admin/reset-temp-password", verifyToken, async (req, res) => {
+  if (!isAdminFromDecoded(req.user)) {
+    return res.status(403).json({ message: "You do not have admin privileges" });
+  }
+
+  const { email, userId } = req.body || {};
+  const emailNorm = typeof email === "string" ? email.trim() : "";
+  const idNorm = typeof userId === "string" ? userId.trim() : "";
+
+  if (!emailNorm && !idNorm) {
+    return res.status(400).json({ message: "Email ou userId requis." });
+  }
+
+  try {
+    const user = emailNorm ? await User.findOne({ email: emailNorm }) : await User.findById(idNorm);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const tempPassword = generateTempPassword();
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+    const expiresAt = new Date(Date.now() + TEMP_PASSWORD_TTL_MS);
+
+    user.password = hashedPassword;
+    user.mustChangePassword = true;
+    user.tempPasswordIssuedAt = new Date();
+    user.tempPasswordExpiresAt = expiresAt;
+    await user.save();
+
+    return res.status(200).json({
+      message: "Mot de passe temporaire généré. L'utilisateur devra le changer à sa prochaine connexion.",
+      tempPassword,
+      expiresAt: expiresAt.toISOString(),
+      user: { id: String(user._id), name: user.name, email: user.email },
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// User: change password (used after temp-password login). Returns a fresh token.
+router.post("/change-password", verifyToken, async (req, res) => {
+  const { newPassword } = req.body || {};
+  const pw = typeof newPassword === "string" ? newPassword : "";
+
+  if (!pw || pw.length < 8) {
+    return res.status(400).json({ message: "Le nouveau mot de passe doit contenir au moins 8 caractères." });
+  }
+
+  try {
+    const user = await User.findById(req.user?.id);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const hashedPassword = await bcrypt.hash(pw, 10);
+    user.password = hashedPassword;
+    user.mustChangePassword = false;
+    user.tempPasswordIssuedAt = null;
+    user.tempPasswordExpiresAt = null;
+    await user.save();
+
+    const token = signUserToken(user);
+    return res.status(200).json({ message: "Mot de passe mis à jour.", token });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
   }
 });
 
