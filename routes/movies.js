@@ -6,6 +6,14 @@ const jwt = require("jsonwebtoken");
 
 const router = express.Router();
 
+function parseOscarYear(raw) {
+  if (raw === undefined || raw === null || raw === "") return null;
+  const n = Number(raw);
+  if (!Number.isInteger(n)) return null;
+  if (n < 1900 || n > 3000) return null;
+  return n;
+}
+
 // Fetch movie details from OMDb API
 async function fetchMovieDetailsFromOmdb(imdb_id) {
   const apiKey = process.env.OMDB_API;  // Replace with your actual OMDb API key
@@ -28,10 +36,25 @@ async function fetchMovieDetailsFromOmdb(imdb_id) {
   }
 }
 
+// Get available Oscar years (distinct years from movies)
+router.get("/years", async (req, res) => {
+  try {
+    const years = await Movie.distinct("year");
+    const cleaned = years
+      .filter((y) => typeof y === "number" && Number.isFinite(y))
+      .sort((a, b) => b - a);
+    res.status(200).json(cleaned);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Get all movies
 router.get("/", async (req, res) => {
   try {
-    const movies = await Movie.find();
+    const year = parseOscarYear(req.query.year);
+    const filter = year ? { year } : {};
+    const movies = await Movie.find(filter);
     res.status(200).json(movies);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -114,7 +137,7 @@ router.patch("/users/updateWatchedMovies", async (req, res) => {
 
 // Add movie
 router.post("/add", async (req, res) => {
-  const { imdb_id, category, vod_link } = req.body;
+  const { imdb_id, category, vod_link, year } = req.body;
 
   try {
     // Get the token from the Authorization header
@@ -132,6 +155,11 @@ router.post("/add", async (req, res) => {
       return res.status(403).json({ message: "You do not have admin privileges" });
     }
 
+    const parsedYear = parseOscarYear(year);
+    if (!parsedYear) {
+      return res.status(400).json({ message: "Année invalide (ex: 2026)" });
+    }
+
     // Fetch movie details from OMDb API
     const movieDetails = await fetchMovieDetailsFromOmdb(imdb_id);
     
@@ -142,6 +170,7 @@ router.post("/add", async (req, res) => {
       description: movieDetails.description,
       rating: movieDetails.rating,
       poster: movieDetails.poster,
+      year: parsedYear,
       category,
       vod_link
     });
@@ -154,6 +183,53 @@ router.post("/add", async (req, res) => {
       return res.status(401).json({ message: "Invalid or expired token" });
     }
     res.status(400).json({ error: err.message });
+  }
+});
+
+// Admin: delete one or more movies (by Mongo _id or imdb_id)
+router.delete("/delete", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+
+    const { ids, imdb_ids } = req.body || {};
+    const idList = Array.isArray(ids) ? ids.filter(Boolean) : [];
+    const imdbList = Array.isArray(imdb_ids) ? imdb_ids.filter(Boolean) : [];
+
+    if (idList.length === 0 && imdbList.length === 0) {
+      return res.status(400).json({ message: "Aucun film sélectionné." });
+    }
+
+    const filter = idList.length
+      ? { _id: { $in: idList } }
+      : { imdb_id: { $in: imdbList } };
+
+    const moviesToDelete = await Movie.find(filter).select("imdb_id");
+    const deletedImdbIds = moviesToDelete.map((m) => m.imdb_id).filter(Boolean);
+
+    const result = await Movie.deleteMany(filter);
+
+    if (deletedImdbIds.length > 0) {
+      await User.updateMany(
+        {},
+        { $pull: { watchedMovies: { imdb_id: { $in: deletedImdbIds } } } }
+      );
+    }
+
+    return res.status(200).json({
+      message: "Movies deleted successfully",
+      deletedCount: result.deletedCount || 0,
+    });
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
   }
 });
 
