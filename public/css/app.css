@@ -127,3 +127,17 @@ footer {
     justify-content: flex-end;
     gap: 10px;
   }
+
+  /* Admin → Version: keep history rows clean and readable */
+  .app-version-list .list-group-item {
+    border-left: 0;
+    border-right: 0;
+  }
+
+  .app-version-list .list-group-item:first-child {
+    border-top: 0;
+  }
+
+  .app-version-list .list-group-item:last-child {
+    border-bottom: 0;
+  }
