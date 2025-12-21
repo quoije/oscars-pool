@@ -13,6 +13,117 @@ window.onload = async function () {
       }
     }
 
+    async function fetchWinners() {
+      try {
+        const res = await fetch('/api/settings/winners', { method: 'GET' });
+        if (!res.ok) throw new Error('Failed to fetch winners');
+        const data = await res.json().catch(() => ({}));
+        return Array.isArray(data?.winners) ? data.winners : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    async function fetchCompletions() {
+      try {
+        const res = await fetch('/api/users/completions', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (!res.ok) throw new Error('Failed to fetch completions');
+        const data = await res.json().catch(() => ({}));
+        return data && typeof data === 'object' ? data : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function renderWinners(winners) {
+      const winnersList = document.getElementById('winners-list');
+      if (!winnersList) return;
+      const list = Array.isArray(winners) ? winners : [];
+      if (!list.length) {
+        winnersList.innerHTML = '<div class="list-group-item text-muted">Aucun gagnant défini.</div>';
+        return;
+      }
+
+      // Ensure sorted by year desc
+      list.sort((a, b) => Number(b?.year || 0) - Number(a?.year || 0));
+      winnersList.innerHTML = '';
+
+      list.forEach((w) => {
+        const year = Number(w?.year);
+        const name = w?.name || '(utilisateur supprimé)';
+        const points = w?.points === null || w?.points === undefined || w?.points === '' ? null : Number(w.points);
+        const pointsLabel = points === null || Number.isNaN(points) ? '' : ` — ${points} pts`;
+        const item = document.createElement('div');
+        item.className = 'list-group-item d-flex justify-content-between align-items-center';
+        item.innerHTML = `
+          <div><strong>${year || '—'}</strong> : ${name}${pointsLabel}</div>
+        `;
+        winnersList.appendChild(item);
+      });
+    }
+
+    function renderCompletions(completions) {
+      const root = document.getElementById('completers-by-year');
+      if (!root) return;
+
+      if (!completions || typeof completions !== 'object') {
+        root.innerHTML = '<div class="text-muted">Impossible de charger les finisseurs 100%.</div>';
+        return;
+      }
+
+      const years = Array.isArray(completions?.years) ? completions.years : [];
+      const totals = completions?.totals && typeof completions.totals === 'object' ? completions.totals : {};
+      const byYear = completions?.completersByYear && typeof completions.completersByYear === 'object' ? completions.completersByYear : {};
+
+      if (!years.length) {
+        root.innerHTML = '<div class="text-muted">Aucune année trouvée.</div>';
+        return;
+      }
+
+      // Build a simple accordion
+      const accordionId = 'completersAccordion';
+      root.innerHTML = `<div class="accordion" id="${accordionId}"></div>`;
+      const acc = root.querySelector('.accordion');
+
+      years.forEach((y, idx) => {
+        const yearStr = String(y);
+        const total = Number(totals?.[yearStr] ?? 0);
+        const completers = Array.isArray(byYear?.[yearStr]) ? byYear[yearStr] : [];
+        const count = completers.length;
+
+        const collapseId = `completers-${yearStr}`;
+        const headingId = `heading-${yearStr}`;
+        const show = idx === 0 ? 'show' : '';
+        const collapsed = idx === 0 ? '' : 'collapsed';
+        const expanded = idx === 0 ? 'true' : 'false';
+
+        const bodyHtml = count
+          ? `<ul class="list-group list-group-flush">
+               ${completers.map((u) => `<li class="list-group-item">${u?.name || '(sans nom)'}</li>`).join('')}
+             </ul>`
+          : `<div class="text-muted">Aucun utilisateur à 100%.</div>`;
+
+        const item = document.createElement('div');
+        item.className = 'accordion-item';
+        item.innerHTML = `
+          <h2 class="accordion-header" id="${headingId}">
+            <button class="accordion-button ${collapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="${expanded}" aria-controls="${collapseId}">
+              ${yearStr} — ${count} finisseur(s) (total films: ${total})
+            </button>
+          </h2>
+          <div id="${collapseId}" class="accordion-collapse collapse ${show}" aria-labelledby="${headingId}" data-bs-parent="#${accordionId}">
+            <div class="accordion-body">
+              ${bodyHtml}
+            </div>
+          </div>
+        `;
+        acc.appendChild(item);
+      });
+    }
+
     if (token) {
       try {
         const decoded = JSON.parse(atob(token.split('.')[1])); // Manually decoding JWT
@@ -52,12 +163,14 @@ window.onload = async function () {
       }
 
       const statsUrl = activeYear ? `/api/users/stats?year=${encodeURIComponent(String(activeYear))}` : '/api/users/stats';
-      const statsRes = await fetch(statsUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const [statsRes, winners, completions] = await Promise.all([
+        fetch(statsUrl, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetchWinners(),
+        fetchCompletions(),
+      ]);
 
       if (!statsRes.ok) {
         throw new Error('Failed to fetch user stats');
@@ -67,6 +180,9 @@ window.onload = async function () {
       const userTableBody = document.getElementById('user-table-body');
       const table = document.querySelector('.user-table');
       const spinner = document.getElementById('loading-spinner');
+
+      renderWinners(winners);
+      renderCompletions(completions);
 
       // Ensure watchedRatio is treated as a number and sort in descending order
       stats.sort((a, b) => parseFloat(b.watchedRatio) - parseFloat(a.watchedRatio));
@@ -117,6 +233,9 @@ window.onload = async function () {
       });
     } catch (error) {
       console.error('Error loading user statistics:', error);
+      // Still attempt to render these sections even if stats fail (best effort)
+      try { renderWinners(await fetchWinners()); } catch (_) {}
+      try { renderCompletions(await fetchCompletions()); } catch (_) {}
     }
 
     // Log-off functionality
