@@ -95,7 +95,7 @@ window.onload = async function () {
   let activeYear = null;
   let winnersLoadedOnce = false;
   let winnerUsersLoadedOnce = false;
-  let winnersByYear = new Map(); // year -> { year, userId, name, points }
+  let winnersByYear = new Map(); // year -> [{ year, userId, name, points }]
   let winnerUsers = []; // admin list: {id, name, email, ...}
 
   const DEFAULT_COMPLETION_MODAL = Object.freeze({
@@ -484,7 +484,7 @@ window.onload = async function () {
     return Array.isArray(data?.winners) ? data.winners : [];
   }
 
-  async function saveWinner(year, userId, points) {
+  async function addWinner(year, userId, points) {
     const res = await fetch(`/api/settings/winners/${encodeURIComponent(String(year))}`, {
       method: 'PUT',
       headers: {
@@ -495,6 +495,19 @@ window.onload = async function () {
         userId: userId ? String(userId) : '',
         points: points === undefined ? null : points,
       }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  async function removeWinner(year, userId) {
+    const res = await fetch(`/api/settings/winners/${encodeURIComponent(String(year))}/${encodeURIComponent(String(userId))}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -579,27 +592,81 @@ window.onload = async function () {
       winnerCurrentEl.textContent = '—';
       return;
     }
-    const w = getWinnerForYear(y);
-    if (!w) {
+    const list = getWinnerForYear(y);
+    const winners = Array.isArray(list) ? list : [];
+    if (!winners.length) {
       winnerCurrentEl.textContent = `${y}: (aucun gagnant)`;
       return;
     }
-    const points = w.points === null || w.points === undefined ? null : Number(w.points);
-    const pointsLabel = points === null || Number.isNaN(points) ? '' : ` — ${points} pts`;
-    winnerCurrentEl.textContent = `${y}: ${w.name || '(utilisateur supprimé)'}${pointsLabel}`;
+
+    // Sort for stable display: points desc (null last), then name
+    const sorted = winners.slice().sort((a, b) => {
+      const ap = a?.points === null || a?.points === undefined ? null : Number(a.points);
+      const bp = b?.points === null || b?.points === undefined ? null : Number(b.points);
+      if (ap === null && bp !== null) return 1;
+      if (ap !== null && bp === null) return -1;
+      if (ap !== null && bp !== null && ap !== bp) return bp - ap;
+      return String(a?.name || '').localeCompare(String(b?.name || ''), 'fr', { sensitivity: 'base' });
+    });
+
+    const rows = sorted.map((w) => {
+      const name = w?.name || '(utilisateur supprimé)';
+      const pts = w?.points === null || w?.points === undefined ? null : Number(w.points);
+      const ptsLabel = pts === null || Number.isNaN(pts) ? '' : ` <span class="text-muted">— ${pts} pts</span>`;
+      const uid = String(w?.userId || '');
+      return `
+        <div class="d-flex justify-content-between align-items-center border rounded px-2 py-1 mb-2">
+          <div class="me-2"><strong>${name}</strong>${ptsLabel}</div>
+          <button type="button" class="btn btn-sm btn-outline-danger" data-winner-remove-year="${y}" data-winner-remove-user="${uid}">Retirer</button>
+        </div>
+      `;
+    }).join('');
+
+    winnerCurrentEl.innerHTML = `
+      <div class="fw-semibold mb-2">${y}</div>
+      ${rows}
+    `;
+
+    winnerCurrentEl.querySelectorAll('button[data-winner-remove-year][data-winner-remove-user]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const yearRaw = btn.getAttribute('data-winner-remove-year');
+        const userRaw = btn.getAttribute('data-winner-remove-user');
+        const yy = parseYear(yearRaw);
+        const uid = String(userRaw || '').trim();
+        if (!yy || !uid) return;
+        btn.disabled = true;
+        const old = btn.textContent;
+        btn.textContent = '...';
+        try {
+          await removeWinner(yy, uid);
+          await loadWinners({ force: true });
+          showResponse('success', `Gagnant retiré pour ${yy}.`);
+        } catch (err) {
+          showResponse('danger', err.message || 'Erreur réseau');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = old;
+        }
+      });
+    });
   }
 
   function applyWinnerFormFromCache() {
     if (!winnerYearSelect) return;
     const y = parseYear(winnerYearSelect.value);
     if (!y) return;
-    const w = getWinnerForYear(y);
     if (winnerUserSelect) {
-      winnerUserSelect.value = w?.userId ? String(w.userId) : '';
+      winnerUserSelect.value = '';
     }
     if (winnerPointsEl) {
-      const pts = w?.points;
-      winnerPointsEl.value = pts === null || pts === undefined ? '' : String(pts);
+      // Convenience: if all winners share the same non-null points, pre-fill it.
+      const list = getWinnerForYear(y);
+      const winners = Array.isArray(list) ? list : [];
+      const ptsVals = winners
+        .map((w) => (w?.points === null || w?.points === undefined) ? null : Number(w.points))
+        .filter((n) => Number.isFinite(n));
+      const unique = Array.from(new Set(ptsVals));
+      winnerPointsEl.value = unique.length === 1 ? String(unique[0]) : '';
     }
     renderWinnerCurrent();
   }
@@ -609,19 +676,21 @@ window.onload = async function () {
     if (winnersLoadedOnce && !force) return;
     const list = await fetchWinners();
     winnersLoadedOnce = true;
-    winnersByYear = new Map(
-      list
-        .filter((w) => parseYear(w?.year))
-        .map((w) => [
-          String(w.year),
-          {
-            year: Number(w.year),
-            userId: String(w.userId || ''),
-            name: w.name || null,
-            points: w.points ?? null,
-          }
-        ])
-    );
+    const grouped = new Map();
+    (Array.isArray(list) ? list : [])
+      .filter((w) => parseYear(w?.year))
+      .forEach((w) => {
+        const key = String(w.year);
+        const arr = grouped.get(key) || [];
+        arr.push({
+          year: Number(w.year),
+          userId: String(w.userId || ''),
+          name: w.name || null,
+          points: w.points ?? null,
+        });
+        grouped.set(key, arr);
+      });
+    winnersByYear = grouped;
     applyWinnerFormFromCache();
   }
 
@@ -1219,12 +1288,12 @@ window.onload = async function () {
       if (!winnerYearSelect) return;
       const y = parseYear(winnerYearSelect.value);
       if (!y) return;
-      const ok = window.confirm(`Supprimer le gagnant pour ${y} ?`);
+      const ok = window.confirm(`Supprimer tous les gagnants pour ${y} ?`);
       if (!ok) return;
       try {
         if (winnerUserSelect) winnerUserSelect.value = '';
         if (winnerPointsEl) winnerPointsEl.value = '';
-        await saveWinner(y, '', null);
+        await addWinner(y, '', null);
         await loadWinners({ force: true });
         showResponse('success', `Gagnant supprimé pour ${y}.`);
       } catch (err) {
@@ -1242,6 +1311,10 @@ window.onload = async function () {
         return;
       }
       const userId = String(winnerUserSelect?.value || '').trim();
+      if (!userId) {
+        showResponse('warning', 'Choisis un utilisateur.');
+        return;
+      }
       const pointsRaw = String(winnerPointsEl?.value || '').trim();
       const points = pointsRaw === '' ? null : Number(pointsRaw);
       const pointsToSend = pointsRaw === '' || Number.isNaN(points) ? null : Math.round(points);
@@ -1250,9 +1323,9 @@ window.onload = async function () {
       const old = winnerSaveBtn.textContent;
       winnerSaveBtn.textContent = 'Enregistrement...';
       try {
-        await saveWinner(y, userId, pointsToSend);
+        await addWinner(y, userId, pointsToSend);
         await loadWinners({ force: true });
-        showResponse('success', `Gagnant enregistré pour ${y}.`);
+        showResponse('success', `Gagnant ajouté pour ${y}.`);
       } catch (err) {
         showResponse('danger', err.message || 'Erreur réseau');
       } finally {

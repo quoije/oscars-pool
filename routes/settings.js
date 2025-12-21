@@ -38,17 +38,33 @@ function parseOptionalPoints(raw) {
 }
 
 function normalizeWinnersByYear(rawValue) {
+  // Stored format:
+  // - New: { "2026": [ { userId, points? }, { userId, points? } ] }
+  // - Legacy: { "2026": { userId, points? } }
   const value = rawValue && typeof rawValue === "object" && !Array.isArray(rawValue) ? rawValue : {};
   const out = {};
+
   for (const [k, v] of Object.entries(value)) {
     const year = parseOscarYear(k);
     if (!year) continue;
-    const entry = v && typeof v === "object" && !Array.isArray(v) ? v : {};
-    const userId = typeof entry.userId === "string" ? entry.userId.trim() : "";
-    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) continue;
-    const points = parseOptionalPoints(entry.points);
-    out[String(year)] = { userId, points };
+
+    const list = Array.isArray(v) ? v : v && typeof v === "object" ? [v] : [];
+    const dedup = new Map(); // userId -> {userId, points}
+
+    for (const rawEntry of list) {
+      const entry = rawEntry && typeof rawEntry === "object" && !Array.isArray(rawEntry) ? rawEntry : {};
+      const userId = typeof entry.userId === "string" ? entry.userId.trim() : "";
+      if (!userId || !mongoose.Types.ObjectId.isValid(userId)) continue;
+      const points = parseOptionalPoints(entry.points);
+      dedup.set(String(userId), { userId: String(userId), points });
+    }
+
+    const normalizedList = Array.from(dedup.values());
+    if (normalizedList.length) {
+      out[String(year)] = normalizedList;
+    }
   }
+
   return out;
 }
 
@@ -188,11 +204,13 @@ router.get("/winners", async (req, res) => {
     const normalized = normalizeWinnersByYear(existing?.value);
 
     const entries = Object.entries(normalized)
-      .map(([yearStr, v]) => ({
-        year: Number(yearStr),
-        userId: v.userId,
-        points: v.points ?? null,
-      }))
+      .flatMap(([yearStr, list]) =>
+        (Array.isArray(list) ? list : []).map((v) => ({
+          year: Number(yearStr),
+          userId: v.userId,
+          points: v.points ?? null,
+        }))
+      )
       .filter((e) => parseOscarYear(e.year))
       .sort((a, b) => b.year - a.year);
 
@@ -215,8 +233,10 @@ router.get("/winners", async (req, res) => {
   }
 });
 
-// Admin-only: set/clear winner for a given year. Points optional.
-// Body: { userId: "<mongoId>" | "" | null, points?: number|null }
+// Admin-only: add/upsert/clear winners for a given year. Points optional.
+// - Clear all for year: { userId: "" } (legacy behavior)
+// - Add/upsert winner for year: { userId: "<mongoId>", points?: number|null }
+// - Replace full list for year: { winners: [{ userId, points? }, ...] }
 router.put("/winners/:year", async (req, res) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return res.status(401).json({ message: "Authentication token is required" });
@@ -232,14 +252,31 @@ router.put("/winners/:year", async (req, res) => {
       return res.status(400).json({ message: "Année invalide (ex: 2026)" });
     }
 
+    const existing = await Setting.findOne({ key: WINNERS_BY_YEAR_KEY }).select("value");
+    const winners = normalizeWinnersByYear(existing?.value);
+
+    // Replace list mode: { winners: [...] }
+    if (Array.isArray(req.body?.winners)) {
+      const replacement = normalizeWinnersByYear({ [String(year)]: req.body.winners })[String(year)] || [];
+      if (!replacement.length) {
+        delete winners[String(year)];
+      } else {
+        winners[String(year)] = replacement;
+      }
+      await Setting.findOneAndUpdate(
+        { key: WINNERS_BY_YEAR_KEY },
+        { $set: { value: winners } },
+        { upsert: true, new: true }
+      );
+      return res.status(200).json({ year, winners: winners[String(year)] || [] });
+    }
+
+    // Add/upsert/clear mode (legacy-compatible): { userId, points? }
     const rawUserId = req.body?.userId;
     const userId = typeof rawUserId === "string" ? rawUserId.trim() : rawUserId === null ? "" : "";
     const points = parseOptionalPoints(req.body?.points);
 
-    const existing = await Setting.findOne({ key: WINNERS_BY_YEAR_KEY }).select("value");
-    const winners = normalizeWinnersByYear(existing?.value);
-
-    // Clear winner for year
+    // Clear all for year
     if (!userId) {
       delete winners[String(year)];
       await Setting.findOneAndUpdate(
@@ -247,7 +284,7 @@ router.put("/winners/:year", async (req, res) => {
         { $set: { value: winners } },
         { upsert: true, new: true }
       );
-      return res.status(200).json({ year, winner: null });
+      return res.status(200).json({ year, winners: [] });
     }
 
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -255,11 +292,13 @@ router.put("/winners/:year", async (req, res) => {
     }
 
     const winnerUser = await User.findById(userId).select("name").lean();
-    if (!winnerUser) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    if (!winnerUser) return res.status(404).json({ message: "User not found" });
 
-    winners[String(year)] = { userId: String(userId), points };
+    const key = String(year);
+    const current = Array.isArray(winners[key]) ? winners[key] : [];
+    const next = current.filter((w) => String(w?.userId || "") !== String(userId));
+    next.push({ userId: String(userId), points });
+    winners[key] = next;
 
     await Setting.findOneAndUpdate(
       { key: WINNERS_BY_YEAR_KEY },
@@ -269,13 +308,51 @@ router.put("/winners/:year", async (req, res) => {
 
     return res.status(200).json({
       year,
-      winner: {
-        year,
-        userId: String(userId),
-        name: winnerUser.name || null,
-        points: points ?? null,
-      },
+      winner: { year, userId: String(userId), name: winnerUser.name || null, points: points ?? null },
+      winners: winners[String(year)] || [],
     });
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin-only: remove a specific winner for a given year.
+router.delete("/winners/:year/:userId", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+
+    const year = parseOscarYear(req.params?.year);
+    if (!year) return res.status(400).json({ message: "Année invalide (ex: 2026)" });
+
+    const userId = typeof req.params?.userId === "string" ? req.params.userId.trim() : "";
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: "userId invalide" });
+    }
+
+    const existing = await Setting.findOne({ key: WINNERS_BY_YEAR_KEY }).select("value");
+    const winners = normalizeWinnersByYear(existing?.value);
+    const key = String(year);
+    const current = Array.isArray(winners[key]) ? winners[key] : [];
+    const next = current.filter((w) => String(w?.userId || "") !== String(userId));
+    if (next.length) winners[key] = next;
+    else delete winners[key];
+
+    await Setting.findOneAndUpdate(
+      { key: WINNERS_BY_YEAR_KEY },
+      { $set: { value: winners } },
+      { upsert: true, new: true }
+    );
+
+    return res.status(200).json({ year, winners: winners[key] || [] });
   } catch (err) {
     if (err instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Invalid or expired token" });

@@ -49,19 +49,51 @@ window.onload = async function () {
         return;
       }
 
-      // Ensure sorted by year desc
-      list.sort((a, b) => Number(b?.year || 0) - Number(a?.year || 0));
+      // Group by year (supports ties)
+      const byYear = new Map();
+      list.forEach((w) => {
+        const y = Number(w?.year || 0);
+        if (!Number.isInteger(y) || y < 1900 || y > 3000) return;
+        const arr = byYear.get(String(y)) || [];
+        arr.push({
+          year: y,
+          name: w?.name || '(utilisateur supprimé)',
+          points: w?.points === null || w?.points === undefined || w?.points === '' ? null : Number(w.points),
+        });
+        byYear.set(String(y), arr);
+      });
+
+      const years = Array.from(byYear.keys()).map(Number).sort((a, b) => b - a);
       winnersList.innerHTML = '';
 
-      list.forEach((w) => {
-        const year = Number(w?.year);
-        const name = w?.name || '(utilisateur supprimé)';
-        const points = w?.points === null || w?.points === undefined || w?.points === '' ? null : Number(w.points);
-        const pointsLabel = points === null || Number.isNaN(points) ? '' : ` — ${points} pts`;
+      years.forEach((year) => {
+        const winnersForYear = byYear.get(String(year)) || [];
+        const sorted = winnersForYear.slice().sort((a, b) => {
+          const ap = a.points === null || Number.isNaN(a.points) ? null : a.points;
+          const bp = b.points === null || Number.isNaN(b.points) ? null : b.points;
+          if (ap === null && bp !== null) return 1;
+          if (ap !== null && bp === null) return -1;
+          if (ap !== null && bp !== null && ap !== bp) return bp - ap;
+          return String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' });
+        });
+
         const item = document.createElement('div');
-        item.className = 'list-group-item d-flex justify-content-between align-items-center';
+        item.className = 'list-group-item';
+
+        const winnersHtml = sorted
+          .map((w) => {
+            const pts = w.points === null || Number.isNaN(w.points) ? null : w.points;
+            const ptsLabel = pts === null ? '' : ` <span class="text-muted">— ${pts} pts</span>`;
+            return `<div><strong>${w.name}</strong>${ptsLabel}</div>`;
+          })
+          .join('');
+
         item.innerHTML = `
-          <div><strong>${year || '—'}</strong> : ${name}${pointsLabel}</div>
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="fw-semibold">${year}</div>
+            <span class="badge bg-secondary">${sorted.length}</span>
+          </div>
+          <div class="mt-2">${winnersHtml}</div>
         `;
         winnersList.appendChild(item);
       });
