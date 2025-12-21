@@ -4,6 +4,7 @@ function createPageLoader(options = {}) {
 
   let progress = 0;
   let removed = false;
+  let navResizeObserver = null;
 
   const overlay = document.createElement('div');
   overlay.className = 'page-loader-overlay';
@@ -46,11 +47,36 @@ function createPageLoader(options = {}) {
     if (el) el.textContent = String(text || '');
   }
 
+  function getNavHeightPx() {
+    const nav = document.querySelector('nav.navbar');
+    if (!nav) return 0;
+    const rect = nav.getBoundingClientRect();
+    const h = Number(rect?.height) || 0;
+    return h > 0 ? Math.round(h) : 0;
+  }
+
+  function updateOverlayTopOffset() {
+    // Scope the offset to this overlay instance (no global CSS var).
+    overlay.style.setProperty('--page-loader-top', `${getNavHeightPx()}px`);
+  }
+
   function ensureMounted() {
     if (removed) return;
     if (!overlay.isConnected) {
+      updateOverlayTopOffset();
       document.body.classList.add('page-loading');
       document.body.appendChild(overlay);
+
+      // Keep the overlay aligned if the navbar height changes (mobile collapse, resize, etc.)
+      const nav = document.querySelector('nav.navbar');
+      if (nav && typeof ResizeObserver !== 'undefined') {
+        try {
+          navResizeObserver = new ResizeObserver(() => updateOverlayTopOffset());
+          navResizeObserver.observe(nav);
+        } catch (_) {
+          navResizeObserver = null;
+        }
+      }
     }
   }
 
@@ -61,6 +87,10 @@ function createPageLoader(options = {}) {
     document.body.classList.remove('page-loading');
     window.setTimeout(() => {
       removed = true;
+      if (navResizeObserver) {
+        try { navResizeObserver.disconnect(); } catch (_) {}
+        navResizeObserver = null;
+      }
       try { overlay.remove(); } catch (_) {}
     }, 220);
   }
