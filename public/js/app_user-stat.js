@@ -1,5 +1,7 @@
 window.onload = async function () {
     const token = localStorage.getItem('auth_token');
+    let winnersCache = null;
+    let completionsCache = null;
 
     async function fetchActiveYear() {
       try {
@@ -47,19 +49,52 @@ window.onload = async function () {
         return;
       }
 
-      // Ensure sorted by year desc
-      list.sort((a, b) => Number(b?.year || 0) - Number(a?.year || 0));
+      // Group by year (supports ties)
+      const byYear = new Map();
+      list.forEach((w) => {
+        const y = Number(w?.year || 0);
+        if (!Number.isInteger(y) || y < 1900 || y > 3000) return;
+        const arr = byYear.get(String(y)) || [];
+        arr.push({
+          year: y,
+          name: w?.name || '(utilisateur supprimé)',
+          points: w?.points === null || w?.points === undefined || w?.points === '' ? null : Number(w.points),
+        });
+        byYear.set(String(y), arr);
+      });
+
+      const years = Array.from(byYear.keys()).map(Number).sort((a, b) => b - a);
       winnersList.innerHTML = '';
 
-      list.forEach((w) => {
-        const year = Number(w?.year);
-        const name = w?.name || '(utilisateur supprimé)';
-        const points = w?.points === null || w?.points === undefined || w?.points === '' ? null : Number(w.points);
-        const pointsLabel = points === null || Number.isNaN(points) ? '' : ` — ${points} pts`;
+      years.forEach((year) => {
+        const winnersForYear = byYear.get(String(year)) || [];
+        const sorted = winnersForYear.slice().sort((a, b) => {
+          const ap = a.points === null || Number.isNaN(a.points) ? null : a.points;
+          const bp = b.points === null || Number.isNaN(b.points) ? null : b.points;
+          if (ap === null && bp !== null) return 1;
+          if (ap !== null && bp === null) return -1;
+          if (ap !== null && bp !== null && ap !== bp) return bp - ap;
+          return String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' });
+        });
+
         const item = document.createElement('div');
-        item.className = 'list-group-item d-flex justify-content-between align-items-center';
+        item.className = 'list-group-item';
+        const tieLabel = sorted.length > 1 ? ' <span class="text-muted">(égalité)</span>' : '';
+
+        const winnersHtml = sorted
+          .map((w) => {
+            const pts = w.points === null || Number.isNaN(w.points) ? null : w.points;
+            const ptsLabel = pts === null ? '' : ` <span class="text-muted">— ${pts} pts</span>`;
+            return `<div><strong>${w.name}</strong>${ptsLabel}</div>`;
+          })
+          .join('');
+
         item.innerHTML = `
-          <div><strong>${year || '—'}</strong> : ${name}${pointsLabel}</div>
+          <div class="d-flex justify-content-between align-items-center">
+            <div class="fw-semibold">${year}${tieLabel}</div>
+            <span class="badge bg-secondary">${sorted.length}</span>
+          </div>
+          <div class="mt-2">${winnersHtml}</div>
         `;
         winnersList.appendChild(item);
       });
@@ -172,6 +207,11 @@ window.onload = async function () {
         fetchCompletions(),
       ]);
 
+      winnersCache = winners;
+      completionsCache = completions;
+      renderWinners(winnersCache);
+      renderCompletions(completionsCache);
+
       if (!statsRes.ok) {
         throw new Error('Failed to fetch user stats');
       }
@@ -180,9 +220,7 @@ window.onload = async function () {
       const userTableBody = document.getElementById('user-table-body');
       const table = document.querySelector('.user-table');
       const spinner = document.getElementById('loading-spinner');
-
-      renderWinners(winners);
-      renderCompletions(completions);
+      const statsError = document.getElementById('stats-error');
 
       // Ensure watchedRatio is treated as a number and sort in descending order
       stats.sort((a, b) => parseFloat(b.watchedRatio) - parseFloat(a.watchedRatio));
@@ -205,6 +243,7 @@ window.onload = async function () {
       // Hide spinner and show table after loading
       spinner.style.display = 'none';
       table.style.display = 'table';
+      if (statsError) statsError.classList.add('d-none');
 
       // Add event listener for user links
       document.querySelectorAll('.user-link').forEach(link => {
@@ -233,9 +272,24 @@ window.onload = async function () {
       });
     } catch (error) {
       console.error('Error loading user statistics:', error);
+      const spinner = document.getElementById('loading-spinner');
+      const table = document.querySelector('.user-table');
+      const statsError = document.getElementById('stats-error');
+      if (spinner) spinner.style.display = 'none';
+      if (table) table.style.display = 'none';
+      if (statsError) {
+        statsError.textContent = "Impossible de charger le classement pour le moment.";
+        statsError.classList.remove('d-none');
+      }
       // Still attempt to render these sections even if stats fail (best effort)
-      try { renderWinners(await fetchWinners()); } catch (_) {}
-      try { renderCompletions(await fetchCompletions()); } catch (_) {}
+      try {
+        if (winnersCache === null) winnersCache = await fetchWinners();
+        renderWinners(winnersCache);
+      } catch (_) {}
+      try {
+        if (completionsCache === null) completionsCache = await fetchCompletions();
+        renderCompletions(completionsCache);
+      } catch (_) {}
     }
 
     // Log-off functionality
