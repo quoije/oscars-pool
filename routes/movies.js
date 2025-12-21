@@ -3,6 +3,7 @@ const Movie = require("../models/Movie");
 const User = require("../models/User");
 const axios = require("axios");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 
 const router = express.Router();
 
@@ -317,6 +318,22 @@ router.put("/:id", async (req, res) => {
     if (err instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Invalid or expired token" });
     }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Get one movie by Mongo _id (used by the custom player page)
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid movie id" });
+    }
+
+    const movie = await Movie.findById(id);
+    if (!movie) return res.status(404).json({ message: "Movie not found" });
+    return res.status(200).json(movie);
+  } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 });
