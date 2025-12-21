@@ -261,6 +261,31 @@ router.post("/admin/reset-temp-password", verifyToken, async (req, res) => {
   }
 });
 
+// Admin: list users (safe fields only)
+router.get("/admin/list", verifyToken, async (req, res) => {
+  if (!isAdminFromDecoded(req.user)) {
+    return res.status(403).json({ message: "You do not have admin privileges" });
+  }
+
+  try {
+    const users = await User.find()
+      .select("name email role mustChangePassword")
+      .sort({ name: 1, email: 1 });
+
+    return res.status(200).json(
+      users.map((u) => ({
+        id: String(u._id),
+        name: u.name,
+        email: u.email,
+        admin: u.role === 69,
+        mustChangePassword: !!u.mustChangePassword,
+      }))
+    );
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // User: change password (used after temp-password login). Returns a fresh token.
 router.post("/change-password", verifyToken, async (req, res) => {
   const { newPassword } = req.body || {};

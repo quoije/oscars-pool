@@ -213,11 +213,111 @@ window.onload = async function () {
   const userResetForm = document.getElementById('reset-user-password-form');
   const userResetEmailEl = document.getElementById('reset_user_email');
 
+  // Admin users list elements
+  const adminUsersBody = document.getElementById('admin-users-body');
+  const refreshUsersBtn = document.getElementById('refresh-users');
+  const adminUsersCountEl = document.getElementById('admin-users-count');
+  const adminUsersTabBtn = document.getElementById('admin-users-tab');
+
+  let usersLoadedOnce = false;
+
   function showUserResetResponse(kind, message) {
     if (!userResetResponseEl) return;
     userResetResponseEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
     userResetResponseEl.classList.add(kind === 'success' ? 'alert-success' : kind === 'warning' ? 'alert-warning' : 'alert-danger');
     userResetResponseEl.textContent = message;
+  }
+
+  function setUsersCount(count) {
+    if (!adminUsersCountEl) return;
+    adminUsersCountEl.textContent = Number.isInteger(count) ? String(count) : '—';
+  }
+
+  function renderAdminUsers(users) {
+    if (!adminUsersBody) return;
+    const list = Array.isArray(users) ? users : [];
+    setUsersCount(list.length);
+
+    if (!list.length) {
+      adminUsersBody.innerHTML = '<tr><td colspan="3" class="text-muted">Aucun utilisateur.</td></tr>';
+      return;
+    }
+
+    adminUsersBody.innerHTML = '';
+
+    list.forEach((u) => {
+      const tr = document.createElement('tr');
+
+      const tdName = document.createElement('td');
+      tdName.textContent = u?.name || '(sans nom)';
+
+      const tdEmail = document.createElement('td');
+      tdEmail.textContent = u?.email || '';
+
+      const tdStatus = document.createElement('td');
+      tdStatus.className = 'text-nowrap';
+
+      const badges = [];
+      if (u?.admin) badges.push({ text: 'Admin', cls: 'bg-warning text-dark' });
+      if (u?.mustChangePassword) badges.push({ text: 'Reset MDP', cls: 'bg-danger' });
+
+      if (!badges.length) {
+        const span = document.createElement('span');
+        span.className = 'badge bg-secondary';
+        span.textContent = 'OK';
+        tdStatus.appendChild(span);
+      } else {
+        badges.forEach((b, idx) => {
+          const span = document.createElement('span');
+          span.className = `badge ${b.cls}`;
+          span.textContent = b.text;
+          tdStatus.appendChild(span);
+          if (idx < badges.length - 1) {
+            tdStatus.appendChild(document.createTextNode(' '));
+          }
+        });
+      }
+
+      tr.appendChild(tdName);
+      tr.appendChild(tdEmail);
+      tr.appendChild(tdStatus);
+      adminUsersBody.appendChild(tr);
+    });
+  }
+
+  async function fetchAdminUsers() {
+    const res = await fetch('/api/users/admin/list', {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      }
+    });
+
+    const data = await res.json().catch(() => ([]));
+    if (!res.ok) {
+      const msg = data?.message || data?.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return Array.isArray(data) ? data : [];
+  }
+
+  async function loadAdminUsers(options = {}) {
+    const force = !!options.force;
+    if (!adminUsersBody) return;
+    if (usersLoadedOnce && !force) return;
+
+    adminUsersBody.innerHTML = '<tr><td colspan="3" class="text-muted">Chargement…</td></tr>';
+    setUsersCount(null);
+
+    try {
+      const users = await fetchAdminUsers();
+      usersLoadedOnce = true;
+      users.sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), 'fr', { sensitivity: 'base' }));
+      renderAdminUsers(users);
+    } catch (err) {
+      adminUsersBody.innerHTML = `<tr><td colspan="3" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
+      setUsersCount(null);
+    }
   }
 
   function parseYear(value) {
@@ -357,6 +457,25 @@ window.onload = async function () {
         showUserResetResponse('danger', err.message || 'Erreur réseau');
       }
     });
+  }
+
+  if (refreshUsersBtn) {
+    refreshUsersBtn.addEventListener('click', async () => {
+      refreshUsersBtn.disabled = true;
+      const oldText = refreshUsersBtn.textContent;
+      refreshUsersBtn.textContent = 'Chargement...';
+      try {
+        await loadAdminUsers({ force: true });
+      } finally {
+        refreshUsersBtn.disabled = false;
+        refreshUsersBtn.textContent = oldText;
+      }
+    });
+  }
+
+  if (adminUsersTabBtn) {
+    // Only load when the tab is shown (and then cache), to keep initial load snappy.
+    adminUsersTabBtn.addEventListener('shown.bs.tab', () => loadAdminUsers({ force: false }));
   }
 
   form.addEventListener('submit', async function (e) {
