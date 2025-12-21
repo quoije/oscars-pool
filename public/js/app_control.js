@@ -304,24 +304,32 @@ window.onload = async function () {
       return;
     }
 
-    appVersionListEl.innerHTML = versions.map((v) => {
+    const rows = versions.map((v) => {
       const id = String(v?.id || '');
       const isActive = activeId && id === activeId;
       const dateLabel = v?.dateISO ? formatDateTime(v.dateISO) : '—';
       const msg = escapeHtml(String(v?.message || '').trim());
-      return `
-        <div class="d-flex justify-content-between align-items-start border rounded px-2 py-2 mb-2 bg-white">
-          <div class="me-2">
-            <div class="fw-semibold">
-              ${escapeHtml(String(v?.version || '—'))}
-              ${isActive ? '<span class="badge bg-warning text-dark ms-1">Active</span>' : ''}
-            </div>
-            <div class="small text-muted">${escapeHtml(dateLabel)}${msg ? ` — ${msg}` : ''}</div>
-          </div>
-          <button type="button" class="btn btn-sm btn-outline-danger" data-app-version-delete="${escapeHtml(id)}">Supprimer</button>
-        </div>
-      `;
+      const versionLabel = escapeHtml(String(v?.version || '—'));
+      const activeBadge = isActive ? '<span class="badge bg-warning text-dark">Active</span>' : '';
+
+      // IMPORTANT: keep markup compact (no preserved whitespace surprises).
+      return (
+        `<div class="list-group-item d-flex justify-content-between align-items-start gap-3">` +
+          `<div class="min-width-0 flex-grow-1">` +
+            `<div class="d-flex align-items-center gap-2 flex-wrap">` +
+              `<span class="fw-semibold text-break">${versionLabel}</span>` +
+              `${activeBadge}` +
+            `</div>` +
+            `<div class="small text-muted text-break">${escapeHtml(dateLabel)}${msg ? ` — ${msg}` : ''}</div>` +
+          `</div>` +
+          `<div class="flex-shrink-0">` +
+            `<button type="button" class="btn btn-sm btn-outline-danger" data-app-version-delete="${escapeHtml(id)}">Supprimer</button>` +
+          `</div>` +
+        `</div>`
+      );
     }).join('');
+
+    appVersionListEl.innerHTML = `<div class="list-group list-group-flush">${rows}</div>`;
 
     appVersionListEl.querySelectorAll('button[data-app-version-delete]').forEach((btn) => {
       btn.addEventListener('click', async () => {
