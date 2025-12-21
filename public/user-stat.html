@@ -20,10 +20,6 @@
     .user-table {
       margin-top: 20px;
     }
-    .ratio {
-      font-weight: bold;
-      margin-top: 10px;
-    }
     .navbar-toggler {
       border-color: white; /* Make the border white */
     }
@@ -100,7 +96,7 @@
       </div>
 
       <!-- Table for users and movies watched -->
-      <table class="table user-table" style="display: none;">
+      <table class="table table-striped table-hover align-middle user-table d-none">
         <thead>
           <tr>
             <th scope="col">Nom</th>
@@ -117,9 +113,20 @@
     <!-- Winners tab -->
     <div class="tab-pane fade" id="pane-winners" role="tabpanel" aria-labelledby="tab-winners" tabindex="0">
       <h4 class="mb-2">Gagnants</h4>
-      <div class="text-muted mb-2">Définis dans l’admin (optionnel).</div>
-      <div id="winners-list" class="list-group mb-4">
-        <div class="list-group-item text-muted">Chargement…</div>
+      <div class="table-responsive mb-4">
+        <table class="table table-sm table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 110px;">Année</th>
+              <th scope="col">Gagnant(s)</th>
+            </tr>
+          </thead>
+          <tbody id="winners-table-body">
+            <tr>
+              <td colspan="2" class="text-muted">Chargement…</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
@@ -127,8 +134,22 @@
     <div class="tab-pane fade" id="pane-completion" role="tabpanel" aria-labelledby="tab-completion" tabindex="0">
       <h4 class="mb-2">Utilisateurs ayant terminé 100% (par année)</h4>
       <div class="text-muted mb-2">Completion = 100% pour l’année (tous les films de l’année vus).</div>
-      <div id="completers-by-year" class="mb-4">
-        <div class="text-muted">Chargement…</div>
+      <div class="table-responsive mb-4">
+        <table class="table table-sm table-striped align-middle mb-0">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 110px;">Année</th>
+              <th scope="col" style="width: 140px;">Finisseur(s)</th>
+              <th scope="col" style="width: 140px;">Total films</th>
+              <th scope="col">Noms</th>
+            </tr>
+          </thead>
+          <tbody id="completers-table-body">
+            <tr>
+              <td colspan="4" class="text-muted">Chargement…</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
