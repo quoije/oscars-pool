@@ -12,6 +12,9 @@ const ACTIVE_YEAR_KEY = "active_oscar_year";
 const COMPLETION_MODAL_KEY = "completion_modal_content";
 const WINNERS_BY_YEAR_KEY = "winners_by_year";
 const OSCAR_DATES_BY_YEAR_KEY = "oscar_date_by_year";
+const APP_VERSION_KEY = "app_version_control";
+
+const crypto = require("crypto");
 
 const DEFAULT_COMPLETION_MODAL = Object.freeze({
   title: "Félicitations! very nice 🎉🎉🎉",
@@ -140,6 +143,51 @@ function normalizeCompletionModal(rawValue) {
     bodyText: String(bodyText || "").slice(0, 8000),
     videoSrc: String(videoSrc || "").slice(0, 2048).trim(),
     bodyHtml: sanitizeHtml(String(bodyHtml || "").slice(0, 20000)),
+  };
+}
+
+function createId() {
+  try {
+    // Node 16+ / 18+: randomUUID
+    if (crypto && typeof crypto.randomUUID === "function") return crypto.randomUUID();
+  } catch (_) {}
+  // Fallback: time-based
+  return `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+}
+
+function normalizeAppVersionControl(rawValue) {
+  const v = rawValue && typeof rawValue === "object" && !Array.isArray(rawValue) ? rawValue : {};
+  const versions = Array.isArray(v.versions) ? v.versions : [];
+
+  const cleaned = versions
+    .map((e) => (e && typeof e === "object" && !Array.isArray(e) ? e : {}))
+    .map((e) => {
+      const id = typeof e.id === "string" ? e.id.trim() : "";
+      const version = typeof e.version === "string" ? e.version.trim() : "";
+      const message = typeof e.message === "string" ? e.message : "";
+      const dateISO = typeof e.dateISO === "string" ? e.dateISO.trim() : "";
+      const d = new Date(dateISO);
+      const safeDateISO = dateISO && !Number.isNaN(d.getTime()) ? d.toISOString() : null;
+      return {
+        id: id || null,
+        version: version ? version.slice(0, 80) : null,
+        message: String(message || "").slice(0, 500),
+        dateISO: safeDateISO,
+      };
+    })
+    .filter((e) => e.id && e.version)
+    .sort((a, b) => {
+      const ad = a.dateISO ? new Date(a.dateISO).getTime() : 0;
+      const bd = b.dateISO ? new Date(b.dateISO).getTime() : 0;
+      return bd - ad;
+    });
+
+  const activeId = typeof v.activeId === "string" ? v.activeId.trim() : "";
+  const active = cleaned.find((e) => String(e.id) === String(activeId)) || null;
+
+  return {
+    activeId: active ? String(active.id) : cleaned[0]?.id ? String(cleaned[0].id) : null,
+    versions: cleaned,
   };
 }
 
@@ -365,6 +413,157 @@ router.get("/winners", async (req, res) => {
       })),
     });
   } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Public: get app version control (active + list)
+router.get("/app-version", async (req, res) => {
+  try {
+    const existing = await Setting.findOne({ key: APP_VERSION_KEY }).select("value").lean();
+    const control = normalizeAppVersionControl(existing?.value);
+    const active = control.activeId
+      ? control.versions.find((v) => String(v.id) === String(control.activeId)) || null
+      : null;
+    return res.status(200).json({ active, versions: control.versions });
+  } catch (_) {
+    return res.status(200).json({ active: null, versions: [] });
+  }
+});
+
+// Admin-only: create a new version entry (optionally activates if none or if activate=true)
+// Body: { version: "1.2.3", message?: "..." }
+router.post("/app-version", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+
+    const version = typeof req.body?.version === "string" ? req.body.version.trim() : "";
+    const message = typeof req.body?.message === "string" ? req.body.message : "";
+    if (!version) return res.status(400).json({ message: "Version requise (ex: 1.0.0)" });
+
+    const existing = await Setting.findOne({ key: APP_VERSION_KEY }).select("value").lean();
+    const control = normalizeAppVersionControl(existing?.value);
+
+    const entry = {
+      id: createId(),
+      version: version.slice(0, 80),
+      message: String(message || "").slice(0, 500),
+      dateISO: new Date().toISOString(),
+    };
+
+    const next = {
+      activeId: control.activeId,
+      versions: [entry, ...(Array.isArray(control.versions) ? control.versions : [])],
+    };
+
+    const wantsActivate = String(req.query?.activate || "").toLowerCase() === "true";
+    if (!next.activeId || wantsActivate) {
+      next.activeId = entry.id;
+    }
+
+    const updated = await Setting.findOneAndUpdate(
+      { key: APP_VERSION_KEY },
+      { $set: { value: next } },
+      { upsert: true, new: true }
+    ).select("value");
+
+    const normalized = normalizeAppVersionControl(updated?.value);
+    const active = normalized.activeId
+      ? normalized.versions.find((v) => String(v.id) === String(normalized.activeId)) || null
+      : null;
+    return res.status(200).json({ active, versions: normalized.versions });
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin-only: set active version by id
+// Body: { id: "<versionId>" }
+router.put("/app-version/active", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+
+    const id = typeof req.body?.id === "string" ? req.body.id.trim() : "";
+    if (!id) return res.status(400).json({ message: "id requis" });
+
+    const existing = await Setting.findOne({ key: APP_VERSION_KEY }).select("value").lean();
+    const control = normalizeAppVersionControl(existing?.value);
+    const exists = control.versions.find((v) => String(v.id) === String(id));
+    if (!exists) return res.status(404).json({ message: "Version introuvable" });
+
+    const next = { activeId: String(id), versions: control.versions };
+    const updated = await Setting.findOneAndUpdate(
+      { key: APP_VERSION_KEY },
+      { $set: { value: next } },
+      { upsert: true, new: true }
+    ).select("value");
+
+    const normalized = normalizeAppVersionControl(updated?.value);
+    const active = normalized.activeId
+      ? normalized.versions.find((v) => String(v.id) === String(normalized.activeId)) || null
+      : null;
+    return res.status(200).json({ active, versions: normalized.versions });
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin-only: delete a version entry by id (re-picks active if needed)
+router.delete("/app-version/:id", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+
+    const id = typeof req.params?.id === "string" ? req.params.id.trim() : "";
+    if (!id) return res.status(400).json({ message: "id requis" });
+
+    const existing = await Setting.findOne({ key: APP_VERSION_KEY }).select("value").lean();
+    const control = normalizeAppVersionControl(existing?.value);
+    const nextVersions = control.versions.filter((v) => String(v.id) !== String(id));
+    const next = {
+      activeId: control.activeId && String(control.activeId) === String(id) ? null : control.activeId,
+      versions: nextVersions,
+    };
+    if (!next.activeId && nextVersions.length) next.activeId = String(nextVersions[0].id);
+
+    const updated = await Setting.findOneAndUpdate(
+      { key: APP_VERSION_KEY },
+      { $set: { value: next } },
+      { upsert: true, new: true }
+    ).select("value");
+
+    const normalized = normalizeAppVersionControl(updated?.value);
+    const active = normalized.activeId
+      ? normalized.versions.find((v) => String(v.id) === String(normalized.activeId)) || null
+      : null;
+    return res.status(200).json({ active, versions: normalized.versions });
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
     return res.status(500).json({ error: err.message });
   }
 });

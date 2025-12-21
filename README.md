@@ -15,7 +15,7 @@ Little nodejs + mongodb app that I hack together with ChatGPT and Cursor to keep
 - Resume playback: per-user playback progress saving (time/duration)
 - Global settings: active Oscar year, “completion” modal content for checklist
 - Password flows: admin temp password reset + forced change on next login
-- Version endpoint backed by latest GitHub commit (cached)
+- App version display (footer) managed from Admin panel (no GitHub dependency)
 
 ## Setup
 Create a `.env` file at the project root (same folder as `package.json`).
@@ -37,8 +37,6 @@ JWT_SECRET=replace-with-a-random-string         # JWT signing secret (auth)
 # optional
 DOG_NAMES=woof,WOOF,Woof                        # simple registration "verification"
 OMDB_API=your_omdb_key                          # OMDb API key (movie info)
-GITHUB_OWNER=quoije                             # version history
-GITHUB_REPO=oscars-pool                         # version history
 ```
 
 Generate a good `JWT_SECRET`:
