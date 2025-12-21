@@ -18,7 +18,8 @@
     "express": "^4.22.1",
     "jsonwebtoken": "^9.0.2",
     "moment-timezone": "^0.5.47",
-    "mongoose": "^8.9.5"
+    "mongoose": "^8.9.5",
+    "multer": "^2.0.2"
   },
   "devDependencies": {
     "nodemon": "^3.1.9"

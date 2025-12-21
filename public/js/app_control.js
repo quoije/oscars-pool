@@ -218,6 +218,18 @@ window.onload = async function () {
   const adminUsersCountEl = document.getElementById('admin-users-count');
   const adminUsersTabBtn = document.getElementById('admin-users-tab');
 
+  // Admin DB backup/restore elements
+  const adminBackupTabBtn = document.getElementById('admin-backup-tab');
+  const dbBackupCreateBtn = document.getElementById('db-backup-create');
+  const dbBackupRefreshBtn = document.getElementById('db-backup-refresh');
+  const dbBackupListBody = document.getElementById('db-backup-list');
+  const dbRestoreFileEl = document.getElementById('db-restore-file');
+  const dbRestoreDropEl = document.getElementById('db-restore-drop');
+  const dbRestoreRunBtn = document.getElementById('db-restore-run');
+  const dbRestoreResultEl = document.getElementById('db-restore-result');
+
+  let backupsLoadedOnce = false;
+
   // Admin: add user form elements
   const openAddUserModalBtn = document.getElementById('open-add-user-modal');
   const addUserModalEl = document.getElementById('addUserModal');
@@ -753,6 +765,240 @@ window.onload = async function () {
   if (adminUsersTabBtn) {
     // Only load when the tab is shown (and then cache), to keep initial load snappy.
     adminUsersTabBtn.addEventListener('shown.bs.tab', () => loadAdminUsers({ force: false }));
+  }
+
+  function formatBytes(n) {
+    const v = Number(n);
+    if (!Number.isFinite(v) || v < 0) return '—';
+    if (v < 1024) return `${v} B`;
+    const units = ['KB', 'MB', 'GB', 'TB'];
+    let x = v / 1024;
+    let idx = 0;
+    while (x >= 1024 && idx < units.length - 1) {
+      x /= 1024;
+      idx += 1;
+    }
+    return `${x.toFixed(x >= 10 ? 1 : 2)} ${units[idx]}`;
+  }
+
+  function formatDateTime(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '—';
+    return d.toLocaleString('fr-FR', { hour12: false });
+  }
+
+  async function fetchBackups() {
+    const res = await fetch('/api/admin/db/backups', {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.message || data.error || `Erreur (${res.status})`);
+    }
+    return Array.isArray(data.backups) ? data.backups : [];
+  }
+
+  function renderBackups(backups) {
+    if (!dbBackupListBody) return;
+    const list = Array.isArray(backups) ? backups : [];
+    if (!list.length) {
+      dbBackupListBody.innerHTML = '<tr><td colspan="4" class="text-muted">Aucune sauvegarde.</td></tr>';
+      return;
+    }
+
+    dbBackupListBody.innerHTML = '';
+    list.forEach((b) => {
+      const name = String(b?.name || '');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td class="font-monospace">${name || '—'}</td>
+        <td class="text-nowrap">${formatBytes(b?.sizeBytes)}</td>
+        <td class="text-nowrap">${formatDateTime(b?.mtime)}</td>
+        <td class="text-end text-nowrap">
+          <button type="button" class="btn btn-sm btn-outline-secondary me-1" data-backup-download="${name}">Télécharger</button>
+          <button type="button" class="btn btn-sm btn-outline-danger" data-backup-delete="${name}">Supprimer</button>
+        </td>
+      `;
+      dbBackupListBody.appendChild(tr);
+    });
+
+    dbBackupListBody.querySelectorAll('button[data-backup-download]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const name = btn.getAttribute('data-backup-download');
+        if (!name) return;
+        btn.disabled = true;
+        const old = btn.textContent;
+        btn.textContent = '...';
+        try {
+          const res = await fetch(`/api/admin/db/backups/${encodeURIComponent(name)}`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.message || data.error || `Erreur (${res.status})`);
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = name;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+        } catch (err) {
+          showResponse('danger', err.message || 'Erreur réseau');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = old;
+        }
+      });
+    });
+
+    dbBackupListBody.querySelectorAll('button[data-backup-delete]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const name = btn.getAttribute('data-backup-delete');
+        if (!name) return;
+        const ok = window.confirm(`Supprimer la sauvegarde "${name}" ?`);
+        if (!ok) return;
+        btn.disabled = true;
+        const old = btn.textContent;
+        btn.textContent = '...';
+        try {
+          const res = await fetch(`/api/admin/db/backups/${encodeURIComponent(name)}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` },
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            throw new Error(data.message || data.error || `Erreur (${res.status})`);
+          }
+          showResponse('success', data.message || 'Sauvegarde supprimée.');
+          await loadBackups({ force: true });
+        } catch (err) {
+          showResponse('danger', err.message || 'Erreur réseau');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = old;
+        }
+      });
+    });
+  }
+
+  async function loadBackups(options = {}) {
+    const force = !!options.force;
+    if (!dbBackupListBody) return;
+    if (backupsLoadedOnce && !force) return;
+    dbBackupListBody.innerHTML = '<tr><td colspan="4" class="text-muted">Chargement…</td></tr>';
+    try {
+      const backups = await fetchBackups();
+      backupsLoadedOnce = true;
+      renderBackups(backups);
+    } catch (err) {
+      dbBackupListBody.innerHTML = `<tr><td colspan="4" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
+    }
+  }
+
+  async function createBackup() {
+    if (!dbBackupCreateBtn) return;
+    dbBackupCreateBtn.disabled = true;
+    const old = dbBackupCreateBtn.textContent;
+    dbBackupCreateBtn.textContent = 'Création...';
+    try {
+      const res = await fetch('/api/admin/db/backup', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || data.error || `Erreur (${res.status})`);
+      }
+      showResponse('success', `Sauvegarde créée: ${data?.backup?.name || 'OK'}`);
+      await loadBackups({ force: true });
+    } catch (err) {
+      showResponse('danger', err.message || 'Erreur réseau');
+    } finally {
+      dbBackupCreateBtn.disabled = false;
+      dbBackupCreateBtn.textContent = old;
+    }
+  }
+
+  async function runRestore() {
+    if (!dbRestoreRunBtn || !dbRestoreFileEl) return;
+    const file = dbRestoreFileEl.files && dbRestoreFileEl.files[0];
+    if (!file) {
+      showResponse('warning', 'Choisis un fichier de sauvegarde (.ndjson.gz).');
+      return;
+    }
+
+    const drop = !!dbRestoreDropEl?.checked;
+    const warning = drop
+      ? 'RESTORE avec DROP: toutes les collections restaurées seront remplacées.'
+      : 'RESTORE sans DROP: risque élevé de doublons/erreurs si la DB contient déjà des données.';
+
+    const ok = window.confirm(`${warning}\n\nContinuer ?`);
+    if (!ok) return;
+
+    dbRestoreRunBtn.disabled = true;
+    const old = dbRestoreRunBtn.textContent;
+    dbRestoreRunBtn.textContent = 'Restauration...';
+    if (dbRestoreResultEl) dbRestoreResultEl.textContent = '';
+
+    try {
+      const fd = new FormData();
+      fd.append('backup', file);
+      // drop passed as query (server supports both)
+      const res = await fetch(`/api/admin/db/restore?drop=${drop ? 'true' : 'false'}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}` },
+        body: fd,
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.message || data.error || `Erreur (${res.status})`);
+      }
+
+      showResponse('success', 'Restore terminé.');
+      if (dbRestoreResultEl) {
+        const inserted = data?.inserted && typeof data.inserted === 'object' ? data.inserted : {};
+        const keys = Object.keys(inserted);
+        const summary = keys.length
+          ? keys.map((k) => `${k}: ${inserted[k]}`).join(' | ')
+          : 'Aucun document inséré (ou backup vide).';
+        dbRestoreResultEl.textContent = summary;
+      }
+    } catch (err) {
+      showResponse('danger', err.message || 'Erreur réseau');
+    } finally {
+      dbRestoreRunBtn.disabled = false;
+      dbRestoreRunBtn.textContent = old;
+    }
+  }
+
+  if (adminBackupTabBtn) {
+    adminBackupTabBtn.addEventListener('shown.bs.tab', () => loadBackups({ force: false }));
+  }
+  if (dbBackupRefreshBtn) {
+    dbBackupRefreshBtn.addEventListener('click', async () => {
+      dbBackupRefreshBtn.disabled = true;
+      const old = dbBackupRefreshBtn.textContent;
+      dbBackupRefreshBtn.textContent = 'Chargement...';
+      try {
+        await loadBackups({ force: true });
+      } finally {
+        dbBackupRefreshBtn.disabled = false;
+        dbBackupRefreshBtn.textContent = old;
+      }
+    });
+  }
+  if (dbBackupCreateBtn) {
+    dbBackupCreateBtn.addEventListener('click', createBackup);
+  }
+  if (dbRestoreRunBtn) {
+    dbRestoreRunBtn.addEventListener('click', runRestore);
   }
 
   form.addEventListener('submit', async function (e) {

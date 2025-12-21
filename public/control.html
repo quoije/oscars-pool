@@ -80,6 +80,11 @@
         Films
       </button>
     </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="admin-backup-tab" data-bs-toggle="tab" data-bs-target="#admin-backup" type="button" role="tab" aria-controls="admin-backup" aria-selected="false">
+        Backup / Restore
+      </button>
+    </li>
   </ul>
 
   <div class="tab-content pt-3">
@@ -313,6 +318,71 @@
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="admin-backup" role="tabpanel" aria-labelledby="admin-backup-tab">
+      <div class="row g-3">
+        <div class="col-12 col-xxl-6">
+          <div class="card p-3">
+            <h4 class="mb-1">Backup</h4>
+            <p class="text-muted mb-3">
+              Crée une sauvegarde de la base MongoDB (format <code>.ndjson.gz</code>) et conserve-la sur le serveur.
+            </p>
+
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" id="db-backup-create" class="btn btn-warning">Créer une sauvegarde</button>
+              <button type="button" id="db-backup-refresh" class="btn btn-outline-primary">Rafraîchir la liste</button>
+            </div>
+
+            <div class="table-responsive mt-3">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Fichier</th>
+                    <th class="text-nowrap" style="width: 1%;">Taille</th>
+                    <th class="text-nowrap" style="width: 1%;">Modifié</th>
+                    <th class="text-nowrap text-end" style="width: 1%;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="db-backup-list">
+                  <tr><td colspan="4" class="text-muted">Ouvre l’onglet pour charger la liste…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xxl-6">
+          <div class="card p-3">
+            <h4 class="mb-1 text-danger">Restore</h4>
+            <p class="text-muted mb-3">
+              Restaure une sauvegarde (fichier <code>.ndjson.gz</code>). Option recommandée: <strong>drop</strong> pour supprimer les collections avant import.
+            </p>
+
+            <div class="alert alert-warning">
+              La restauration peut <strong>écraser</strong> les données. Fais un backup juste avant si besoin.
+            </div>
+
+            <div class="mb-3">
+              <label for="db-restore-file" class="form-label">Fichier de backup</label>
+              <input class="form-control" type="file" id="db-restore-file" accept=".gz,.ndjson.gz,application/gzip">
+            </div>
+
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="db-restore-drop" checked>
+              <label class="form-check-label" for="db-restore-drop">
+                Drop les collections avant restore (recommandé)
+              </label>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2">
+              <button type="button" id="db-restore-run" class="btn btn-danger">Restaurer</button>
+            </div>
+
+            <div id="db-restore-result" class="small text-muted mt-3"></div>
           </div>
         </div>
       </div>
