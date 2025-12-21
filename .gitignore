@@ -137,3 +137,7 @@ dist
 
 # ayylmao
 ayylmao.js
+
+# Local media files (served by python video_server.py)
+media/*
+!media/.gitkeep

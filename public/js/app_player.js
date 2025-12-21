@@ -87,7 +87,7 @@ function looksLikeHls(url) {
 function looksLikeVideoFile(url) {
   const s = String(url || '').toLowerCase();
   // common direct file extensions
-  return /\.(mp4|webm|ogg|ogv|mov|m4v)(\?|#|$)/.test(s);
+  return /\.(mp4|mkv|webm|ogg|ogv|mov|m4v)(\?|#|$)/.test(s);
 }
 
 function toYoutubeEmbed(url) {
