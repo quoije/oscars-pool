@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Player</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="./css/app.css" rel="stylesheet">
+  <style>
+    .player-wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .player-surface {
+      background: #000;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+    video {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: #000;
+    }
+    iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 0;
+      display: block;
+      background: #000;
+    }
+    .meta-muted {
+      color: rgba(0,0,0,0.65);
+    }
+    .badge-src {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body class="bg-light">
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container">
+      <a class="navbar-brand" href="/movies.html">Pool Oscars</a>
+      <div class="d-flex ms-auto align-items-center gap-2">
+        <span id="player-user-name" class="navbar-text text-white-50"></span>
+        <a id="open-original" class="btn btn-outline-light btn-sm d-none" target="_blank" rel="noopener noreferrer">Open original</a>
+        <a class="btn btn-outline-light btn-sm" href="/movies.html">Back to movies</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container py-4 player-wrap">
+    <div class="mb-3">
+      <h2 id="movie-title" class="mb-1">Loading…</h2>
+      <div class="meta-muted">
+        <span id="movie-category"></span>
+        <span id="movie-rating"></span>
+      </div>
+    </div>
+
+    <div id="alert" class="alert alert-danger d-none" role="alert"></div>
+
+    <div class="player-surface">
+      <video id="video" class="d-none" controls playsinline></video>
+      <iframe
+        id="embed"
+        class="d-none"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen
+        referrerpolicy="no-referrer-when-downgrade"
+        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation"
+      ></iframe>
+    </div>
+
+    <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
+      <span class="badge bg-secondary">Source</span>
+      <span id="source-label" class="badge bg-light text-dark badge-src">—</span>
+    </div>
+  </div>
+
+  <!-- HLS support (m3u8) -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.15/dist/hls.min.js"></script>
+  <script src="./js/app_player.js"></script>
+</body>
+</html>
+
