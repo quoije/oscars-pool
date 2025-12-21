@@ -108,10 +108,17 @@ window.onload = async function () {
     // Populate "Dernière mise à jour des films" banner (per active year)
     await fetchMoviesLastUpdated(activeYear, token);
 
-    const res = await fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
+    // Fetch movies + watched list in parallel (Render latency is high).
+    const [res, watchedRes] = await Promise.all([
+      fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      }),
+      fetch('/api/movies/watchedMovies', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      })
+    ]);
 
     if (!res.ok) {
       localStorage.removeItem('auth_token');
@@ -121,13 +128,8 @@ window.onload = async function () {
 
     const movies = await res.json();
 
-    // Sort movies alphabetically by title
+    // Sort movies alphabetically by title (server also sorts, but keep client as a fallback)
     movies.sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
-
-    const watchedRes = await fetch('/api/movies/watchedMovies', {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` },
-    });
 
     let watchedMovies = [];
     if (watchedRes.ok) {

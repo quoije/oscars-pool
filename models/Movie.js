@@ -20,4 +20,11 @@ const movieSchema = new mongoose.Schema({
   watchedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }, { timestamps: true });
 
+// Common read patterns:
+// - list movies for a year, sorted by title
+// - check "last update" per year (sort by updatedAt)
+movieSchema.index({ year: 1, title: 1 });
+movieSchema.index({ year: 1, updatedAt: -1 });
+movieSchema.index({ year: 1, imdb_id: 1 });
+
 module.exports = mongoose.model("Movie", movieSchema);

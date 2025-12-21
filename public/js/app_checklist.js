@@ -110,10 +110,6 @@ window.onload = async function () {
     const oscarYearEl = document.getElementById('oscar-year');
     if (oscarYearEl) oscarYearEl.textContent = String(activeYear);
 
-    // Load (public) "100% completion" modal content at runtime.
-    const completionModalContent = await fetchCompletionModalContent();
-    applyCompletionModalContent(completionModalContent);
-
     const oscarEffectiveDate = await fetchOscarEffectiveDate(activeYear);
     const targetDate =
       parseLocalNoonFromIsoDate(oscarEffectiveDate) ||
@@ -159,26 +155,31 @@ window.onload = async function () {
       window.location.href = '/';
     }
 
-    const res = await fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
+    // Fetch remaining data in parallel (Render latency is high).
+    const [completionModalContent, moviesRes, watchedRes] = await Promise.all([
+      fetchCompletionModalContent(),
+      fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}&view=checklist`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      }),
+      fetch('/api/movies/watchedMovies', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+    ]);
 
-    if (!res.ok) {
+    applyCompletionModalContent(completionModalContent);
+
+    if (!moviesRes.ok) {
       localStorage.removeItem('auth_token');
       window.location.href = '/';
       return;
     }
 
-    const movies = await res.json();
+    const movies = await moviesRes.json();
 
     // Sort movies alphabetically by title
     movies.sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
-
-    const watchedRes = await fetch('/api/movies/watchedMovies', {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
 
     let watchedMovies = [];
     if (watchedRes.ok) {
