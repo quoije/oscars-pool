@@ -62,6 +62,16 @@ window.onload = async function () {
   const selectAllBox = document.getElementById('select-all-movies');
   const selectedCountEl = document.getElementById('selected-count');
 
+  // Winners tab elements
+  const adminWinnersTabBtn = document.getElementById('admin-winners-tab');
+  const winnerYearSelect = document.getElementById('winner_year');
+  const winnerUserSelect = document.getElementById('winner_user');
+  const winnerPointsEl = document.getElementById('winner_points');
+  const winnerReloadBtn = document.getElementById('winner_reload');
+  const winnerClearBtn = document.getElementById('winner_clear');
+  const winnerSaveBtn = document.getElementById('winner_save');
+  const winnerCurrentEl = document.getElementById('winner_current');
+
   const editMovieModalEl = document.getElementById('editMovieModal');
   const editMovieModal = editMovieModalEl ? new bootstrap.Modal(editMovieModalEl) : null;
   const editMovieModalTitleEl = document.getElementById('editMovieModalTitle');
@@ -83,6 +93,10 @@ window.onload = async function () {
 
   let moviesById = new Map();
   let activeYear = null;
+  let winnersLoadedOnce = false;
+  let winnerUsersLoadedOnce = false;
+  let winnersByYear = new Map(); // year -> { year, userId, name, points }
+  let winnerUsers = []; // admin list: {id, name, email, ...}
 
   const DEFAULT_COMPLETION_MODAL = Object.freeze({
     title: 'Félicitations! very nice 🎉🎉🎉',
@@ -458,6 +472,168 @@ window.onload = async function () {
     if (!Number.isInteger(n)) return null;
     if (n < 1900 || n > 3000) return null;
     return n;
+  }
+
+  async function fetchWinners() {
+    const res = await fetch('/api/settings/winners', { method: 'GET' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return Array.isArray(data?.winners) ? data.winners : [];
+  }
+
+  async function saveWinner(year, userId, points) {
+    const res = await fetch(`/api/settings/winners/${encodeURIComponent(String(year))}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        userId: userId ? String(userId) : '',
+        points: points === undefined ? null : points,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  function buildWinnerUsersOptions(users) {
+    if (!winnerUserSelect) return;
+    const list = Array.isArray(users) ? users : [];
+    const previous = String(winnerUserSelect.value || '');
+    winnerUserSelect.innerHTML = '';
+
+    const emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = '—';
+    winnerUserSelect.appendChild(emptyOpt);
+
+    list.forEach((u) => {
+      const opt = document.createElement('option');
+      opt.value = String(u?.id || '');
+      const label = u?.name ? u.name : u?.email ? u.email : '(sans nom)';
+      opt.textContent = label;
+      winnerUserSelect.appendChild(opt);
+    });
+
+    const stillExists = list.map((u) => String(u?.id || '')).includes(previous);
+    winnerUserSelect.value = stillExists ? previous : '';
+  }
+
+  function setWinnerYearOptions(cleanedYears) {
+    if (!winnerYearSelect) return;
+    const years = Array.isArray(cleanedYears) ? cleanedYears : [];
+    const previous = String(winnerYearSelect.value || '');
+    winnerYearSelect.innerHTML = '';
+
+    if (!years.length) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Aucune année (ajoute un film)';
+      opt.disabled = true;
+      opt.selected = true;
+      winnerYearSelect.appendChild(opt);
+      winnerYearSelect.disabled = true;
+      if (winnerSaveBtn) winnerSaveBtn.disabled = true;
+      if (winnerClearBtn) winnerClearBtn.disabled = true;
+      return;
+    }
+
+    years.forEach((y) => {
+      const opt = document.createElement('option');
+      opt.value = String(y);
+      opt.textContent = String(y);
+      winnerYearSelect.appendChild(opt);
+    });
+
+    winnerYearSelect.disabled = false;
+    if (winnerSaveBtn) winnerSaveBtn.disabled = false;
+    if (winnerClearBtn) winnerClearBtn.disabled = false;
+
+    const stillExists = years.map(String).includes(previous);
+    const desired = stillExists
+      ? previous
+      : (activeYear && years.map(String).includes(String(activeYear)))
+        ? String(activeYear)
+        : String(years[0]);
+    winnerYearSelect.value = desired;
+  }
+
+  function getWinnerForYear(year) {
+    const y = parseYear(year);
+    if (!y) return null;
+    return winnersByYear.get(String(y)) || null;
+  }
+
+  function renderWinnerCurrent() {
+    if (!winnerCurrentEl || !winnerYearSelect) return;
+    const y = parseYear(winnerYearSelect.value);
+    if (!y) {
+      winnerCurrentEl.textContent = '—';
+      return;
+    }
+    const w = getWinnerForYear(y);
+    if (!w) {
+      winnerCurrentEl.textContent = `${y}: (aucun gagnant)`;
+      return;
+    }
+    const points = w.points === null || w.points === undefined ? null : Number(w.points);
+    const pointsLabel = points === null || Number.isNaN(points) ? '' : ` — ${points} pts`;
+    winnerCurrentEl.textContent = `${y}: ${w.name || '(utilisateur supprimé)'}${pointsLabel}`;
+  }
+
+  function applyWinnerFormFromCache() {
+    if (!winnerYearSelect) return;
+    const y = parseYear(winnerYearSelect.value);
+    if (!y) return;
+    const w = getWinnerForYear(y);
+    if (winnerUserSelect) {
+      winnerUserSelect.value = w?.userId ? String(w.userId) : '';
+    }
+    if (winnerPointsEl) {
+      const pts = w?.points;
+      winnerPointsEl.value = pts === null || pts === undefined ? '' : String(pts);
+    }
+    renderWinnerCurrent();
+  }
+
+  async function loadWinners(options = {}) {
+    const force = !!options.force;
+    if (winnersLoadedOnce && !force) return;
+    const list = await fetchWinners();
+    winnersLoadedOnce = true;
+    winnersByYear = new Map(
+      list
+        .filter((w) => parseYear(w?.year))
+        .map((w) => [
+          String(w.year),
+          {
+            year: Number(w.year),
+            userId: String(w.userId || ''),
+            name: w.name || null,
+            points: w.points ?? null,
+          }
+        ])
+    );
+    applyWinnerFormFromCache();
+  }
+
+  async function loadWinnerUsers(options = {}) {
+    const force = !!options.force;
+    if (winnerUsersLoadedOnce && !force) return;
+    const users = await fetchAdminUsers();
+    winnerUsersLoadedOnce = true;
+    winnerUsers = Array.isArray(users) ? users : [];
+    winnerUsers.sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), 'fr', { sensitivity: 'base' }));
+    buildWinnerUsersOptions(winnerUsers);
+    applyWinnerFormFromCache();
   }
 
   async function fetchActiveYear() {
@@ -1001,6 +1177,91 @@ window.onload = async function () {
     dbRestoreRunBtn.addEventListener('click', runRestore);
   }
 
+  // Winners tab wiring
+  async function initWinnersTab(options = {}) {
+    const force = !!options.force;
+    try {
+      await Promise.all([
+        loadWinners({ force }),
+        loadWinnerUsers({ force }),
+      ]);
+      renderWinnerCurrent();
+    } catch (err) {
+      showResponse('danger', err.message || 'Erreur réseau');
+    }
+  }
+
+  if (adminWinnersTabBtn) {
+    adminWinnersTabBtn.addEventListener('shown.bs.tab', () => initWinnersTab({ force: false }));
+  }
+
+  if (winnerYearSelect) {
+    winnerYearSelect.addEventListener('change', () => applyWinnerFormFromCache());
+  }
+
+  if (winnerReloadBtn) {
+    winnerReloadBtn.addEventListener('click', async () => {
+      winnerReloadBtn.disabled = true;
+      const old = winnerReloadBtn.textContent;
+      winnerReloadBtn.textContent = 'Chargement...';
+      try {
+        await initWinnersTab({ force: true });
+        showResponse('success', 'Gagnants rechargés.');
+      } finally {
+        winnerReloadBtn.disabled = false;
+        winnerReloadBtn.textContent = old;
+      }
+    });
+  }
+
+  if (winnerClearBtn) {
+    winnerClearBtn.addEventListener('click', async () => {
+      if (!winnerYearSelect) return;
+      const y = parseYear(winnerYearSelect.value);
+      if (!y) return;
+      const ok = window.confirm(`Supprimer le gagnant pour ${y} ?`);
+      if (!ok) return;
+      try {
+        if (winnerUserSelect) winnerUserSelect.value = '';
+        if (winnerPointsEl) winnerPointsEl.value = '';
+        await saveWinner(y, '', null);
+        await loadWinners({ force: true });
+        showResponse('success', `Gagnant supprimé pour ${y}.`);
+      } catch (err) {
+        showResponse('danger', err.message || 'Erreur réseau');
+      }
+    });
+  }
+
+  if (winnerSaveBtn) {
+    winnerSaveBtn.addEventListener('click', async () => {
+      if (!winnerYearSelect) return;
+      const y = parseYear(winnerYearSelect.value);
+      if (!y) {
+        showResponse('warning', 'Année invalide.');
+        return;
+      }
+      const userId = String(winnerUserSelect?.value || '').trim();
+      const pointsRaw = String(winnerPointsEl?.value || '').trim();
+      const points = pointsRaw === '' ? null : Number(pointsRaw);
+      const pointsToSend = pointsRaw === '' || Number.isNaN(points) ? null : Math.round(points);
+
+      winnerSaveBtn.disabled = true;
+      const old = winnerSaveBtn.textContent;
+      winnerSaveBtn.textContent = 'Enregistrement...';
+      try {
+        await saveWinner(y, userId, pointsToSend);
+        await loadWinners({ force: true });
+        showResponse('success', `Gagnant enregistré pour ${y}.`);
+      } catch (err) {
+        showResponse('danger', err.message || 'Erreur réseau');
+      } finally {
+        winnerSaveBtn.disabled = false;
+        winnerSaveBtn.textContent = old;
+      }
+    });
+  }
+
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
 
@@ -1135,6 +1396,10 @@ window.onload = async function () {
           activeYearInput.value = desired;
         }
       }
+
+      // Winners year dropdown (optional tab)
+      setWinnerYearOptions(cleanedYears);
+      applyWinnerFormFromCache();
     } catch (_) {
       // ignore
     }

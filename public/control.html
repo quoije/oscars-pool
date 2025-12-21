@@ -81,6 +81,11 @@
       </button>
     </li>
     <li class="nav-item" role="presentation">
+      <button class="nav-link" id="admin-winners-tab" data-bs-toggle="tab" data-bs-target="#admin-winners" type="button" role="tab" aria-controls="admin-winners" aria-selected="false">
+        Gagnants
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
       <button class="nav-link" id="admin-backup-tab" data-bs-toggle="tab" data-bs-target="#admin-backup" type="button" role="tab" aria-controls="admin-backup" aria-selected="false">
         Backup / Restore
       </button>
@@ -383,6 +388,49 @@
             </div>
 
             <div id="db-restore-result" class="small text-muted mt-3"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="admin-winners" role="tabpanel" aria-labelledby="admin-winners-tab">
+      <div class="row g-3">
+        <div class="col-12 col-xxl-8">
+          <div class="card p-3">
+            <h4 class="mb-1">Définir le gagnant par année</h4>
+            <div class="text-muted mb-3">
+              Choisis une année, un utilisateur, et des points (optionnel). Laisse le champ points vide si tu ne veux pas l’afficher.
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label for="winner_year" class="form-label">Année</label>
+                <select id="winner_year" class="form-select"></select>
+                <div class="form-text">Basé sur les années présentes dans les films.</div>
+              </div>
+              <div class="col-md-5">
+                <label for="winner_user" class="form-label">Utilisateur</label>
+                <select id="winner_user" class="form-select">
+                  <option value="">—</option>
+                </select>
+                <div class="form-text">Si tu choisis “—”, le gagnant est supprimé pour l’année.</div>
+              </div>
+              <div class="col-md-3">
+                <label for="winner_points" class="form-label">Points (optionnel)</label>
+                <input id="winner_points" type="number" class="form-control" placeholder="ex: 42" min="0" step="1">
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
+              <button type="button" id="winner_reload" class="btn btn-outline-primary">Recharger</button>
+              <button type="button" id="winner_clear" class="btn btn-outline-danger">Supprimer</button>
+              <button type="button" id="winner_save" class="btn btn-warning">Enregistrer</button>
+            </div>
+
+            <div class="mt-3">
+              <div class="text-muted small mb-1">Gagnant actuel</div>
+              <div id="winner_current" class="border rounded p-2 bg-light">—</div>
+            </div>
           </div>
         </div>
       </div>

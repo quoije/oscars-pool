@@ -167,6 +167,85 @@ router.get("/stats", verifyToken, async (req, res) => {
   }
 });
 
+// Get users who have 100% completion per year (across all years in DB)
+// Returns: { years: number[], totals: { [year]: number }, completersByYear: { [year]: {name, watchedCount, totalMoviesCount}[] } }
+router.get("/completions", verifyToken, async (req, res) => {
+  try {
+    const yearsRaw = await Movie.distinct("year");
+    const years = (Array.isArray(yearsRaw) ? yearsRaw : [])
+      .map((y) => Number(y))
+      .filter((y) => parseOscarYear(y))
+      .sort((a, b) => b - a);
+
+    if (years.length === 0) {
+      return res.status(200).json({ years: [], totals: {}, completersByYear: {} });
+    }
+
+    // Fetch imdb_id + year for all movies that have a valid year
+    const movies = await Movie.find({ year: { $in: years } }).select("imdb_id year").lean();
+
+    const imdbIdsByYear = new Map();
+    const totals = {};
+
+    movies.forEach((m) => {
+      const year = Number(m?.year);
+      if (!parseOscarYear(year)) return;
+      const imdb = typeof m?.imdb_id === "string" ? m.imdb_id : "";
+      if (!imdb) return;
+      if (!imdbIdsByYear.has(year)) imdbIdsByYear.set(year, new Set());
+      imdbIdsByYear.get(year).add(imdb);
+    });
+
+    for (const y of years) {
+      const set = imdbIdsByYear.get(y);
+      totals[String(y)] = set ? set.size : 0;
+    }
+
+    const users = await User.find().select("name watchedMovies.imdb_id").lean();
+
+    const completersByYear = {};
+    for (const y of years) {
+      const total = totals[String(y)] || 0;
+      if (total <= 0) {
+        completersByYear[String(y)] = [];
+        continue;
+      }
+      const yearSet = imdbIdsByYear.get(y) || new Set();
+
+      const completers = [];
+      users.forEach((u) => {
+        const watched = Array.isArray(u?.watchedMovies) ? u.watchedMovies : [];
+        const watchedSet = new Set(
+          watched
+            .map((wm) => (typeof wm?.imdb_id === "string" ? wm.imdb_id : ""))
+            .filter(Boolean)
+        );
+
+        let count = 0;
+        for (const imdb of watchedSet) {
+          if (yearSet.has(imdb)) count += 1;
+        }
+
+        if (count === total) {
+          completers.push({
+            name: u?.name || "(sans nom)",
+            watchedCount: count,
+            totalMoviesCount: total,
+          });
+        }
+      });
+
+      completers.sort((a, b) => String(a.name).localeCompare(String(b.name), "fr", { sensitivity: "base" }));
+      completersByYear[String(y)] = completers;
+    }
+
+    return res.status(200).json({ years, totals, completersByYear });
+  } catch (err) {
+    console.error("Erreur dans l'extraction des completers:", err);
+    return res.status(500).json({ error: "Internal server error" });
+  }
+});
+
 // Register User
 router.post("/register", async (req, res) => {
   const { name, email, password, verifoof } = req.body;
