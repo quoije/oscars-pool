@@ -1,5 +1,6 @@
 function createPageLoader(options = {}) {
   const title = String(options.title || 'Chargement…');
+  // Subtitle kept for backwards-compat with callers, but we no longer render text in the UI.
   const subtitle = String(options.subtitle || 'Préparation de la page…');
 
   let progress = 0;
@@ -13,22 +14,15 @@ function createPageLoader(options = {}) {
   overlay.setAttribute('aria-busy', 'true');
 
   overlay.innerHTML = `
-    <div class="page-loader-card">
-      <p class="page-loader-title">${title}</p>
-      <p class="page-loader-subtitle" id="page-loader-subtitle">${subtitle}</p>
+    <div class="page-loader-card page-loader-card--baronly">
+      <span class="visually-hidden">${title}</span>
       <div class="page-loader-progress" aria-hidden="true">
         <div class="page-loader-bar" id="page-loader-bar"></div>
-      </div>
-      <div class="page-loader-actions d-none" id="page-loader-actions">
-        <button type="button" class="btn btn-sm btn-outline-dark" id="page-loader-retry">Réessayer</button>
       </div>
     </div>
   `;
 
   const barEl = () => overlay.querySelector('#page-loader-bar');
-  const subtitleEl = () => overlay.querySelector('#page-loader-subtitle');
-  const actionsEl = () => overlay.querySelector('#page-loader-actions');
-  const retryBtnEl = () => overlay.querySelector('#page-loader-retry');
 
   function clampPct(p) {
     const n = Number(p);
@@ -42,9 +36,8 @@ function createPageLoader(options = {}) {
     if (bar) bar.style.width = `${progress}%`;
   }
 
-  function setSubtitle(text) {
-    const el = subtitleEl();
-    if (el) el.textContent = String(text || '');
+  function setSubtitle(_) {
+    // Intentionally no-op (we only show the bar now).
   }
 
   function getNavHeightPx() {
@@ -100,13 +93,10 @@ function createPageLoader(options = {}) {
     hideAndRemoveSoon();
   }
 
-  function fail(message) {
-    setSubtitle(message || 'Erreur lors du chargement.');
-    setProgress(Math.max(progress, 90));
-    const actions = actionsEl();
-    if (actions) actions.classList.remove('d-none');
-    const btn = retryBtnEl();
-    if (btn) btn.onclick = () => window.location.reload();
+  function fail(_) {
+    // Don't block the UI on errors: let the page render its own error message.
+    setProgress(Math.max(progress, 95));
+    window.setTimeout(() => hideAndRemoveSoon(), 200);
   }
 
   ensureMounted();
