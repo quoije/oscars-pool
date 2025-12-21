@@ -27,12 +27,6 @@ npm install
 node index.js
 ```
 
-If you're updating an existing install (older `node_modules`), the admin DB backup/restore feature now uses `multer`, so make sure it's installed:
-
-```bash
-npm install multer
-```
-
 Add this to your `.env` (**required**: `MONGO_URI`, `JWT_SECRET`):
 
 ```bash
