@@ -298,6 +298,61 @@ router.get("/admin/list", verifyToken, async (req, res) => {
   }
 });
 
+// Admin: create a user with a random temp password (forces change on first login).
+router.post("/admin/create", verifyToken, async (req, res) => {
+  if (!isAdminFromDecoded(req.user)) {
+    return res.status(403).json({ message: "You do not have admin privileges" });
+  }
+
+  const { name, email, admin } = req.body || {};
+  const nameNorm = typeof name === "string" ? name.trim() : "";
+  const emailNorm = typeof email === "string" ? email.trim() : "";
+  const makeAdmin = !!admin;
+
+  if (!nameNorm) {
+    return res.status(400).json({ message: "Nom requis." });
+  }
+  if (!emailNorm) {
+    return res.status(400).json({ message: "Email requis." });
+  }
+  // Basic sanity check (not a full RFC validator)
+  if (!/^\S+@\S+\.\S+$/.test(emailNorm)) {
+    return res.status(400).json({ message: "Email invalide." });
+  }
+
+  try {
+    const existingUser = await User.findOne({ email: emailNorm });
+    if (existingUser) {
+      return res.status(409).json({ message: "L'email existe déjà, veuillez en choisir un autre." });
+    }
+
+    const tempPassword = generateTempPassword();
+    const hashedPassword = await bcrypt.hash(tempPassword, 10);
+    const expiresAt = new Date(Date.now() + TEMP_PASSWORD_TTL_MS);
+
+    const user = new User({
+      name: nameNorm,
+      email: emailNorm,
+      password: hashedPassword,
+      role: makeAdmin ? 69 : 0,
+      mustChangePassword: true,
+      tempPasswordIssuedAt: new Date(),
+      tempPasswordExpiresAt: expiresAt,
+    });
+
+    await user.save();
+
+    return res.status(201).json({
+      message: "Utilisateur créé. Mot de passe temporaire généré.",
+      tempPassword,
+      expiresAt: expiresAt.toISOString(),
+      user: { id: String(user._id), name: user.name, email: user.email, admin: user.role === 69, mustChangePassword: true },
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Admin: delete a user (and related playback progress)
 router.post("/admin/delete", verifyToken, async (req, res) => {
   if (!isAdminFromDecoded(req.user)) {

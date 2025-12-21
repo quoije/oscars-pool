@@ -218,6 +218,22 @@ window.onload = async function () {
   const adminUsersCountEl = document.getElementById('admin-users-count');
   const adminUsersTabBtn = document.getElementById('admin-users-tab');
 
+  // Admin: add user form elements
+  const openAddUserModalBtn = document.getElementById('open-add-user-modal');
+  const addUserModalEl = document.getElementById('addUserModal');
+  const addUserModal = addUserModalEl ? new bootstrap.Modal(addUserModalEl) : null;
+  const addUserForm = document.getElementById('add-user-form');
+  const addUserNameEl = document.getElementById('add_user_name');
+  const addUserEmailEl = document.getElementById('add_user_email');
+  const addUserAdminEl = document.getElementById('add_user_admin');
+  const addUserResponseEl = document.getElementById('add-user-response');
+  const addUserResultEl = document.getElementById('add-user-result');
+  const addUserTempPasswordEl = document.getElementById('add-user-temp-password');
+  const addUserExpiresAtEl = document.getElementById('add-user-expires-at');
+  const addUserSubmitBtn = document.getElementById('add-user-submit');
+  const addUserResetBtn = document.getElementById('add-user-reset');
+  const copyAddUserTempPasswordBtn = document.getElementById('copy-add-user-temp-password');
+
   // Admin user modals
   const resetUserPasswordModalEl = document.getElementById('resetUserPasswordModal');
   const resetUserPasswordModal = resetUserPasswordModalEl ? new bootstrap.Modal(resetUserPasswordModalEl) : null;
@@ -253,6 +269,27 @@ window.onload = async function () {
     if (!el) return;
     el.classList.add('d-none');
     el.textContent = '';
+  }
+
+  function resetAddUserUi(options = {}) {
+    hideAlert(addUserResponseEl);
+    if (addUserResultEl) addUserResultEl.classList.add('d-none');
+    if (addUserTempPasswordEl) addUserTempPasswordEl.textContent = '—';
+    if (addUserExpiresAtEl) addUserExpiresAtEl.textContent = '';
+    if (options.resetForm && addUserForm) {
+      try { addUserForm.reset(); } catch (_) {}
+    }
+    if (addUserSubmitBtn) addUserSubmitBtn.disabled = false;
+  }
+
+  function openAddUserModal() {
+    if (!addUserModal) return;
+    resetAddUserUi({ resetForm: true });
+    try { addUserModal.show(); } catch (_) {}
+    // Focus name field (best effort)
+    setTimeout(() => {
+      try { addUserNameEl?.focus(); } catch (_) {}
+    }, 50);
   }
 
   function resetResetUserModalUi() {
@@ -527,6 +564,91 @@ window.onload = async function () {
       } catch (_) {
         // Fallback: select text for manual copy
         setAlert(resetUserModalResponseEl, 'warning', 'Impossible de copier automatiquement. Copie manuellement.');
+      }
+    });
+  }
+
+  if (copyAddUserTempPasswordBtn) {
+    copyAddUserTempPasswordBtn.addEventListener('click', async () => {
+      const text = String(addUserTempPasswordEl?.textContent || '').trim();
+      if (!text || text === '—') return;
+      try {
+        await navigator.clipboard.writeText(text);
+        setAlert(addUserResponseEl, 'success', 'Copié.');
+        setTimeout(() => hideAlert(addUserResponseEl), 1200);
+      } catch (_) {
+        setAlert(addUserResponseEl, 'warning', 'Impossible de copier automatiquement. Copie manuellement.');
+      }
+    });
+  }
+
+  if (openAddUserModalBtn) {
+    openAddUserModalBtn.addEventListener('click', () => openAddUserModal());
+  }
+
+  if (addUserModalEl) {
+    // Whenever the modal is opened, clear previous result/state.
+    addUserModalEl.addEventListener('shown.bs.modal', () => {
+      resetAddUserUi({ resetForm: true });
+    });
+  }
+
+  if (addUserResetBtn) {
+    addUserResetBtn.addEventListener('click', () => {
+      resetAddUserUi({ resetForm: true });
+    });
+  }
+
+  if (addUserForm) {
+    addUserForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      resetAddUserUi({ resetForm: false });
+
+      const name = String(addUserNameEl?.value || '').trim();
+      const email = String(addUserEmailEl?.value || '').trim();
+      const admin = !!addUserAdminEl?.checked;
+
+      if (!name) {
+        setAlert(addUserResponseEl, 'warning', 'Nom requis.');
+        return;
+      }
+      if (!email) {
+        setAlert(addUserResponseEl, 'warning', 'Email requis.');
+        return;
+      }
+
+      if (addUserSubmitBtn) addUserSubmitBtn.disabled = true;
+      setAlert(addUserResponseEl, 'warning', 'Création...');
+
+      try {
+        const res = await fetch('/api/users/admin/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ name, email, admin }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setAlert(addUserResponseEl, 'danger', data.message || data.error || `Erreur (${res.status})`);
+          if (addUserSubmitBtn) addUserSubmitBtn.disabled = false;
+          return;
+        }
+
+        // Show temp password once
+        if (addUserTempPasswordEl) addUserTempPasswordEl.textContent = data?.tempPassword || '—';
+        if (addUserExpiresAtEl) addUserExpiresAtEl.textContent = data?.expiresAt ? `Expire: ${data.expiresAt}` : '';
+        if (addUserResultEl) addUserResultEl.classList.remove('d-none');
+        setAlert(addUserResponseEl, 'success', data.message || 'Utilisateur créé.');
+        if (addUserSubmitBtn) addUserSubmitBtn.disabled = false;
+
+        // Refresh list if already loaded or when user tab is active
+        await loadAdminUsers({ force: true });
+      } catch (err) {
+        setAlert(addUserResponseEl, 'danger', err.message || 'Erreur réseau');
+        if (addUserSubmitBtn) addUserSubmitBtn.disabled = false;
       }
     });
   }

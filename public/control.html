@@ -181,7 +181,10 @@
                   <span id="admin-users-count">—</span> utilisateur(s)
                 </div>
               </div>
-              <button type="button" id="refresh-users" class="btn btn-outline-primary btn-sm">Rafraîchir</button>
+              <div class="d-flex gap-2">
+                <button type="button" id="open-add-user-modal" class="btn btn-warning btn-sm">Ajouter un utilisateur</button>
+                <button type="button" id="refresh-users" class="btn btn-outline-primary btn-sm">Rafraîchir</button>
+              </div>
             </div>
 
             <div class="table-responsive">
@@ -386,6 +389,54 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
         <button type="button" class="btn btn-danger" id="confirm-delete-user" disabled>Supprimer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add user modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Ajouter un utilisateur</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-muted mb-2">
+          Crée un compte avec un <strong>mot de passe temporaire</strong> (affiché une seule fois). L’utilisateur devra le changer à sa prochaine connexion.
+        </div>
+
+        <div id="add-user-response" class="alert d-none" role="alert"></div>
+
+        <form id="add-user-form">
+          <div class="mb-3">
+            <label for="add_user_name" class="form-label">Nom</label>
+            <input type="text" class="form-control" id="add_user_name" placeholder="Prénom / pseudo" required>
+          </div>
+          <div class="mb-3">
+            <label for="add_user_email" class="form-label">Email</label>
+            <input type="email" class="form-control" id="add_user_email" placeholder="email@exemple.com" required>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="add_user_admin">
+            <label class="form-check-label" for="add_user_admin">Admin</label>
+          </div>
+
+          <div id="add-user-result" class="border rounded p-2 bg-light d-none">
+            <div class="small text-muted mb-1">Mot de passe temporaire (affiché une seule fois)</div>
+            <div class="d-flex gap-2 align-items-center">
+              <code class="flex-grow-1" id="add-user-temp-password">—</code>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="copy-add-user-temp-password">Copier</button>
+            </div>
+            <div class="small text-muted mt-2" id="add-user-expires-at"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+        <button type="button" id="add-user-reset" class="btn btn-outline-secondary">Reset</button>
+        <button type="submit" form="add-user-form" class="btn btn-warning" id="add-user-submit">Créer</button>
       </div>
     </div>
   </div>
