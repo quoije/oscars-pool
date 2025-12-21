@@ -58,7 +58,10 @@ footer {
 
   .page-loader-overlay {
     position: fixed;
-    inset: 0;
+    top: var(--page-loader-top, 0px);
+    left: 0;
+    right: 0;
+    bottom: 0;
     z-index: 2000;
     display: flex;
     align-items: center;
@@ -85,6 +88,11 @@ footer {
     box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12);
   }
 
+  .page-loader-card.page-loader-card--baronly {
+    width: min(420px, 90vw);
+    padding: 14px;
+  }
+
   .page-loader-title {
     margin: 0 0 10px 0;
     font-weight: 700;
@@ -109,7 +117,7 @@ footer {
     height: 100%;
     width: 0%;
     border-radius: 999px;
-    background: linear-gradient(90deg, #ff4d4d 0%, #ffb200 50%, #4cd964 100%);
+    background: #111;
     transition: width 220ms ease;
   }
 
