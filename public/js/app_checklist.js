@@ -8,11 +8,9 @@ window.onload = async function () {
       movieTableBody.innerHTML = `
         <tr>
           <td colspan="3" class="text-center py-4" aria-live="polite" aria-busy="true">
-            <div class="d-inline-flex align-items-center gap-2">
-              <div class="spinner-border text-secondary" role="status" aria-label="Chargement">
-                <span class="visually-hidden">Chargement...</span>
-              </div>
-              <span>Chargement…</span>
+            <div class="d-inline-flex align-items-center gap-2" role="status" aria-label="Chargement">
+              <span class="text-muted">Chargement</span>
+              <span class="loading-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
             </div>
           </td>
         </tr>
@@ -20,15 +18,11 @@ window.onload = async function () {
     }
 
     function setInlineLoading(el, label = 'Chargement…') {
+      // Keep the header clean: no inline spinners, just text.
       if (!el) return;
-      el.innerHTML = `
-        <span class="d-inline-flex align-items-center gap-2" aria-live="polite" aria-busy="true">
-          <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Chargement">
-            <span class="visually-hidden">Chargement...</span>
-          </span>
-          <span>${label}</span>
-        </span>
-      `;
+      el.textContent = label;
+      el.setAttribute('aria-live', 'polite');
+      el.setAttribute('aria-busy', 'true');
     }
 
     function showTableError(message) {
@@ -224,9 +218,7 @@ window.onload = async function () {
     showTableLoading();
     setInlineLoading(watchedRatioEl);
     const progressBarEl = document.getElementById('progress-bar');
-    if (progressBarEl) {
-      progressBarEl.classList.add('progress-bar-striped', 'progress-bar-animated');
-    }
+    // Avoid extra "loading" animations; the table loader is enough.
 
     let movies = [];
     let watchedMovies = [];
@@ -270,9 +262,7 @@ window.onload = async function () {
       const summary = await summaryPromise;
       watchedMovies = Array.isArray(summary?.watchedMovies) ? summary.watchedMovies : [];
 
-      if (progressBarEl) {
-        progressBarEl.classList.remove('progress-bar-striped', 'progress-bar-animated');
-      }
+      if (progressBarEl) progressBarEl.removeAttribute('aria-busy');
     } catch (e) {
       showTableError('Impossible de charger la checklist. Réessaie dans quelques instants.');
       return;
