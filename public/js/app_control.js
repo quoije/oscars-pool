@@ -542,6 +542,10 @@ window.onload = async function () {
     try {
       const yearsRes = await fetch('/api/movies/years');
       const years = yearsRes.ok ? await yearsRes.json() : [];
+      const cleanedYears = (Array.isArray(years) ? years : [])
+        .map((y) => Number(y))
+        .filter((y) => Number.isInteger(y) && y >= 1900 && y <= 3000)
+        .sort((a, b) => b - a);
 
       // Rebuild manage dropdown from scratch (so removed years disappear)
       const previousSelection = manageYearSelect.value;
@@ -551,19 +555,19 @@ window.onload = async function () {
       allOpt.textContent = 'Toutes';
       manageYearSelect.appendChild(allOpt);
 
-      years.forEach((y) => {
+      cleanedYears.forEach((y) => {
         const opt = document.createElement('option');
         opt.value = String(y);
         opt.textContent = String(y);
         manageYearSelect.appendChild(opt);
       });
 
-      const stillExists = years.map(String).includes(previousSelection);
+      const stillExists = cleanedYears.map(String).includes(previousSelection);
       manageYearSelect.value = stillExists ? previousSelection : '';
 
       // Prefer defaulting UI to active year (if selection is empty/invalid).
       const hasSelection = !!manageYearSelect.value;
-      if (!hasSelection && activeYear && years.map(String).includes(String(activeYear))) {
+      if (!hasSelection && activeYear && cleanedYears.map(String).includes(String(activeYear))) {
         manageYearSelect.value = String(activeYear);
       }
 
@@ -571,8 +575,44 @@ window.onload = async function () {
       if (!yearInput.value) {
         if (activeYear) {
           yearInput.value = String(activeYear);
-        } else if (years.length > 0) {
-          yearInput.value = String(years[0]);
+        } else if (cleanedYears.length > 0) {
+          yearInput.value = String(cleanedYears[0]);
+        }
+      }
+
+      // Rebuild active-year dropdown from distinct movie years
+      if (activeYearInput && saveActiveYearBtn) {
+        const previousActiveSelection = String(activeYearInput.value || '');
+        activeYearInput.innerHTML = '';
+
+        if (cleanedYears.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'Aucune année (ajoute un film)';
+          opt.disabled = true;
+          opt.selected = true;
+          activeYearInput.appendChild(opt);
+          activeYearInput.disabled = true;
+          saveActiveYearBtn.disabled = true;
+        } else {
+          cleanedYears.forEach((y) => {
+            const opt = document.createElement('option');
+            opt.value = String(y);
+            opt.textContent = String(y);
+            activeYearInput.appendChild(opt);
+          });
+
+          // Keep current selection if still valid, else use activeYear, else latest.
+          const desired =
+            (previousActiveSelection && cleanedYears.map(String).includes(previousActiveSelection))
+              ? previousActiveSelection
+              : (activeYear && cleanedYears.map(String).includes(String(activeYear)))
+                ? String(activeYear)
+                : String(cleanedYears[0]);
+
+          activeYearInput.disabled = false;
+          saveActiveYearBtn.disabled = false;
+          activeYearInput.value = desired;
         }
       }
     } catch (_) {
@@ -860,8 +900,7 @@ window.onload = async function () {
 
   // Initial load
   activeYear = await fetchActiveYear();
-  if (activeYearInput && activeYear) {
-    activeYearInput.value = String(activeYear);
+  if (activeYear) {
     document.title = `Pool Oscars ${activeYear} - Admin`;
   }
 
