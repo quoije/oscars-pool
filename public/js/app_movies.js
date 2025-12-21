@@ -117,6 +117,7 @@ window.onload = async function () {
       const isChecked = watchedMoviesInYear.some(watchedMovie => watchedMovie.imdb_id === movie.imdb_id);
       const watchedMovie = watchedMoviesInYear.find(wm => wm.imdb_id === movie.imdb_id);
       const watchedDate = watchedMovie ? new Date(watchedMovie.watchedDate).toLocaleString() : '';
+      const playerUrl = movie && movie._id ? `/player.html?id=${encodeURIComponent(movie._id)}` : (movie.vod_link || '#');
 
       const movieDiv = document.createElement('div');
       movieDiv.classList.add('col-md-4', 'mb-4', 'movie-card');
@@ -124,10 +125,12 @@ window.onload = async function () {
       movieDiv.innerHTML = `
         <div class="card">
           ${isChecked ? '<div class="watched-banner">VISIONNÉ</div>' : ''}
-          <a href="${movie.vod_link}"><img src="${movie.poster}" class="card-img-top" alt="${movie.title}" style="width: 75%; display: block; margin: 0 auto; padding: 10px;"></a>
+          <a href="${playerUrl}" target="_blank" rel="noopener noreferrer">
+            <img src="${movie.poster}" class="card-img-top" alt="${movie.title}" style="width: 75%; display: block; margin: 0 auto; padding: 10px;">
+          </a>
           <div class="card-body">
             <h5 class="card-title d-flex justify-content-between align-items-center">
-              ${movie.title}
+              <a href="${playerUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-dark">${movie.title}</a>
               <span>⭐ ${movie.rating} <a href="https://www.imdb.com/title/${movie.imdb_id}/"><img src="/img/imdb.png"></a></span>
             </h5>
             <p class="fw-bold fst-italic card-text" style="font-size: 0.75rem;">${movie.category}</p>

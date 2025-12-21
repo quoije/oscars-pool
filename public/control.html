@@ -251,8 +251,31 @@
                 <input type="text" class="form-control" id="category" placeholder="Best Picture, etc." required>
               </div>
               <div class="mb-3">
-                <label for="vod_link" class="form-label">Lien VOD</label>
-                <input type="url" class="form-control" id="vod_link" placeholder="https://..." required>
+                <label class="form-label">Lecteur (source)</label>
+                <div class="row g-2">
+                  <div class="col-12 col-lg-4">
+                    <label for="player_mode" class="form-label">Mode</label>
+                    <select id="player_mode" class="form-select">
+                      <option value="auto" selected>Auto</option>
+                      <option value="video">Video</option>
+                      <option value="embed">Embed</option>
+                    </select>
+                    <div class="form-text">Auto = video_src → embed_src → vod_link.</div>
+                  </div>
+                  <div class="col-12 col-lg-8">
+                    <label for="video_src" class="form-label">Video URL (mp4/webm/m3u8)</label>
+                    <input type="text" class="form-control" id="video_src" placeholder="https://.../movie.mp4 or .../playlist.m3u8">
+                  </div>
+                  <div class="col-12">
+                    <label for="embed_src" class="form-label">Embed URL or iframe code</label>
+                    <textarea class="form-control font-monospace" id="embed_src" rows="3" placeholder="https://www.youtube.com/watch?v=... OR <iframe src='...'></iframe>"></textarea>
+                  </div>
+                  <div class="col-12">
+                    <label for="vod_link" class="form-label">Legacy VOD link (optional)</label>
+                    <input type="text" class="form-control" id="vod_link" placeholder="https://...">
+                    <div class="form-text">Backward-compat. Prefer video_src / embed_src above.</div>
+                  </div>
+                </div>
               </div>
               <div class="d-flex gap-2">
                 <button type="submit" class="btn btn-primary">Ajouter</button>
@@ -299,13 +322,14 @@
                   <tr>
                     <th style="width: 1%;">Sel.</th>
                     <th>Titre</th>
+                    <th style="width: 12%;">Player</th>
                     <th style="width: 20%;">Catégorie</th>
                     <th style="width: 12%;">Année</th>
                     <th style="width: 1%;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="admin-movies-body">
-                  <tr><td colspan="5" class="text-muted">Charge la liste…</td></tr>
+                  <tr><td colspan="6" class="text-muted">Charge la liste…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -342,8 +366,30 @@
             <input type="text" class="form-control" id="edit_category" placeholder="Best Picture, etc." required>
           </div>
           <div class="col-md-6">
-            <label for="edit_vod_link" class="form-label">Lien VOD</label>
-            <input type="url" class="form-control" id="edit_vod_link" placeholder="https://..." required>
+            <label class="form-label">Lecteur (source)</label>
+            <div class="row g-2">
+              <div class="col-12">
+                <label for="edit_player_mode" class="form-label">Mode</label>
+                <select id="edit_player_mode" class="form-select">
+                  <option value="auto">Auto</option>
+                  <option value="video">Video</option>
+                  <option value="embed">Embed</option>
+                </select>
+                <div class="form-text">Auto = video_src → embed_src → vod_link.</div>
+              </div>
+              <div class="col-12">
+                <label for="edit_video_src" class="form-label">Video URL (mp4/webm/m3u8)</label>
+                <input type="text" class="form-control" id="edit_video_src" placeholder="https://.../movie.mp4 or .../playlist.m3u8">
+              </div>
+              <div class="col-12">
+                <label for="edit_embed_src" class="form-label">Embed URL or iframe code</label>
+                <textarea class="form-control font-monospace" id="edit_embed_src" rows="3" placeholder="https://... OR <iframe ...>"></textarea>
+              </div>
+              <div class="col-12">
+                <label for="edit_vod_link" class="form-label">Legacy VOD link (optional)</label>
+                <input type="text" class="form-control" id="edit_vod_link" placeholder="https://...">
+              </div>
+            </div>
           </div>
 
           <div class="col-12">

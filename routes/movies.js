@@ -3,6 +3,7 @@ const Movie = require("../models/Movie");
 const User = require("../models/User");
 const axios = require("axios");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 
 const router = express.Router();
 
@@ -16,6 +17,28 @@ function parseOscarYear(raw) {
 
 function isValidImdbId(value) {
   return typeof value === "string" && /^tt\d{5,}$/.test(value.trim());
+}
+
+function normalizeOptionalString(v, maxLen = 2048) {
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  const s = String(v).trim();
+  if (!s) return "";
+  return s.slice(0, maxLen);
+}
+
+function normalizePlayerMode(v) {
+  const s = String(v || "").trim().toLowerCase();
+  if (!s) return "auto";
+  if (s === "auto" || s === "video" || s === "embed") return s;
+  return null;
+}
+
+function hasAnySource({ vod_link, video_src, embed_src }) {
+  const a = typeof vod_link === "string" ? vod_link.trim() : "";
+  const b = typeof video_src === "string" ? video_src.trim() : "";
+  const c = typeof embed_src === "string" ? embed_src.trim() : "";
+  return !!(a || b || c);
 }
 
 // Fetch movie details from OMDb API
@@ -144,7 +167,7 @@ router.patch("/users/updateWatchedMovies", async (req, res) => {
 
 // Add movie
 router.post("/add", async (req, res) => {
-  const { imdb_id, category, vod_link, year } = req.body;
+  const { imdb_id, category, vod_link, year, player_mode, video_src, embed_src } = req.body;
 
   try {
     // Get the token from the Authorization header
@@ -167,6 +190,17 @@ router.post("/add", async (req, res) => {
       return res.status(400).json({ message: "Année invalide (ex: 2026)" });
     }
 
+    const normalizedVod = normalizeOptionalString(vod_link, 4096);
+    const normalizedVideo = normalizeOptionalString(video_src, 4096);
+    const normalizedEmbed = normalizeOptionalString(embed_src, 20000);
+    const normalizedMode = normalizePlayerMode(player_mode);
+    if (normalizedMode === null) {
+      return res.status(400).json({ message: "player_mode invalide (auto|video|embed)" });
+    }
+    if (!hasAnySource({ vod_link: normalizedVod || "", video_src: normalizedVideo || "", embed_src: normalizedEmbed || "" })) {
+      return res.status(400).json({ message: "Ajoute au moins une source (VOD / video_src / embed_src)." });
+    }
+
     // Fetch movie details from OMDb API
     const movieDetails = await fetchMovieDetailsFromOmdb(imdb_id);
     
@@ -179,7 +213,10 @@ router.post("/add", async (req, res) => {
       poster: movieDetails.poster,
       year: parsedYear,
       category,
-      vod_link
+      vod_link: normalizedVod || undefined,
+      player_mode: normalizedMode,
+      video_src: normalizedVideo || undefined,
+      embed_src: normalizedEmbed || undefined,
     });
 
     await movie.save();
@@ -261,6 +298,9 @@ router.put("/:id", async (req, res) => {
       year,
       category,
       vod_link,
+      player_mode,
+      video_src,
+      embed_src,
       refreshOmdb,
     } = req.body || {};
 
@@ -280,7 +320,14 @@ router.put("/:id", async (req, res) => {
     }
 
     if (typeof vod_link === "string" && vod_link.trim() === "") {
-      return res.status(400).json({ message: "Lien VOD invalide." });
+      // Allow clearing vod_link; enforce "at least one source" after applying changes.
+    }
+
+    if (player_mode !== undefined) {
+      const normalizedMode = normalizePlayerMode(player_mode);
+      if (normalizedMode === null) {
+        return res.status(400).json({ message: "player_mode invalide (auto|video|embed)" });
+      }
     }
 
     const movie = await Movie.findById(id);
@@ -288,7 +335,22 @@ router.put("/:id", async (req, res) => {
 
     if (imdb_id !== undefined) movie.imdb_id = String(imdb_id).trim();
     if (category !== undefined) movie.category = String(category).trim();
-    if (vod_link !== undefined) movie.vod_link = String(vod_link).trim();
+    if (vod_link !== undefined) {
+      const v = normalizeOptionalString(vod_link, 4096);
+      movie.vod_link = v ? v : null;
+    }
+    if (player_mode !== undefined) {
+      const normalizedMode = normalizePlayerMode(player_mode);
+      movie.player_mode = normalizedMode === null ? movie.player_mode : normalizedMode;
+    }
+    if (video_src !== undefined) {
+      const v = normalizeOptionalString(video_src, 4096);
+      movie.video_src = v ? v : null;
+    }
+    if (embed_src !== undefined) {
+      const v = normalizeOptionalString(embed_src, 20000);
+      movie.embed_src = v ? v : null;
+    }
 
     if (year !== undefined && year !== null && year !== "") {
       movie.year = parseOscarYear(year);
@@ -311,12 +373,36 @@ router.put("/:id", async (req, res) => {
       if (poster !== undefined) movie.poster = poster;
     }
 
+    if (!hasAnySource({
+      vod_link: movie.vod_link || "",
+      video_src: movie.video_src || "",
+      embed_src: movie.embed_src || "",
+    })) {
+      return res.status(400).json({ message: "Ajoute au moins une source (VOD / video_src / embed_src)." });
+    }
+
     await movie.save();
     return res.status(200).json(movie);
   } catch (err) {
     if (err instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Invalid or expired token" });
     }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Get one movie by Mongo _id (used by the custom player page)
+router.get("/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid movie id" });
+    }
+
+    const movie = await Movie.findById(id);
+    if (!movie) return res.status(404).json({ message: "Movie not found" });
+    return res.status(200).json(movie);
+  } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 });
