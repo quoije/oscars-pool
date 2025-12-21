@@ -7,20 +7,28 @@ function createPageLoader(options = {}) {
   let removed = false;
   let navResizeObserver = null;
 
-  const overlay = document.createElement('div');
-  overlay.className = 'page-loader-overlay';
-  overlay.setAttribute('role', 'status');
-  overlay.setAttribute('aria-live', 'polite');
-  overlay.setAttribute('aria-busy', 'true');
+  // Reuse a preloaded overlay if present (prevents initial "clear" flash).
+  const preloadedOverlay = document.getElementById('page-loader-overlay');
+  const overlay = preloadedOverlay || document.createElement('div');
+  if (!preloadedOverlay) {
+    overlay.className = 'page-loader-overlay';
+    overlay.setAttribute('role', 'status');
+    overlay.setAttribute('aria-live', 'polite');
+    overlay.setAttribute('aria-busy', 'true');
 
-  overlay.innerHTML = `
-    <div class="page-loader-card page-loader-card--baronly">
-      <span class="visually-hidden">${title}</span>
-      <div class="page-loader-progress" aria-hidden="true">
-        <div class="page-loader-bar" id="page-loader-bar"></div>
+    overlay.innerHTML = `
+      <div class="page-loader-card page-loader-card--baronly">
+        <span class="visually-hidden">${title}</span>
+        <div class="page-loader-progress" aria-hidden="true">
+          <div class="page-loader-bar" id="page-loader-bar"></div>
+        </div>
       </div>
-    </div>
-  `;
+    `;
+  } else {
+    // Keep screen reader label up to date.
+    const label = overlay.querySelector('.visually-hidden');
+    if (label) label.textContent = title;
+  }
 
   const barEl = () => overlay.querySelector('#page-loader-bar');
 
@@ -105,7 +113,7 @@ function createPageLoader(options = {}) {
   return { setProgress, setSubtitle, done, fail };
 }
 
-window.onload = async function () {
+window.addEventListener('DOMContentLoaded', async function () {
     const pageLoader = createPageLoader({
       title: 'Chargement de la checklist',
       subtitle: 'Récupération des données…'
@@ -523,4 +531,4 @@ window.onload = async function () {
       rewardVideo.pause();
       rewardVideo.currentTime = 0;
     });
-  };
+  });
