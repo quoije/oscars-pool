@@ -90,6 +90,36 @@ function looksLikeVideoFile(url) {
   return /\.(mp4|mkv|webm|ogg|ogv|mov|m4v)(\?|#|$)/.test(s);
 }
 
+function isMkv(url) {
+  try {
+    const u = new URL(url, window.location.origin);
+    return u.pathname.toLowerCase().endsWith('.mkv');
+  } catch (_) {
+    return /\.mkv(\?|#|$)/i.test(String(url || ''));
+  }
+}
+
+async function tryGetGeneratedHlsPlaylist(rawUrl) {
+  // Only supports the python server's /media/<path> URLs.
+  try {
+    const u = new URL(rawUrl, window.location.origin);
+    if (!u.pathname.startsWith('/media/')) return null;
+    const rel = decodeURIComponent(u.pathname.slice('/media/'.length));
+    if (!rel) return null;
+
+    const api = new URL('/api/hls', u.origin);
+    api.searchParams.set('source', rel);
+    const res = await fetch(api.toString(), { method: 'GET' });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const playlist = data?.playlist_abs_url || data?.playlist_url;
+    if (!playlist) return null;
+    return playlist.startsWith('http') ? playlist : new URL(playlist, u.origin).toString();
+  } catch (_) {
+    return null;
+  }
+}
+
 function toYoutubeEmbed(url) {
   try {
     const u = new URL(url);
@@ -210,14 +240,31 @@ async function playVodLink(vodLink) {
 
   // Direct video file
   if (looksLikeVideoFile(raw)) {
+    // MKV is commonly not playable in browsers; try HLS generation first if it's from our python server.
+    if (isMkv(raw)) {
+      const playlist = await tryGetGeneratedHlsPlaylist(raw);
+      if (playlist) {
+        setSourceLabel('HLS (generated)');
+        return await playVodLink(playlist);
+      }
+    }
+
     setSourceLabel('Direct video file');
     const videoEl = showVideoPlayer();
     if (!videoEl) return;
     videoEl.src = raw;
     videoEl.addEventListener('error', () => {
-      // If the browser can't play it (or CORS blocks), fall back to iframe.
-      setSourceLabel('Embed (fallback)');
-      showEmbedPlayer(raw);
+      // If the browser can't play it (or CORS blocks), try HLS from the python server, then fall back to iframe.
+      (async () => {
+        const playlist = await tryGetGeneratedHlsPlaylist(raw);
+        if (playlist) {
+          setSourceLabel('HLS (generated)');
+          await playVodLink(playlist);
+          return;
+        }
+        setSourceLabel('Embed (fallback)');
+        showEmbedPlayer(raw);
+      })();
     }, { once: true });
     try { videoEl.load(); } catch (_) {}
     return;

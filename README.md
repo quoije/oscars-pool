@@ -22,6 +22,17 @@ This repo also includes a small Python server that serves local video files with
 - Served as: `http://localhost:8001/media/<filename>`
 - List endpoint: `http://localhost:8001/api/media`
 
+### HLS (for better browser compatibility, especially MKV)
+The Python server can also **generate and serve HLS** (`.m3u8` + `.ts`) using `ffmpeg`, and the web player will automatically try this when a `/media/*.mkv` file is used (or when direct playback fails).
+
+- Prepare endpoint: `http://localhost:8001/api/hls?source=<path relative to media>`
+- Playlist served from: `http://localhost:8001/hls/<id>/index.m3u8`
+- Output is cached under: `./.hls_cache/` (ignored by git)
+
+Example:
+- Source: `http://localhost:8001/media/MyMovie.mkv`
+- The player will request: `http://localhost:8001/api/hls?source=MyMovie.mkv` and then play the returned `.m3u8`.
+
 ### Install
 
 ```bash
