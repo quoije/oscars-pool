@@ -1,6 +1,7 @@
 window.onload = async function () {
     const token = localStorage.getItem('auth_token');
     const movieTableBody = document.getElementById('movie-table-body');
+    const watchedRatioEl = document.getElementById('watched-ratio');
 
     function showTableLoading() {
       if (!movieTableBody) return;
@@ -15,6 +16,18 @@ window.onload = async function () {
             </div>
           </td>
         </tr>
+      `;
+    }
+
+    function setInlineLoading(el, label = 'Chargement…') {
+      if (!el) return;
+      el.innerHTML = `
+        <span class="d-inline-flex align-items-center gap-2" aria-live="polite" aria-busy="true">
+          <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Chargement">
+            <span class="visually-hidden">Chargement...</span>
+          </span>
+          <span>${label}</span>
+        </span>
       `;
     }
 
@@ -135,29 +148,52 @@ window.onload = async function () {
       return Number.isNaN(d.getTime()) ? null : d;
     }
 
+    async function fetchMoviesSummary(year) {
+      const res = await fetch(`/api/movies/summary?year=${encodeURIComponent(String(year))}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (!res.ok) throw new Error('Failed to fetch movies summary');
+      return await res.json();
+    }
+
     const activeYear = await fetchActiveYear();
     document.title = `Pool Oscars ${activeYear} - Checklist`;
     const oscarYearEl = document.getElementById('oscar-year');
     if (oscarYearEl) oscarYearEl.textContent = String(activeYear);
 
-    const oscarEffectiveDate = await fetchOscarEffectiveDate(activeYear);
-    const targetDate =
-      parseLocalNoonFromIsoDate(oscarEffectiveDate) ||
-      new Date(`March 15, ${activeYear} 12:00:00`);
-
+    // Render countdown immediately with a deterministic fallback (then refine from settings).
     const oscarDayMonthEl = document.getElementById('oscar-date-day-month');
+    const timeLeftEl = document.getElementById('time-left');
+    const fallbackDate = parseLocalNoonFromIsoDate(`${activeYear}-03-15`) || new Date(`March 15, ${activeYear} 12:00:00`);
     if (oscarDayMonthEl) {
       try {
-        oscarDayMonthEl.textContent = targetDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+        oscarDayMonthEl.textContent = fallbackDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
       } catch (_) {
         oscarDayMonthEl.textContent = '15 mars';
       }
     }
 
     const currentDate = new Date();
-    const timeDifference = targetDate - currentDate;
-    const daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
-    document.getElementById('time-left').textContent = `${daysLeft} jours`;
+    let timeDifference = fallbackDate - currentDate;
+    let daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
+    if (timeLeftEl) timeLeftEl.textContent = `${daysLeft} jours`;
+
+    fetchOscarEffectiveDate(activeYear).then((oscarEffectiveDate) => {
+      const targetDate =
+        parseLocalNoonFromIsoDate(oscarEffectiveDate) ||
+        fallbackDate;
+
+      if (oscarDayMonthEl) {
+        try {
+          oscarDayMonthEl.textContent = targetDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+        } catch (_) {}
+      }
+      const now = new Date();
+      timeDifference = targetDate - now;
+      daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
+      if (timeLeftEl) timeLeftEl.textContent = `${daysLeft} jours`;
+    }).catch(() => {});
 
     if (token) {
       try {
@@ -186,20 +222,33 @@ window.onload = async function () {
     }
 
     showTableLoading();
+    setInlineLoading(watchedRatioEl);
+    const progressBarEl = document.getElementById('progress-bar');
+    if (progressBarEl) {
+      progressBarEl.classList.add('progress-bar-striped', 'progress-bar-animated');
+    }
 
     let movies = [];
     let watchedMovies = [];
     let watchedMoviesInYear = [];
     let movieImdbIds = new Set();
     try {
-      // Fetch remaining data in parallel (Render latency is high).
-      const [completionModalContent, moviesRes, watchedRes] = await Promise.all([
+      // Start summary fetch immediately so the header can update without waiting for the full list.
+      const summaryPromise = fetchMoviesSummary(activeYear)
+        .then((summary) => {
+          const totalCount = Number(summary?.totalMoviesCount) || 0;
+          const watchedCount = Number(summary?.watchedMoviesCount) || 0;
+          const ratioPct = totalCount > 0 ? ((watchedCount / totalCount) * 100).toFixed(1) : '0.0';
+          if (watchedRatioEl) watchedRatioEl.innerText = `Vu: ${watchedCount} / ${totalCount} (${ratioPct}%)`;
+          updateProgressBar(watchedCount, totalCount, false);
+          return summary;
+        })
+        .catch(() => null);
+
+      // Fetch remaining data in parallel.
+      const [completionModalContent, moviesRes] = await Promise.all([
         fetchCompletionModalContent(),
         fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}&view=checklist`, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch('/api/movies/watchedMovies', {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` }
         })
@@ -218,8 +267,11 @@ window.onload = async function () {
       // Sort movies alphabetically by title
       movies.sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
 
-      if (watchedRes.ok) {
-        watchedMovies = await watchedRes.json();
+      const summary = await summaryPromise;
+      watchedMovies = Array.isArray(summary?.watchedMovies) ? summary.watchedMovies : [];
+
+      if (progressBarEl) {
+        progressBarEl.classList.remove('progress-bar-striped', 'progress-bar-animated');
       }
     } catch (e) {
       showTableError('Impossible de charger la checklist. Réessaie dans quelques instants.');
@@ -259,10 +311,12 @@ window.onload = async function () {
       frame();
     }
 
-    function updateProgressBar(watchedCount, totalCount) {
+    function updateProgressBar(watchedCount, totalCount, celebrate = true) {
       const progressBar = document.getElementById('progress-bar');
-      const percentage = (watchedCount / totalCount) * 100;
-      console.log(percentage);
+      if (!progressBar) return;
+      const safeTotal = Number(totalCount);
+      const safeWatched = Number(watchedCount);
+      const percentage = safeTotal > 0 && Number.isFinite(safeWatched) ? (safeWatched / safeTotal) * 100 : 0;
       progressBar.style.width = `${percentage}%`;
 
       if (percentage <= 50) {
@@ -273,15 +327,16 @@ window.onload = async function () {
 
       progressBar.setAttribute('aria-valuenow', Math.round(percentage));
 
-      const videoModal = new bootstrap.Modal(document.getElementById("videoModal"));
-
-      if (percentage === 100) {
-        videoModal.show();
-        launchConfetti();
-        const rewardVideo = document.getElementById("rewardVideo");
-        // Only attempt autoplay if we actually have a visible <video>.
-        if (rewardVideo && !rewardVideo.classList.contains('d-none')) {
-          rewardVideo.play().catch(() => {});
+      if (celebrate) {
+        const videoModal = new bootstrap.Modal(document.getElementById("videoModal"));
+        if (percentage === 100) {
+          videoModal.show();
+          launchConfetti();
+          const rewardVideo = document.getElementById("rewardVideo");
+          // Only attempt autoplay if we actually have a visible <video>.
+          if (rewardVideo && !rewardVideo.classList.contains('d-none')) {
+            rewardVideo.play().catch(() => {});
+          }
         }
       }
     }

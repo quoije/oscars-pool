@@ -195,6 +195,74 @@ router.get("/last-update", async (req, res) => {
   }
 });
 
+// Get lightweight per-year summary for fast UI (counts, watched-in-year, last update)
+router.get("/summary", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const year = parseOscarYear(req.query.year);
+    const filter = year ? { year } : {};
+
+    // Base (year-wide) data can be cached (not user-specific).
+    const cacheKey = `movies:summary-base:${year || "all"}`;
+    let base = cacheGet(cacheKey);
+
+    if (!base) {
+      const [idDocs, latestMovie] = await Promise.all([
+        Movie.find(filter).select("imdb_id").lean(),
+        Movie.findOne(filter)
+          .select("updatedAt createdAt")
+          .sort({ updatedAt: -1, createdAt: -1, _id: -1 })
+          .lean(),
+      ]);
+
+      const imdbIds = idDocs.map((d) => d.imdb_id).filter(Boolean);
+      const imdbIdSet = new Set(imdbIds);
+
+      const lastUpdated =
+        latestMovie?.updatedAt ||
+        latestMovie?.createdAt ||
+        (typeof latestMovie?._id?.getTimestamp === "function" ? latestMovie._id.getTimestamp() : null);
+
+      base = {
+        year: year || null,
+        totalMoviesCount: imdbIds.length,
+        imdbIds,
+        // Store ISO string so it's JSON-safe + stable
+        lastUpdated: lastUpdated ? new Date(lastUpdated).toISOString() : null,
+      };
+
+      // Avoid storing a Set in cache (non-serializable and not needed elsewhere)
+      cacheSet(cacheKey, base);
+    }
+
+    const user = await User.findById(decoded.id).select("watchedMovies").lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    const imdbIdSet = new Set(base.imdbIds || []);
+    const watchedMoviesAll = Array.isArray(user.watchedMovies) ? user.watchedMovies : [];
+    const watchedMoviesInYear = watchedMoviesAll.filter((wm) => imdbIdSet.has(wm.imdb_id));
+
+    // Since this is user-specific, don't encourage shared caching.
+    res.set("Cache-Control", "private, max-age=5");
+    return res.status(200).json({
+      year: base.year,
+      totalMoviesCount: base.totalMoviesCount,
+      watchedMoviesCount: watchedMoviesInYear.length,
+      watchedMovies: watchedMoviesInYear,
+      lastUpdated: base.lastUpdated,
+    });
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 // Get watched movies for the user
 router.get("/watchedMovies", async (req, res) => {
   const token = req.headers.authorization?.split(" ")[1]; // Get token from header
