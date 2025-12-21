@@ -18,7 +18,16 @@ Little nodejs + mongodb app that I hack together with ChatGPT and Cursor to keep
 - Version endpoint backed by latest GitHub commit (cached)
 
 ## Setup
-Config those in your .env file:
+Create a `.env` file at the project root (same folder as `package.json`). It’s not committed to git—each machine needs its own values.
+
+Minimal steps:
+
+```bash
+npm install
+node index.js
+```
+
+Configure these in your `.env` file (**required**: `MONGO_URI`, `JWT_SECRET`):
 
 **DOG_NAMES=**`woof, WOOF, Woof` &nbsp;&nbsp;&nbsp;&nbsp;(for "verification")<br>
 **GITHUB_OWNER=**`quoije` &nbsp;&nbsp;&nbsp;&nbsp;(for version history)<br> 
@@ -26,6 +35,17 @@ Config those in your .env file:
 **JWT_SECRET=**`RANDOM STRING` &nbsp;&nbsp;&nbsp;&nbsp;(for authentication token)<br>
 **MONGO_URI=**`mongodb+srv://USER:PASS@cluster0.XXXX.mongodb.net/?retryWrites=true&w=majority&appName=Cluster69`<br>
 **OMDB_API=**`1234567` &nbsp;&nbsp;&nbsp;&nbsp;(for movie info)
+
+Example `.env`:
+
+```bash
+MONGO_URI=mongodb://127.0.0.1:27017/oscars-pool
+JWT_SECRET=change-me
+DOG_NAMES=woof,WOOF,Woof
+OMDB_API=your_omdb_key
+GITHUB_OWNER=quoije
+GITHUB_REPO=oscars-pool
+```
 
 ## Database (MongoDB)
 This app uses **MongoDB** via Mongoose. Provide a connection string in `MONGO_URI`.
@@ -35,5 +55,3 @@ This app uses **MongoDB** via Mongoose. Provide a connection string in `MONGO_UR
   - Atlas: `mongodb+srv://USER:PASS@cluster0.XXXX.mongodb.net/<dbName>?retryWrites=true&w=majority`
   - Local: `mongodb://127.0.0.1:27017/<dbName>`
 - Collections are created/managed automatically from the models in `models/` (e.g. `User`, `Movie`, `Setting`, `PlaybackProgress`).
-
-run with **node .\index.js**
