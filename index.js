@@ -21,12 +21,14 @@ const userRoutes = require("./routes/users");
 const movieRoutes = require("./routes/movies");
 const versionRoutes = require("./routes/version");
 const settingsRoutes = require("./routes/settings");
+const adminDbRoutes = require("./routes/adminDb");
 
 app.use(express.static('public'));
 app.use("/api/users", userRoutes);
 app.use("/api/movies", movieRoutes);
 app.use("/api/version", versionRoutes);
 app.use("/api/settings", settingsRoutes);
+app.use("/api/admin", adminDbRoutes);
 
 // Start Server
 const PORT = process.env.PORT || 5000;
