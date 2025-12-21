@@ -31,14 +31,14 @@ Add this to your `.env` (**required**: `MONGO_URI`, `JWT_SECRET`):
 
 ```bash
 # required
-MONGO_URI=mongodb://127.0.0.1:27017/oscars-pool
-JWT_SECRET=replace-with-a-random-string
+MONGO_URI=mongodb://127.0.0.1:27017/oscars-pool # MongoDB connection string
+JWT_SECRET=replace-with-a-random-string         # JWT signing secret (auth)
 
 # optional
-DOG_NAMES=woof,WOOF,Woof
-OMDB_API=your_omdb_key
-GITHUB_OWNER=quoije
-GITHUB_REPO=oscars-pool
+DOG_NAMES=woof,WOOF,Woof                        # simple registration "verification"
+OMDB_API=your_omdb_key                          # OMDb API key (movie info)
+GITHUB_OWNER=quoije                             # version history
+GITHUB_REPO=oscars-pool                         # version history
 ```
 
 Generate a good `JWT_SECRET`:
