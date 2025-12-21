@@ -133,12 +133,12 @@ window.onload = async function () {
       movieDiv.innerHTML = `
         <div class="card">
           ${isChecked ? '<div class="watched-banner">VISIONNÉ</div>' : ''}
-          <a href="${playerUrl}" target="_blank" rel="noopener noreferrer">
+          <a href="${playerUrl}" target="_self" rel="noopener noreferrer">
             <img src="${movie.poster}" class="card-img-top" alt="${movie.title}" style="width: 75%; display: block; margin: 0 auto; padding: 10px;">
           </a>
           <div class="card-body">
             <h5 class="card-title d-flex justify-content-between align-items-center">
-              <a href="${playerUrl}" target="_blank" rel="noopener noreferrer" class="text-decoration-none text-dark">${movie.title}</a>
+              <a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none text-dark">${movie.title}</a>
               <span>⭐ ${movie.rating} <a href="https://www.imdb.com/title/${movie.imdb_id}/"><img src="/img/imdb.png"></a></span>
             </h5>
             <p class="fw-bold fst-italic card-text" style="font-size: 0.75rem;">${movie.category}</p>
