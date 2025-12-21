@@ -11,6 +11,7 @@ const router = express.Router();
 const ACTIVE_YEAR_KEY = "active_oscar_year";
 const COMPLETION_MODAL_KEY = "completion_modal_content";
 const WINNERS_BY_YEAR_KEY = "winners_by_year";
+const OSCAR_DATES_BY_YEAR_KEY = "oscar_date_by_year";
 
 const DEFAULT_COMPLETION_MODAL = Object.freeze({
   title: "Félicitations! very nice 🎉🎉🎉",
@@ -35,6 +36,52 @@ function parseOptionalPoints(raw) {
   if (!Number.isFinite(n)) return null;
   // Points can be any finite number, but we store a rounded int for consistency.
   return Math.round(n);
+}
+
+function parseIsoDateString(raw) {
+  // Expected format: YYYY-MM-DD
+  if (raw === undefined || raw === null) return null;
+  const s = String(raw).trim();
+  if (!s) return null;
+
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+
+  if (!Number.isInteger(year) || year < 1900 || year > 3000) return null;
+  if (!Number.isInteger(month) || month < 1 || month > 12) return null;
+  if (!Number.isInteger(day) || day < 1 || day > 31) return null;
+
+  // Validate calendar date (handles month/day overflow like Feb 30).
+  const d = new Date(Date.UTC(year, month - 1, day));
+  if (
+    d.getUTCFullYear() !== year ||
+    d.getUTCMonth() !== month - 1 ||
+    d.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function normalizeOscarDatesByYear(rawValue) {
+  // Stored format: { "2026": "2026-03-15" }
+  const value = rawValue && typeof rawValue === "object" && !Array.isArray(rawValue) ? rawValue : {};
+  const out = {};
+
+  for (const [k, v] of Object.entries(value)) {
+    const year = parseOscarYear(k);
+    if (!year) continue;
+    const date = parseIsoDateString(v);
+    if (!date) continue;
+    out[String(year)] = date;
+  }
+
+  return out;
 }
 
 function normalizeWinnersByYear(rawValue) {
@@ -123,6 +170,95 @@ router.get("/year", async (req, res) => {
     const year = await getOrInitActiveYear();
     return res.status(200).json({ year });
   } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Public: get Oscar date for a given year (with fallback).
+// - If no custom date is configured, fallback is March 15 of that year (legacy behavior).
+router.get("/oscar-date", async (req, res) => {
+  try {
+    const year = parseOscarYear(req.query?.year);
+    if (!year) {
+      return res.status(400).json({ message: "Année invalide (ex: 2026)" });
+    }
+
+    const existing = await Setting.findOne({ key: OSCAR_DATES_BY_YEAR_KEY }).select("value");
+    const dates = normalizeOscarDatesByYear(existing?.value);
+    const configured = dates[String(year)] || null;
+    const effectiveDate = configured || `${String(year)}-03-15`;
+
+    return res.status(200).json({
+      year,
+      date: configured, // configured value (null if unset)
+      effectiveDate, // always present
+    });
+  } catch (err) {
+    // Even if DB is down, keep the legacy fallback.
+    const year = parseOscarYear(req.query?.year);
+    if (year) {
+      return res.status(200).json({ year, date: null, effectiveDate: `${String(year)}-03-15` });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Public: get all configured Oscar dates.
+router.get("/oscar-dates", async (req, res) => {
+  try {
+    const existing = await Setting.findOne({ key: OSCAR_DATES_BY_YEAR_KEY }).select("value");
+    const dates = normalizeOscarDatesByYear(existing?.value);
+    return res.status(200).json({ dates });
+  } catch (err) {
+    return res.status(200).json({ dates: {} });
+  }
+});
+
+// Admin-only: set/clear Oscar date for a given year.
+// Body: { date: "YYYY-MM-DD" } or { date: "" } to clear.
+router.put("/oscar-date/:year", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+
+    const year = parseOscarYear(req.params?.year);
+    if (!year) {
+      return res.status(400).json({ message: "Année invalide (ex: 2026)" });
+    }
+
+    const rawDate = req.body?.date;
+    const date = parseIsoDateString(rawDate);
+    const wantsClear = rawDate === "" || rawDate === null || rawDate === undefined || (typeof rawDate === "string" && rawDate.trim() === "");
+
+    if (!wantsClear && !date) {
+      return res.status(400).json({ message: "Date invalide (format attendu: YYYY-MM-DD)" });
+    }
+
+    const existing = await Setting.findOne({ key: OSCAR_DATES_BY_YEAR_KEY }).select("value");
+    const dates = normalizeOscarDatesByYear(existing?.value);
+
+    if (wantsClear) {
+      delete dates[String(year)];
+    } else {
+      dates[String(year)] = date;
+    }
+
+    await Setting.findOneAndUpdate(
+      { key: OSCAR_DATES_BY_YEAR_KEY },
+      { $set: { value: dates } },
+      { upsert: true, new: true }
+    );
+
+    return res.status(200).json({ year, date: dates[String(year)] || null });
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
     return res.status(500).json({ error: err.message });
   }
 });
