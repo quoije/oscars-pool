@@ -5,19 +5,28 @@ const crypto = require("crypto");
 const User = require("../models/User");
 const Movie = require("../models/Movie");
 const Setting = require("../models/Setting");
+const PlaybackProgress = require("../models/PlaybackProgress");
 const axios = require("axios");
 
 const router = express.Router();
 
 // Set password for verification
 
-const woof = process.env.DOG_NAMES ? process.env.DOG_NAMES.split(",") : [];
+const woof =
+  typeof process.env.DOG_NAMES === "string"
+    ? process.env.DOG_NAMES.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
 
 const ACTIVE_YEAR_KEY = "active_oscar_year";
 
 // Fetch movie details from OMDb API
 async function fetchMovieDetailsFromOmdb(imdb_id) {
-  const apiKey = process.env.OMDB_API;  // Replace with your actual OMDb API key
+  const apiKey = typeof process.env.OMDB_API === "string" ? process.env.OMDB_API.trim() : "";
+  if (!apiKey) {
+    const err = new Error("OMDb n'est pas configuré (env OMDB_API manquante).");
+    err.code = "OMDB_NOT_CONFIGURED";
+    throw err;
+  }
   const omdbUrl = `https://www.omdbapi.com/?i=${encodeURIComponent(imdb_id)}&apikey=${apiKey}`;
   
   try {
@@ -161,7 +170,11 @@ router.get("/stats", verifyToken, async (req, res) => {
 // Register User
 router.post("/register", async (req, res) => {
   const { name, email, password, role, verifoof } = req.body;
+  const dogCheckEnabled = woof.length > 0;
+
   function registerVerification() {
+    // If DOG_NAMES isn't configured, skip the "dog name" verification entirely.
+    if (!dogCheckEnabled) return true;
     return woof.includes(verifoof);
   }
 
@@ -169,16 +182,16 @@ router.post("/register", async (req, res) => {
     if (!password) {
       throw new Error("Le mot de passe est obligatoire et ne peut être indéfini");
     }
-    if (!verifoof) {
-      throw new Error("Le nom du chien doit être défini" );
+    if (dogCheckEnabled && !verifoof) {
+      throw new Error("Le nom du chien doit être défini");
     }
     if (!registerVerification()) {
-      return res.status(201).json({ message: "Mauvais nom de chien" });
+      return res.status(400).json({ message: "Mauvais nom de chien" });
     }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(201).json({ message: "L'email existe déjà, veuillez en choisir un autre." });
+      return res.status(409).json({ message: "L'email existe déjà, veuillez en choisir un autre." });
     }
     
     // Hash password and create user
@@ -188,8 +201,7 @@ router.post("/register", async (req, res) => {
 
     res.status(201).json({ message: "L'utilisateur s'est enregistré avec succès !" });
   } catch (err) {
-    res.status(400).json({ error: err.message });
-    res.status(403).json({ message: "Erreur interne lmao" });
+    return res.status(400).json({ message: err?.message || "Erreur interne" });
   }
 });
 
@@ -281,6 +293,46 @@ router.get("/admin/list", verifyToken, async (req, res) => {
         mustChangePassword: !!u.mustChangePassword,
       }))
     );
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: delete a user (and related playback progress)
+router.post("/admin/delete", verifyToken, async (req, res) => {
+  if (!isAdminFromDecoded(req.user)) {
+    return res.status(403).json({ message: "You do not have admin privileges" });
+  }
+
+  const { email, userId } = req.body || {};
+  const emailNorm = typeof email === "string" ? email.trim() : "";
+  const idNorm = typeof userId === "string" ? userId.trim() : "";
+
+  if (!emailNorm && !idNorm) {
+    return res.status(400).json({ message: "Email ou userId requis." });
+  }
+
+  try {
+    const user = emailNorm ? await User.findOne({ email: emailNorm }) : await User.findById(idNorm);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Safety: prevent deleting yourself from the admin UI.
+    if (String(user._id) === String(req.user?.id || "")) {
+      return res.status(400).json({ message: "Impossible de supprimer ton propre compte." });
+    }
+
+    // Safety: prevent deleting admin accounts via the UI endpoint.
+    if (user.role === 69) {
+      return res.status(400).json({ message: "Impossible de supprimer un compte admin via cette interface." });
+    }
+
+    await PlaybackProgress.deleteMany({ userId: user._id });
+    await User.deleteOne({ _id: user._id });
+
+    return res.status(200).json({
+      message: "Utilisateur supprimé.",
+      user: { id: String(user._id), name: user.name, email: user.email },
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

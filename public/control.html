@@ -172,30 +172,6 @@
 
     <div class="tab-pane fade" id="admin-users" role="tabpanel" aria-labelledby="admin-users-tab">
       <div class="row g-3">
-        <div class="col-12 col-xl-8">
-          <div class="card p-3">
-            <h4 class="mb-1">Réinitialiser mot de passe utilisateur</h4>
-            <p class="text-muted mb-3">
-              Génère un mot de passe temporaire aléatoire. L'utilisateur devra choisir un nouveau mot de passe à sa prochaine connexion.
-            </p>
-
-            <div id="user-reset-response" class="alert d-none" role="alert"></div>
-
-            <form id="reset-user-password-form">
-              <div class="mb-3">
-                <label for="reset_user_email" class="form-label">Email utilisateur</label>
-                <input type="email" class="form-control" id="reset_user_email" placeholder="user@email.com" required>
-                <div class="form-text">
-                  Important: le mot de passe temporaire est affiché une seule fois ici. Copie-le et envoie-le à l'utilisateur.
-                </div>
-              </div>
-              <div class="d-flex justify-content-end">
-                <button type="submit" class="btn btn-danger">Reset</button>
-              </div>
-            </form>
-          </div>
-        </div>
-
         <div class="col-12">
           <div class="card p-3">
             <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
@@ -215,10 +191,11 @@
                     <th>Nom</th>
                     <th>Email</th>
                     <th style="width: 1%;">Statut</th>
+                    <th style="width: 1%;">Actions</th>
                   </tr>
                 </thead>
                 <tbody id="admin-users-body">
-                  <tr><td colspan="3" class="text-muted">Charge la liste…</td></tr>
+                  <tr><td colspan="4" class="text-muted">Charge la liste…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -335,6 +312,80 @@
             </div>
           </div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reset user password modal -->
+<div class="modal fade" id="resetUserPasswordModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Reset mot de passe</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-muted mb-2">
+          Génère un mot de passe temporaire. L'utilisateur devra le changer à sa prochaine connexion.
+        </div>
+
+        <div class="mb-3">
+          <div class="fw-semibold" id="reset_user_label">—</div>
+          <div class="text-muted small" id="reset_user_email_label">—</div>
+        </div>
+
+        <div id="reset-user-modal-response" class="alert d-none" role="alert"></div>
+
+        <div id="reset-user-modal-result" class="border rounded p-2 bg-light d-none">
+          <div class="small text-muted mb-1">Mot de passe temporaire (affiché une seule fois)</div>
+          <div class="d-flex gap-2 align-items-center">
+            <code class="flex-grow-1" id="reset-user-temp-password">—</code>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="copy-temp-password">Copier</button>
+          </div>
+          <div class="small text-muted mt-2" id="reset-user-expires-at"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+        <button type="button" class="btn btn-danger" id="confirm-reset-user-password">Générer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete user confirmation modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-danger">Supprimer un utilisateur</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          Tu es sur le point de supprimer:
+          <div class="fw-semibold" id="delete_user_label">—</div>
+          <div class="text-muted small" id="delete_user_email_label">—</div>
+        </div>
+
+        <div class="alert alert-warning">
+          Cette action est <strong>irréversible</strong>.
+        </div>
+
+        <div class="mb-2">
+          Pour confirmer, tape l'email exact:
+        </div>
+        <input type="text" class="form-control" id="delete_user_verify_input" placeholder="email@exemple.com">
+        <div class="form-text">
+          Le bouton “Supprimer” s'activera seulement si l'email correspond.
+        </div>
+
+        <div id="delete-user-modal-response" class="alert d-none mt-3" role="alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-danger" id="confirm-delete-user" disabled>Supprimer</button>
       </div>
     </div>
   </div>
