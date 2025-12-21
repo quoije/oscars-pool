@@ -2,24 +2,19 @@ window.onload = async function () {
     function setLoading(el) {
       if (!el) return;
       el.innerHTML = `
-        <div class="d-flex justify-content-center align-items-center my-5" aria-live="polite" aria-busy="true">
-          <div class="spinner-border text-secondary" role="status" aria-label="Chargement">
-            <span class="visually-hidden">Chargement...</span>
-          </div>
+        <div class="loading-indicator" role="status" aria-live="polite" aria-busy="true" aria-label="Chargement">
+          <span class="text-muted">Chargement</span>
+          <span class="loading-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
         </div>
       `;
     }
 
     function setInlineLoading(el, label = 'Chargement…') {
+      // Keep the header clean: no inline spinners, just text.
       if (!el) return;
-      el.innerHTML = `
-        <span class="d-inline-flex align-items-center gap-2" aria-live="polite" aria-busy="true">
-          <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Chargement">
-            <span class="visually-hidden">Chargement...</span>
-          </span>
-          <span>${label}</span>
-        </span>
-      `;
+      el.textContent = label;
+      el.setAttribute('aria-live', 'polite');
+      el.setAttribute('aria-busy', 'true');
     }
 
     function setLoadError(el, message) {
