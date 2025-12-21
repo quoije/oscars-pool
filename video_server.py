@@ -5,9 +5,11 @@ import shutil
 import subprocess
 import time
 import hashlib
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from pathlib import Path
 from typing import Generator, Iterable, Optional, Tuple
 
+import jwt
 from fastapi import FastAPI, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -17,10 +19,21 @@ BASE_DIR = Path(__file__).resolve().parent
 MEDIA_DIR = BASE_DIR / "media"
 HLS_CACHE_DIR = Path(os.getenv("HLS_CACHE_DIR", str(BASE_DIR / ".hls_cache"))).resolve()
 
+# Load repo .env (shared with the Node app) if present.
+try:
+    from dotenv import load_dotenv  # type: ignore
+
+    load_dotenv(BASE_DIR / ".env")
+except Exception:
+    pass
+
 # Allow common video types (what browsers can play is separate from what we serve).
 ALLOWED_EXTS = {".mp4", ".mkv"}
 
 RANGE_RE = re.compile(r"^bytes=(\d*)-(\d*)$")
+
+AUTH_REQUIRED = os.getenv("VIDEO_AUTH_REQUIRED", "1").strip() not in {"0", "false", "False", "no", "NO"}
+JWT_SECRET = os.getenv("JWT_SECRET")
 
 
 def _safe_resolve_media_path(rel_path: str) -> Path:
@@ -46,6 +59,37 @@ def _safe_resolve_media_path(rel_path: str) -> Path:
         raise HTTPException(status_code=415, detail="Unsupported file type")
 
     return candidate
+
+
+def _extract_token(request: Request) -> Optional[str]:
+    # Query-param token (works for <video> and Safari HLS)
+    q = request.query_params.get("token")
+    if q:
+        return q
+
+    # Authorization: Bearer <token> (works for fetch/hls.js)
+    auth = request.headers.get("authorization") or request.headers.get("Authorization")
+    if auth and auth.lower().startswith("bearer "):
+        return auth.split(" ", 1)[1].strip() or None
+    return None
+
+
+def _require_auth(request: Request) -> dict:
+    if not AUTH_REQUIRED:
+        return {}
+
+    token = _extract_token(request)
+    if not token:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if not JWT_SECRET:
+        raise HTTPException(status_code=500, detail="Server misconfigured: JWT_SECRET is not set")
+
+    try:
+        return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+    except jwt.ExpiredSignatureError as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired token") from exc
 
 
 def _guess_content_type(path: Path) -> str:
@@ -262,6 +306,33 @@ def _safe_resolve_hls_asset(hls_id: str, asset_path: str) -> Path:
     return candidate
 
 
+def _with_token_query(uri: str, token: str) -> str:
+    parts = urlsplit(uri)
+    q = dict(parse_qsl(parts.query, keep_blank_values=True))
+    if "token" not in q:
+        q["token"] = token
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(q), parts.fragment))
+
+
+def _rewrite_m3u8_with_token(content: str, token: str) -> str:
+    """
+    Adds ?token=... to each URI line (segments, key URIs, etc.) in a playlist.
+    Only touches non-comment, non-empty lines.
+    """
+    out_lines: list[str] = []
+    for raw_line in content.splitlines(True):
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            out_lines.append(raw_line)
+            continue
+        # Preserve original newline by rewriting only the URI portion.
+        uri = line
+        # If the line already includes leading/trailing whitespace, normalize to original.
+        rewritten = _with_token_query(uri, token)
+        out_lines.append(raw_line.replace(uri, rewritten, 1))
+    return "".join(out_lines)
+
+
 app = FastAPI(title=APP_NAME)
 
 # Default to permissive CORS because the player may be on another port/host.
@@ -287,7 +358,8 @@ def health() -> dict:
 
 
 @app.get("/api/media")
-def list_media() -> JSONResponse:
+def list_media(request: Request) -> JSONResponse:
+    _require_auth(request)
     MEDIA_DIR.mkdir(parents=True, exist_ok=True)
     items = []
     for p in sorted(MEDIA_DIR.rglob("*")):
@@ -307,12 +379,16 @@ def list_media() -> JSONResponse:
 
 
 @app.get("/api/hls")
-def prepare_hls(request: Request, source: str = Query(..., description="Path relative to ./media (e.g. MyMovie.mkv)")) -> JSONResponse:
+def prepare_hls(
+    request: Request,
+    source: str = Query(..., description="Path relative to ./media (e.g. MyMovie.mkv)"),
+) -> JSONResponse:
     """
     Generates (and caches) an HLS VOD playlist for a local media file.
 
     Returns an id and a playlist URL like: /hls/<id>/index.m3u8
     """
+    _require_auth(request)
     media_path = _safe_resolve_media_path(source)
     hls_id = _ensure_hls_for_media(media_path)
     base = str(request.base_url).rstrip("/")
@@ -328,19 +404,34 @@ def prepare_hls(request: Request, source: str = Query(..., description="Path rel
 
 @app.api_route("/hls/{hls_id}/{asset_path:path}", methods=["GET", "HEAD"])
 async def serve_hls_asset(hls_id: str, asset_path: str, request: Request) -> Response:
+    _require_auth(request)
     path = _safe_resolve_hls_asset(hls_id, asset_path)
-    size = path.stat().st_size
     ctype = _hls_content_type(path)
 
-    headers = {
-        "Content-Type": ctype,
-        "Content-Length": str(size),
-        "Cache-Control": "no-store",
-    }
-
     if request.method == "HEAD":
+        size = path.stat().st_size
+        headers = {
+            "Content-Type": ctype,
+            "Content-Length": str(size),
+            "Cache-Control": "no-store",
+        }
         return Response(status_code=200, headers=headers)
 
+    # For playlists, inject token into segment URIs so the browser can fetch them without headers.
+    if path.suffix.lower() == ".m3u8":
+        token = _extract_token(request) or ""
+        text = path.read_text("utf-8", errors="replace")
+        if token:
+            text = _rewrite_m3u8_with_token(text, token)
+        data = text.encode("utf-8")
+        return Response(
+            content=data,
+            status_code=200,
+            headers={"Content-Type": ctype, "Content-Length": str(len(data)), "Cache-Control": "no-store"},
+        )
+
+    size = path.stat().st_size
+    headers = {"Content-Type": ctype, "Content-Length": str(size), "Cache-Control": "no-store"}
     return StreamingResponse(
         _iter_file(path, 0, size - 1),
         status_code=200,
@@ -351,6 +442,7 @@ async def serve_hls_asset(hls_id: str, asset_path: str, request: Request) -> Res
 
 @app.api_route("/media/{file_path:path}", methods=["GET", "HEAD"])
 async def serve_media(file_path: str, request: Request) -> Response:
+    _require_auth(request)
     path = _safe_resolve_media_path(file_path)
     size = path.stat().st_size
     ctype = _guess_content_type(path)

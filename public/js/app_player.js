@@ -90,6 +90,25 @@ function looksLikeVideoFile(url) {
   return /\.(mp4|mkv|webm|ogg|ogv|mov|m4v)(\?|#|$)/.test(s);
 }
 
+function getAuthToken() {
+  return localStorage.getItem('auth_token');
+}
+
+function withAuthTokenQuery(url) {
+  const token = getAuthToken();
+  if (!token) return url;
+  try {
+    const u = new URL(url, window.location.origin);
+    const p = u.pathname || '';
+    // Only attach tokens to our python video endpoints.
+    if (!(p.startsWith('/media/') || p.startsWith('/hls/'))) return url;
+    if (!u.searchParams.has('token')) u.searchParams.set('token', token);
+    return u.toString();
+  } catch (_) {
+    return url;
+  }
+}
+
 function isMkv(url) {
   try {
     const u = new URL(url, window.location.origin);
@@ -109,12 +128,17 @@ async function tryGetGeneratedHlsPlaylist(rawUrl) {
 
     const api = new URL('/api/hls', u.origin);
     api.searchParams.set('source', rel);
-    const res = await fetch(api.toString(), { method: 'GET' });
+    const token = getAuthToken();
+    const res = await fetch(api.toString(), {
+      method: 'GET',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+    });
     if (!res.ok) return null;
     const data = await res.json().catch(() => null);
     const playlist = data?.playlist_abs_url || data?.playlist_url;
     if (!playlist) return null;
-    return playlist.startsWith('http') ? playlist : new URL(playlist, u.origin).toString();
+    const abs = playlist.startsWith('http') ? playlist : new URL(playlist, u.origin).toString();
+    return withAuthTokenQuery(abs);
   } catch (_) {
     return null;
   }
@@ -221,7 +245,7 @@ async function playVodLink(vodLink) {
   }
 
   // "Open original" button
-  setOpenOriginal(raw);
+  setOpenOriginal(withAuthTokenQuery(raw));
 
   // Prefer known embed providers
   const yt = toYoutubeEmbed(raw);
@@ -252,7 +276,7 @@ async function playVodLink(vodLink) {
     setSourceLabel('Direct video file');
     const videoEl = showVideoPlayer();
     if (!videoEl) return;
-    videoEl.src = raw;
+    videoEl.src = withAuthTokenQuery(raw);
     videoEl.addEventListener('error', () => {
       // If the browser can't play it (or CORS blocks), try HLS from the python server, then fall back to iframe.
       (async () => {
@@ -275,10 +299,11 @@ async function playVodLink(vodLink) {
     setSourceLabel('HLS stream (.m3u8)');
     const videoEl = showVideoPlayer();
     if (!videoEl) return;
+    const hlsUrl = withAuthTokenQuery(raw);
 
     // Native HLS (Safari) first
     if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
-      videoEl.src = raw;
+      videoEl.src = hlsUrl;
       try { videoEl.load(); } catch (_) {}
       return;
     }
@@ -288,7 +313,7 @@ async function playVodLink(vodLink) {
       const hls = new window.Hls({
         enableWorker: true,
       });
-      hls.loadSource(raw);
+      hls.loadSource(hlsUrl);
       hls.attachMedia(videoEl);
       hls.on(window.Hls.Events.ERROR, function (_evt, data) {
         if (data?.fatal) {

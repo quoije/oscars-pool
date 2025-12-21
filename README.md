@@ -22,6 +22,20 @@ This repo also includes a small Python server that serves local video files with
 - Served as: `http://localhost:8001/media/<filename>`
 - List endpoint: `http://localhost:8001/api/media`
 
+### Authentication (required)
+By default, the Python server requires a valid Oscar-Pool JWT (same `JWT_SECRET` as your Node app).
+
+- The server loads `./.env` automatically (so it can reuse `JWT_SECRET`)
+- The web player sends auth automatically:
+  - direct `/media/*` and `/hls/*` requests use `?token=<jwt>` (needed for the `<video>` tag)
+  - `/api/hls` uses `Authorization: Bearer <jwt>`
+
+To disable auth (not recommended):
+
+```bash
+export VIDEO_AUTH_REQUIRED=0
+```
+
 ### HLS (for better browser compatibility, especially MKV)
 The Python server can also **generate and serve HLS** (`.m3u8` + `.ts`) using `ffmpeg`, and the web player will automatically try this when a `/media/*.mkv` file is used (or when direct playback fails).
 
