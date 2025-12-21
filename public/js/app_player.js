@@ -11,7 +11,22 @@ function showAlert(message) {
   const el = document.getElementById('alert');
   if (!el) return;
   el.textContent = message;
+  // Ensure error styling (danger) when using the simple API.
+  el.classList.remove('alert-primary', 'alert-secondary', 'alert-success', 'alert-danger', 'alert-warning', 'alert-info', 'alert-light', 'alert-dark');
+  el.classList.add('alert-danger');
   el.classList.remove('d-none');
+}
+
+function showAlertVariant(message, variant) {
+  const el = document.getElementById('alert');
+  if (!el) return;
+  el.textContent = message;
+  el.classList.remove('d-none');
+
+  // Reset any prior bootstrap alert-* variants
+  el.classList.remove('alert-primary', 'alert-secondary', 'alert-success', 'alert-danger', 'alert-warning', 'alert-info', 'alert-light', 'alert-dark');
+  const v = String(variant || 'danger').trim().toLowerCase();
+  el.classList.add(`alert-${v || 'danger'}`);
 }
 
 function setSourceLabel(text) {
@@ -140,6 +155,33 @@ function showEmbedPlayer(embedUrl) {
   }
 }
 
+function hideAllPlayers() {
+  const videoEl = document.getElementById('video');
+  const iframeEl = document.getElementById('embed');
+
+  if (videoEl) {
+    try { videoEl.pause(); } catch (_) {}
+    videoEl.classList.add('d-none');
+    try { videoEl.removeAttribute('src'); videoEl.load(); } catch (_) {}
+  }
+  if (iframeEl) {
+    iframeEl.classList.add('d-none');
+    iframeEl.removeAttribute('src');
+  }
+}
+
+function setOpenOriginal(raw) {
+  const openOriginal = document.getElementById('open-original');
+  if (!openOriginal) return;
+  if (raw) {
+    openOriginal.href = raw;
+    openOriginal.classList.remove('d-none');
+  } else {
+    openOriginal.removeAttribute('href');
+    openOriginal.classList.add('d-none');
+  }
+}
+
 async function playVodLink(vodLink) {
   const raw = normalizeVodLink(vodLink);
   if (!raw) {
@@ -149,11 +191,7 @@ async function playVodLink(vodLink) {
   }
 
   // "Open original" button
-  const openOriginal = document.getElementById('open-original');
-  if (openOriginal) {
-    openOriginal.href = raw;
-    openOriginal.classList.remove('d-none');
-  }
+  setOpenOriginal(raw);
 
   // Prefer known embed providers
   const yt = toYoutubeEmbed(raw);
@@ -226,16 +264,27 @@ async function playVodLink(vodLink) {
   showEmbedPlayer(raw);
 }
 
+function cleanUrlValue(v) {
+  const s = typeof v === 'string' ? v.trim() : '';
+  return s ? s : null;
+}
+
 function resolveMovieSource(movie) {
   const mode = String(movie?.player_mode || 'auto').toLowerCase();
-  const legacy = movie?.vod_link;
-  const video = movie?.video_src;
-  const embed = movie?.embed_src;
+  const legacy = cleanUrlValue(movie?.vod_link);
+  const video = cleanUrlValue(movie?.video_src);
+  const embed = cleanUrlValue(movie?.embed_src);
 
-  if (mode === 'video') return video || legacy || embed || null;
-  if (mode === 'embed') return embed || legacy || video || null;
-  // auto
-  return video || embed || legacy || null;
+  // Legacy should never embed in the player (open in new tab only).
+  // So we only pick legacy if there is no other option, and mark it.
+  let picked = null;
+  if (mode === 'video') picked = video || null;
+  else if (mode === 'embed') picked = embed || null;
+  else picked = video || embed || null; // auto
+
+  if (picked) return { src: picked, isLegacy: false };
+  if (legacy) return { src: legacy, isLegacy: true };
+  return { src: null, isLegacy: false };
 }
 
 window.onload = async function () {
@@ -258,8 +307,20 @@ window.onload = async function () {
       window.location.href = '/change-password.html';
       return;
     }
-    const nameEl = document.getElementById('player-user-name');
+    const nameEl = document.getElementById('user-name');
     if (nameEl) nameEl.textContent = decoded.name || '';
+    if (decoded.admin) {
+      const adminLink = document.getElementById('admin-control-link');
+      if (adminLink) adminLink.classList.remove('d-none');
+    }
+
+    const logoffBtn = document.getElementById('log-off');
+    if (logoffBtn) {
+      logoffBtn.addEventListener('click', function () {
+        localStorage.removeItem('auth_token');
+        window.location.href = '/';
+      });
+    }
   } catch (_) {
     localStorage.removeItem('auth_token');
     window.location.href = '/';
@@ -273,7 +334,10 @@ window.onload = async function () {
   }
 
   try {
-    const res = await fetch(`/api/movies/${encodeURIComponent(id)}`, { method: 'GET' });
+    const res = await fetch(`/api/movies/${encodeURIComponent(id)}`, {
+      method: 'GET',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+    });
     const movie = await res.json().catch(() => ({}));
     if (!res.ok) {
       showAlert(movie?.message || movie?.error || `Failed to load movie (${res.status}).`);
@@ -281,8 +345,25 @@ window.onload = async function () {
     }
 
     setHeader(movie);
-    const src = resolveMovieSource(movie);
-    await playVodLink(src);
+    const resolved = resolveMovieSource(movie);
+    if (!resolved?.src) {
+      setOpenOriginal(null);
+      setSourceLabel('—');
+      hideAllPlayers();
+      showAlert('No playable source configured for this movie.');
+      return;
+    }
+
+    if (resolved.isLegacy) {
+      // Legacy source: never embed it in the player.
+      setOpenOriginal(resolved.src);
+      setSourceLabel('Legacy link (opens in new tab)');
+      hideAllPlayers();
+      showAlertVariant('Legacy source: use “Open original” to watch in a new tab.', 'warning');
+      return;
+    }
+
+    await playVodLink(resolved.src);
   } catch (err) {
     showAlert(err.message || 'Network error.');
   }
