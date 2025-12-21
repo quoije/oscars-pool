@@ -27,4 +27,13 @@ Config those in your .env file:
 **MONGO_URI=**`mongodb+srv://USER:PASS@cluster0.XXXX.mongodb.net/?retryWrites=true&w=majority&appName=Cluster69`<br>
 **OMDB_API=**`1234567` &nbsp;&nbsp;&nbsp;&nbsp;(for movie info)
 
+## Database (MongoDB)
+This app uses **MongoDB** via Mongoose. Provide a connection string in `MONGO_URI`.
+
+- Use **MongoDB Atlas** (recommended) or a local MongoDB instance.
+- `MONGO_URI` examples:
+  - Atlas: `mongodb+srv://USER:PASS@cluster0.XXXX.mongodb.net/<dbName>?retryWrites=true&w=majority`
+  - Local: `mongodb://127.0.0.1:27017/<dbName>`
+- Collections are created/managed automatically from the models in `models/` (e.g. `User`, `Movie`, `Setting`, `PlaybackProgress`).
+
 run with **node .\index.js**
