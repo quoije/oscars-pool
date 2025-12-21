@@ -622,8 +622,9 @@ window.onload = async function () {
       `;
     }).join('');
 
+    const tieLabel = sorted.length > 1 ? ' <span class="text-muted fw-normal">(égalité)</span>' : '';
     winnerCurrentEl.innerHTML = `
-      <div class="fw-semibold mb-2">${y}</div>
+      <div class="fw-semibold mb-2">${y}${tieLabel}</div>
       ${rows}
     `;
 

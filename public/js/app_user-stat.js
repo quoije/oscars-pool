@@ -79,6 +79,7 @@ window.onload = async function () {
 
         const item = document.createElement('div');
         item.className = 'list-group-item';
+        const tieLabel = sorted.length > 1 ? ' <span class="text-muted">(égalité)</span>' : '';
 
         const winnersHtml = sorted
           .map((w) => {
@@ -90,7 +91,7 @@ window.onload = async function () {
 
         item.innerHTML = `
           <div class="d-flex justify-content-between align-items-center">
-            <div class="fw-semibold">${year}</div>
+            <div class="fw-semibold">${year}${tieLabel}</div>
             <span class="badge bg-secondary">${sorted.length}</span>
           </div>
           <div class="mt-2">${winnersHtml}</div>
