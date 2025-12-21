@@ -41,11 +41,15 @@ window.onload = async function () {
     }
 
     function renderWinners(winners) {
-      const winnersList = document.getElementById('winners-list');
-      if (!winnersList) return;
+      const tbody = document.getElementById('winners-table-body');
+      if (!tbody) return;
       const list = Array.isArray(winners) ? winners : [];
       if (!list.length) {
-        winnersList.innerHTML = '<div class="list-group-item text-muted">Aucun gagnant défini.</div>';
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="2" class="text-muted">Aucun gagnant défini.</td>
+          </tr>
+        `;
         return;
       }
 
@@ -64,7 +68,7 @@ window.onload = async function () {
       });
 
       const years = Array.from(byYear.keys()).map(Number).sort((a, b) => b - a);
-      winnersList.innerHTML = '';
+      tbody.innerHTML = '';
 
       years.forEach((year) => {
         const winnersForYear = byYear.get(String(year)) || [];
@@ -77,35 +81,56 @@ window.onload = async function () {
           return String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' });
         });
 
-        const item = document.createElement('div');
-        item.className = 'list-group-item';
-        const tieLabel = sorted.length > 1 ? ' <span class="text-muted">(égalité)</span>' : '';
+        const tr = document.createElement('tr');
 
-        const winnersHtml = sorted
-          .map((w) => {
-            const pts = w.points === null || Number.isNaN(w.points) ? null : w.points;
-            const ptsLabel = pts === null ? '' : ` <span class="text-muted">— ${pts} pts</span>`;
-            return `<div><strong>${w.name}</strong>${ptsLabel}</div>`;
-          })
-          .join('');
+        const tdYear = document.createElement('td');
+        tdYear.className = 'fw-semibold';
+        tdYear.textContent = String(year);
+        if (sorted.length > 1) {
+          const small = document.createElement('div');
+          small.className = 'text-muted small';
+          small.textContent = 'égalité';
+          tdYear.appendChild(document.createElement('br'));
+          tdYear.appendChild(small);
+        }
 
-        item.innerHTML = `
-          <div class="d-flex justify-content-between align-items-center">
-            <div class="fw-semibold">${year}${tieLabel}</div>
-            <span class="badge bg-secondary">${sorted.length}</span>
-          </div>
-          <div class="mt-2">${winnersHtml}</div>
-        `;
-        winnersList.appendChild(item);
+        const tdWinners = document.createElement('td');
+        sorted.forEach((w, idx) => {
+          const row = document.createElement('div');
+          if (idx > 0) row.classList.add('mt-1');
+
+          const name = document.createElement('span');
+          name.className = 'fw-semibold';
+          name.textContent = w?.name || '(utilisateur supprimé)';
+          row.appendChild(name);
+
+          const pts = w.points === null || Number.isNaN(w.points) ? null : w.points;
+          if (pts !== null) {
+            const ptsSpan = document.createElement('span');
+            ptsSpan.className = 'text-muted';
+            ptsSpan.textContent = ` — ${pts} pts`;
+            row.appendChild(ptsSpan);
+          }
+
+          tdWinners.appendChild(row);
+        });
+
+        tr.appendChild(tdYear);
+        tr.appendChild(tdWinners);
+        tbody.appendChild(tr);
       });
     }
 
     function renderCompletions(completions) {
-      const root = document.getElementById('completers-by-year');
-      if (!root) return;
+      const tbody = document.getElementById('completers-table-body');
+      if (!tbody) return;
 
       if (!completions || typeof completions !== 'object') {
-        root.innerHTML = '<div class="text-muted">Impossible de charger les finisseurs 100%.</div>';
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" class="text-muted">Impossible de charger les finisseurs 100%.</td>
+          </tr>
+        `;
         return;
       }
 
@@ -114,48 +139,62 @@ window.onload = async function () {
       const byYear = completions?.completersByYear && typeof completions.completersByYear === 'object' ? completions.completersByYear : {};
 
       if (!years.length) {
-        root.innerHTML = '<div class="text-muted">Aucune année trouvée.</div>';
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="4" class="text-muted">Aucune année trouvée.</td>
+          </tr>
+        `;
         return;
       }
 
-      // Build a simple accordion
-      const accordionId = 'completersAccordion';
-      root.innerHTML = `<div class="accordion" id="${accordionId}"></div>`;
-      const acc = root.querySelector('.accordion');
+      const sortedYears = years
+        .map((y) => Number(y))
+        .filter((y) => Number.isInteger(y))
+        .sort((a, b) => b - a);
 
-      years.forEach((y, idx) => {
+      tbody.innerHTML = '';
+      sortedYears.forEach((y) => {
         const yearStr = String(y);
         const total = Number(totals?.[yearStr] ?? 0);
         const completers = Array.isArray(byYear?.[yearStr]) ? byYear[yearStr] : [];
         const count = completers.length;
 
-        const collapseId = `completers-${yearStr}`;
-        const headingId = `heading-${yearStr}`;
-        const show = idx === 0 ? 'show' : '';
-        const collapsed = idx === 0 ? '' : 'collapsed';
-        const expanded = idx === 0 ? 'true' : 'false';
+        const tr = document.createElement('tr');
 
-        const bodyHtml = count
-          ? `<ul class="list-group list-group-flush">
-               ${completers.map((u) => `<li class="list-group-item">${u?.name || '(sans nom)'}</li>`).join('')}
-             </ul>`
-          : `<div class="text-muted">Aucun utilisateur à 100%.</div>`;
+        const tdYear = document.createElement('td');
+        tdYear.className = 'fw-semibold';
+        tdYear.textContent = yearStr;
 
-        const item = document.createElement('div');
-        item.className = 'accordion-item';
-        item.innerHTML = `
-          <h2 class="accordion-header" id="${headingId}">
-            <button class="accordion-button ${collapsed}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}" aria-expanded="${expanded}" aria-controls="${collapseId}">
-              ${yearStr} — ${count} finisseur(s) (total films: ${total})
-            </button>
-          </h2>
-          <div id="${collapseId}" class="accordion-collapse collapse ${show}" aria-labelledby="${headingId}" data-bs-parent="#${accordionId}">
-            <div class="accordion-body">
-              ${bodyHtml}
-            </div>
-          </div>
-        `;
-        acc.appendChild(item);
+        const tdCount = document.createElement('td');
+        const badge = document.createElement('span');
+        badge.className = 'badge bg-secondary';
+        badge.textContent = String(count);
+        tdCount.appendChild(badge);
+
+        const tdTotal = document.createElement('td');
+        tdTotal.textContent = String(Number.isFinite(total) ? total : 0);
+
+        const tdNames = document.createElement('td');
+        if (!count) {
+          tdNames.className = 'text-muted';
+          tdNames.textContent = '—';
+        } else {
+          const wrap = document.createElement('div');
+          wrap.className = 'd-flex flex-wrap gap-1';
+          completers.forEach((u) => {
+            const name = document.createElement('span');
+            name.className = 'badge bg-light text-dark border';
+            name.textContent = u?.name || '(sans nom)';
+            wrap.appendChild(name);
+          });
+          tdNames.appendChild(wrap);
+        }
+
+        tr.appendChild(tdYear);
+        tr.appendChild(tdCount);
+        tr.appendChild(tdTotal);
+        tr.appendChild(tdNames);
+        tbody.appendChild(tr);
       });
     }
 
@@ -241,8 +280,8 @@ window.onload = async function () {
       });
 
       // Hide spinner and show table after loading
-      spinner.style.display = 'none';
-      table.style.display = 'table';
+      if (spinner) spinner.classList.add('d-none');
+      if (table) table.classList.remove('d-none');
       if (statsError) statsError.classList.add('d-none');
 
       // Add event listener for user links
@@ -275,8 +314,8 @@ window.onload = async function () {
       const spinner = document.getElementById('loading-spinner');
       const table = document.querySelector('.user-table');
       const statsError = document.getElementById('stats-error');
-      if (spinner) spinner.style.display = 'none';
-      if (table) table.style.display = 'none';
+      if (spinner) spinner.classList.add('d-none');
+      if (table) table.classList.add('d-none');
       if (statsError) {
         statsError.textContent = "Impossible de charger le classement pour le moment.";
         statsError.classList.remove('d-none');
