@@ -169,7 +169,7 @@ router.get("/stats", verifyToken, async (req, res) => {
 
 // Register User
 router.post("/register", async (req, res) => {
-  const { name, email, password, role, verifoof } = req.body;
+  const { name, email, password, verifoof } = req.body;
   const dogCheckEnabled = woof.length > 0;
 
   function registerVerification() {
@@ -179,6 +179,19 @@ router.post("/register", async (req, res) => {
   }
 
   try {
+    const nameNorm = typeof name === "string" ? name.trim() : "";
+    const emailNorm = typeof email === "string" ? email.trim() : "";
+
+    if (!nameNorm) {
+      throw new Error("Le nom est obligatoire");
+    }
+    if (!emailNorm) {
+      throw new Error("L'email est obligatoire");
+    }
+    // Basic sanity check (not a full RFC validator)
+    if (!/^\S+@\S+\.\S+$/.test(emailNorm)) {
+      throw new Error("Email invalide.");
+    }
     if (!password) {
       throw new Error("Le mot de passe est obligatoire et ne peut être indéfini");
     }
@@ -189,14 +202,15 @@ router.post("/register", async (req, res) => {
       return res.status(400).json({ message: "Mauvais nom de chien" });
     }
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ email: emailNorm });
     if (existingUser) {
       return res.status(409).json({ message: "L'email existe déjà, veuillez en choisir un autre." });
     }
     
     // Hash password and create user
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = new User({ name, email, password: hashedPassword, role });
+    // SECURITY: never accept role escalation from a public endpoint.
+    const user = new User({ name: nameNorm, email: emailNorm, password: hashedPassword, role: 0 });
     await user.save();
 
     res.status(201).json({ message: "L'utilisateur s'est enregistré avec succès !" });
