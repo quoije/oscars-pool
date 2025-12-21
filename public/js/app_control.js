@@ -72,6 +72,9 @@ window.onload = async function () {
   const editYearEl = document.getElementById('edit_year');
   const editCategoryEl = document.getElementById('edit_category');
   const editVodLinkEl = document.getElementById('edit_vod_link');
+  const editPlayerModeEl = document.getElementById('edit_player_mode');
+  const editVideoSrcEl = document.getElementById('edit_video_src');
+  const editEmbedSrcEl = document.getElementById('edit_embed_src');
   const editRefreshOmdbEl = document.getElementById('edit_refresh_omdb');
   const editTitleEl = document.getElementById('edit_title');
   const editRatingEl = document.getElementById('edit_rating');
@@ -485,6 +488,9 @@ window.onload = async function () {
     const imdb_id = document.getElementById('imdb_id').value.trim();
     const category = document.getElementById('category').value.trim();
     const vod_link = document.getElementById('vod_link').value.trim();
+    const player_mode = (document.getElementById('player_mode')?.value || 'auto').trim();
+    const video_src = document.getElementById('video_src')?.value?.trim() || '';
+    const embed_src = document.getElementById('embed_src')?.value?.trim() || '';
 
     if (!year) {
       showResponse('warning', 'Année invalide. Exemple attendu: 2026');
@@ -496,6 +502,11 @@ window.onload = async function () {
       return;
     }
 
+    if (!vod_link && !video_src && !embed_src) {
+      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / embed_src).');
+      return;
+    }
+
     try {
       const res = await fetch('/api/movies/add', {
         method: 'POST',
@@ -503,7 +514,7 @@ window.onload = async function () {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ year, imdb_id, category, vod_link })
+        body: JSON.stringify({ year, imdb_id, category, vod_link, player_mode, video_src, embed_src })
       });
 
       if (res.ok) {
@@ -596,6 +607,9 @@ window.onload = async function () {
     editYearEl.value = movie.year ? String(movie.year) : '';
     editCategoryEl.value = movie.category || '';
     editVodLinkEl.value = movie.vod_link || '';
+    if (editPlayerModeEl) editPlayerModeEl.value = movie.player_mode || 'auto';
+    if (editVideoSrcEl) editVideoSrcEl.value = movie.video_src || '';
+    if (editEmbedSrcEl) editEmbedSrcEl.value = movie.embed_src || '';
     editRefreshOmdbEl.checked = false;
 
     editTitleEl.value = movie.title || '';
@@ -619,6 +633,9 @@ window.onload = async function () {
     const yearRaw = (editYearEl.value || '').trim();
     const category = (editCategoryEl.value || '').trim();
     const vod_link = (editVodLinkEl.value || '').trim();
+    const player_mode = (editPlayerModeEl?.value || 'auto').trim();
+    const video_src = (editVideoSrcEl?.value || '').trim();
+    const embed_src = (editEmbedSrcEl?.value || '').trim();
     const refreshOmdb = !!editRefreshOmdbEl.checked;
 
     const title = editTitleEl.value;
@@ -645,8 +662,8 @@ window.onload = async function () {
       return;
     }
 
-    if (!vod_link) {
-      showResponse('warning', 'Lien VOD invalide.');
+    if (!vod_link && !video_src && !embed_src) {
+      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / embed_src).');
       return;
     }
 
@@ -655,6 +672,9 @@ window.onload = async function () {
       year: yearRaw === '' ? null : year,
       category,
       vod_link,
+      player_mode,
+      video_src,
+      embed_src,
       refreshOmdb
     };
 

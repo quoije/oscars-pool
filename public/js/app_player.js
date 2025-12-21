@@ -226,6 +226,18 @@ async function playVodLink(vodLink) {
   showEmbedPlayer(raw);
 }
 
+function resolveMovieSource(movie) {
+  const mode = String(movie?.player_mode || 'auto').toLowerCase();
+  const legacy = movie?.vod_link;
+  const video = movie?.video_src;
+  const embed = movie?.embed_src;
+
+  if (mode === 'video') return video || legacy || embed || null;
+  if (mode === 'embed') return embed || legacy || video || null;
+  // auto
+  return video || embed || legacy || null;
+}
+
 window.onload = async function () {
   // Basic auth UX: require a valid local token (like the rest of the app).
   const token = localStorage.getItem('auth_token');
@@ -269,7 +281,8 @@ window.onload = async function () {
     }
 
     setHeader(movie);
-    await playVodLink(movie?.vod_link);
+    const src = resolveMovieSource(movie);
+    await playVodLink(src);
   } catch (err) {
     showAlert(err.message || 'Network error.');
   }
