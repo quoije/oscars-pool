@@ -11,13 +11,21 @@ const router = express.Router();
 
 // Set password for verification
 
-const woof = process.env.DOG_NAMES ? process.env.DOG_NAMES.split(",") : [];
+const woof =
+  typeof process.env.DOG_NAMES === "string"
+    ? process.env.DOG_NAMES.split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
 
 const ACTIVE_YEAR_KEY = "active_oscar_year";
 
 // Fetch movie details from OMDb API
 async function fetchMovieDetailsFromOmdb(imdb_id) {
-  const apiKey = process.env.OMDB_API;  // Replace with your actual OMDb API key
+  const apiKey = typeof process.env.OMDB_API === "string" ? process.env.OMDB_API.trim() : "";
+  if (!apiKey) {
+    const err = new Error("OMDb n'est pas configuré (env OMDB_API manquante).");
+    err.code = "OMDB_NOT_CONFIGURED";
+    throw err;
+  }
   const omdbUrl = `https://www.omdbapi.com/?i=${encodeURIComponent(imdb_id)}&apikey=${apiKey}`;
   
   try {
@@ -161,7 +169,11 @@ router.get("/stats", verifyToken, async (req, res) => {
 // Register User
 router.post("/register", async (req, res) => {
   const { name, email, password, role, verifoof } = req.body;
+  const dogCheckEnabled = woof.length > 0;
+
   function registerVerification() {
+    // If DOG_NAMES isn't configured, skip the "dog name" verification entirely.
+    if (!dogCheckEnabled) return true;
     return woof.includes(verifoof);
   }
 
@@ -169,16 +181,16 @@ router.post("/register", async (req, res) => {
     if (!password) {
       throw new Error("Le mot de passe est obligatoire et ne peut être indéfini");
     }
-    if (!verifoof) {
-      throw new Error("Le nom du chien doit être défini" );
+    if (dogCheckEnabled && !verifoof) {
+      throw new Error("Le nom du chien doit être défini");
     }
     if (!registerVerification()) {
-      return res.status(201).json({ message: "Mauvais nom de chien" });
+      return res.status(400).json({ message: "Mauvais nom de chien" });
     }
 
     const existingUser = await User.findOne({ email });
     if (existingUser) {
-      return res.status(201).json({ message: "L'email existe déjà, veuillez en choisir un autre." });
+      return res.status(409).json({ message: "L'email existe déjà, veuillez en choisir un autre." });
     }
     
     // Hash password and create user
@@ -188,8 +200,7 @@ router.post("/register", async (req, res) => {
 
     res.status(201).json({ message: "L'utilisateur s'est enregistré avec succès !" });
   } catch (err) {
-    res.status(400).json({ error: err.message });
-    res.status(403).json({ message: "Erreur interne lmao" });
+    return res.status(400).json({ message: err?.message || "Erreur interne" });
   }
 });
 

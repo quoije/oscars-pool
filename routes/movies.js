@@ -45,7 +45,12 @@ function hasAnySource({ vod_link, video_src, embed_src }) {
 
 // Fetch movie details from OMDb API
 async function fetchMovieDetailsFromOmdb(imdb_id) {
-  const apiKey = process.env.OMDB_API;  // Replace with your actual OMDb API key
+  const apiKey = typeof process.env.OMDB_API === "string" ? process.env.OMDB_API.trim() : "";
+  if (!apiKey) {
+    const err = new Error("OMDb n'est pas configuré (env OMDB_API manquante).");
+    err.code = "OMDB_NOT_CONFIGURED";
+    throw err;
+  }
   const omdbUrl = `https://www.omdbapi.com/?i=${encodeURIComponent(imdb_id)}&apikey=${apiKey}`;
   
   try {
@@ -204,7 +209,22 @@ router.post("/add", async (req, res) => {
     }
 
     // Fetch movie details from OMDb API
-    const movieDetails = await fetchMovieDetailsFromOmdb(imdb_id);
+    let movieDetails;
+    try {
+      movieDetails = await fetchMovieDetailsFromOmdb(imdb_id);
+    } catch (err) {
+      // If OMDb isn't configured, keep the feature usable: add with placeholders so admin can fill manually later.
+      if (err?.code === "OMDB_NOT_CONFIGURED") {
+        movieDetails = {
+          title: String(imdb_id || "").trim() || "Untitled",
+          description: "",
+          rating: "",
+          poster: ""
+        };
+      } else {
+        throw err;
+      }
+    }
     
     // Proceed with adding the movie
     const movie = new Movie({
@@ -363,11 +383,18 @@ router.put("/:id", async (req, res) => {
 
     // If refreshOmdb is true, overwrite OMDb-derived fields from the imdb_id
     if (refreshOmdb) {
-      const details = await fetchMovieDetailsFromOmdb(movie.imdb_id);
-      movie.title = details.title;
-      movie.description = details.description;
-      movie.rating = details.rating;
-      movie.poster = details.poster;
+      try {
+        const details = await fetchMovieDetailsFromOmdb(movie.imdb_id);
+        movie.title = details.title;
+        movie.description = details.description;
+        movie.rating = details.rating;
+        movie.poster = details.poster;
+      } catch (err) {
+        if (err?.code === "OMDB_NOT_CONFIGURED") {
+          return res.status(503).json({ message: "OMDb n'est pas configuré (env OMDB_API manquante)." });
+        }
+        throw err;
+      }
     } else {
       if (title !== undefined) movie.title = title;
       if (description !== undefined) movie.description = description;
