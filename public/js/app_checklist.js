@@ -1,5 +1,35 @@
 window.onload = async function () {
     const token = localStorage.getItem('auth_token');
+    const movieTableBody = document.getElementById('movie-table-body');
+
+    function showTableLoading() {
+      if (!movieTableBody) return;
+      movieTableBody.innerHTML = `
+        <tr>
+          <td colspan="3" class="text-center py-4" aria-live="polite" aria-busy="true">
+            <div class="d-inline-flex align-items-center gap-2">
+              <div class="spinner-border text-secondary" role="status" aria-label="Chargement">
+                <span class="visually-hidden">Chargement...</span>
+              </div>
+              <span>Chargement…</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
+    function showTableError(message) {
+      if (!movieTableBody) return;
+      movieTableBody.innerHTML = `
+        <tr>
+          <td colspan="3">
+            <div class="alert alert-danger my-2" role="alert">
+              ${message || 'Erreur lors du chargement.'}
+            </div>
+          </td>
+        </tr>
+      `;
+    }
 
     const DEFAULT_COMPLETION_MODAL = Object.freeze({
       title: 'Félicitations! very nice 🎉🎉🎉',
@@ -155,39 +185,49 @@ window.onload = async function () {
       window.location.href = '/';
     }
 
-    // Fetch remaining data in parallel (Render latency is high).
-    const [completionModalContent, moviesRes, watchedRes] = await Promise.all([
-      fetchCompletionModalContent(),
-      fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}&view=checklist`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` }
-      }),
-      fetch('/api/movies/watchedMovies', {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}` }
-      })
-    ]);
+    showTableLoading();
 
-    applyCompletionModalContent(completionModalContent);
+    let movies = [];
+    let watchedMovies = [];
+    let watchedMoviesInYear = [];
+    let movieImdbIds = new Set();
+    try {
+      // Fetch remaining data in parallel (Render latency is high).
+      const [completionModalContent, moviesRes, watchedRes] = await Promise.all([
+        fetchCompletionModalContent(),
+        fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}&view=checklist`, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` }
+        }),
+        fetch('/api/movies/watchedMovies', {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+      ]);
 
-    if (!moviesRes.ok) {
-      localStorage.removeItem('auth_token');
-      window.location.href = '/';
+      applyCompletionModalContent(completionModalContent);
+
+      if (!moviesRes.ok) {
+        localStorage.removeItem('auth_token');
+        window.location.href = '/';
+        return;
+      }
+
+      movies = await moviesRes.json();
+
+      // Sort movies alphabetically by title
+      movies.sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
+
+      if (watchedRes.ok) {
+        watchedMovies = await watchedRes.json();
+      }
+    } catch (e) {
+      showTableError('Impossible de charger la checklist. Réessaie dans quelques instants.');
       return;
     }
 
-    const movies = await moviesRes.json();
-
-    // Sort movies alphabetically by title
-    movies.sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
-
-    let watchedMovies = [];
-    if (watchedRes.ok) {
-      watchedMovies = await watchedRes.json();
-    }
-
-    const movieImdbIds = new Set(movies.map((m) => m.imdb_id).filter(Boolean));
-    let watchedMoviesInYear = watchedMovies.filter((wm) => movieImdbIds.has(wm.imdb_id));
+    movieImdbIds = new Set(movies.map((m) => m.imdb_id).filter(Boolean));
+    watchedMoviesInYear = watchedMovies.filter((wm) => movieImdbIds.has(wm.imdb_id));
 
     const totalMoviesCount = movies.length;
     const watchedMoviesCount = watchedMoviesInYear.length;
@@ -248,7 +288,7 @@ window.onload = async function () {
 
     updateProgressBar(watchedMoviesCount, totalMoviesCount);
 
-    const movieTableBody = document.getElementById('movie-table-body');
+    if (movieTableBody) movieTableBody.innerHTML = '';
     movies.forEach(movie => {
       const watchedMovie = watchedMoviesInYear.find(wm => wm.imdb_id === movie.imdb_id);
       const watchedDate = watchedMovie ? new Date(watchedMovie.watchedDate).toLocaleString() : '';

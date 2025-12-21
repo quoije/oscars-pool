@@ -3,6 +3,24 @@ window.onload = async function () {
     let winnersCache = null;
     let completionsCache = null;
 
+    function setTableBodyLoading(tbodyId, colspan) {
+      const tbody = document.getElementById(tbodyId);
+      if (!tbody) return;
+      const span = Number.isFinite(Number(colspan)) ? Number(colspan) : 1;
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="${span}" class="text-center py-4" aria-live="polite" aria-busy="true">
+            <div class="d-inline-flex align-items-center gap-2">
+              <div class="spinner-border text-secondary" role="status" aria-label="Chargement">
+                <span class="visually-hidden">Chargement...</span>
+              </div>
+              <span class="text-muted">Chargement…</span>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+
     async function fetchActiveYear() {
       try {
         const res = await fetch('/api/settings/year', { method: 'GET' });
@@ -229,6 +247,16 @@ window.onload = async function () {
     }
 
     try {
+      // Show loading states immediately (avoid "blank" panels)
+      const table = document.querySelector('.user-table');
+      const spinner = document.getElementById('loading-spinner');
+      const statsError = document.getElementById('stats-error');
+      if (spinner) spinner.classList.remove('d-none');
+      if (table) table.classList.add('d-none');
+      if (statsError) statsError.classList.add('d-none');
+      setTableBodyLoading('winners-table-body', 2);
+      setTableBodyLoading('completers-table-body', 4);
+
       const activeYear = await fetchActiveYear();
       if (activeYear) {
         document.title = `Pool Oscars ${activeYear} - Statistiques des utilisateurs`;
@@ -257,9 +285,6 @@ window.onload = async function () {
 
       const stats = await statsRes.json();
       const userTableBody = document.getElementById('user-table-body');
-      const table = document.querySelector('.user-table');
-      const spinner = document.getElementById('loading-spinner');
-      const statsError = document.getElementById('stats-error');
 
       // Ensure watchedRatio is treated as a number and sort in descending order
       stats.sort((a, b) => parseFloat(b.watchedRatio) - parseFloat(a.watchedRatio));
