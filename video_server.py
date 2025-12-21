@@ -7,7 +7,8 @@ import time
 import hashlib
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 from pathlib import Path
-from typing import Generator, Iterable, Optional, Tuple
+from typing import Any, Dict, Generator, Iterable, List, Optional, Tuple
+import threading
 
 import jwt
 from fastapi import FastAPI, HTTPException, Query, Request, Response
@@ -34,6 +35,10 @@ RANGE_RE = re.compile(r"^bytes=(\d*)-(\d*)$")
 
 AUTH_REQUIRED = os.getenv("VIDEO_AUTH_REQUIRED", "1").strip() not in {"0", "false", "False", "no", "NO"}
 JWT_SECRET = os.getenv("JWT_SECRET")
+
+# Limit concurrent ffmpeg transcodes (HLS generation) to avoid CPU overload.
+HLS_MAX_JOBS = max(1, int(os.getenv("HLS_MAX_JOBS", "2").strip() or "2"))
+_HLS_JOB_SEM = threading.Semaphore(HLS_MAX_JOBS)
 
 
 def _safe_resolve_media_path(rel_path: str) -> Path:
@@ -170,6 +175,63 @@ def _hls_id_for_media(path: Path) -> str:
     return hashlib.sha1(key).hexdigest()
 
 
+def _probe_streams(path: Path) -> Dict[str, Any]:
+    """
+    Returns basic info about the input using ffprobe: {width,height,has_audio}.
+    """
+    cmd = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "v:0",
+        "-show_entries",
+        "stream=width,height",
+        "-of",
+        "csv=p=0:s=x",
+        str(path),
+    ]
+    try:
+        p = subprocess.run(cmd, check=True, capture_output=True, text=True)
+        wh = (p.stdout or "").strip()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=500, detail="ffprobe not installed") from exc
+    except subprocess.CalledProcessError as exc:
+        stderr = (exc.stderr or "").strip()
+        raise HTTPException(status_code=500, detail=f"ffprobe failed: {stderr or 'ffprobe error'}") from exc
+
+    width = height = None
+    if "x" in wh:
+        try:
+            w_s, h_s = wh.split("x", 1)
+            width, height = int(w_s), int(h_s)
+        except Exception:
+            width = height = None
+
+    cmd_a = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-select_streams",
+        "a:0",
+        "-show_entries",
+        "stream=index",
+        "-of",
+        "csv=p=0",
+        str(path),
+    ]
+    try:
+        pa = subprocess.run(cmd_a, check=False, capture_output=True, text=True)
+        has_audio = bool((pa.stdout or "").strip())
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=500, detail="ffprobe not installed") from exc
+
+    if not width or not height:
+        raise HTTPException(status_code=415, detail="Unsupported media: missing video stream")
+
+    return {"width": width, "height": height, "has_audio": has_audio}
+
+
 def _acquire_lock(lock_path: Path, timeout_s: int = 600) -> None:
     """
     Simple file lock to avoid concurrent transcodes for the same id.
@@ -221,12 +283,45 @@ def _ensure_hls_for_media(media_path: Path) -> str:
             shutil.rmtree(tmp_dir, ignore_errors=True)
         tmp_dir.mkdir(parents=True, exist_ok=True)
 
+        # Multi-rendition adaptive HLS (master + variants).
         hls_time = os.getenv("HLS_TIME", "6").strip()
         crf = os.getenv("HLS_CRF", "23").strip()
         preset = os.getenv("HLS_PRESET", "veryfast").strip()
-        audio_bitrate = os.getenv("HLS_AUDIO_BITRATE", "160k").strip()
 
-        cmd = [
+        info = _probe_streams(media_path)
+        src_h = int(info["height"])
+        has_audio = bool(info["has_audio"])
+
+        # Variant syntax: "height:video_kbps,height:video_kbps,..."
+        default_variants = "1080:5500,720:3000,480:1500,360:900"
+        variants_env = os.getenv("HLS_VARIANTS", default_variants).strip()
+        variants: List[Tuple[int, int]] = []
+        for part in [p.strip() for p in variants_env.split(",") if p.strip()]:
+            if ":" not in part:
+                continue
+            h_s, b_s = part.split(":", 1)
+            try:
+                h = int(h_s)
+                b = int(b_s)
+            except ValueError:
+                continue
+            if h <= 0 or b <= 0:
+                continue
+            if h <= src_h:
+                variants.append((h, b))
+
+        if not variants:
+            variants = [(min(720, src_h), 3000)]
+
+        variants = sorted(list({v for v in variants}), key=lambda x: x[0], reverse=True)
+        n = len(variants)
+
+        # Build filter_complex split+scale for N renditions
+        split_tags = "".join([f"[v{i}]" for i in range(n)])
+        scale_filters = [f"[v{i}]scale=-2:{variants[i][0]}[v{i}o]" for i in range(n)]
+        filter_complex = f"[0:v]split={n}{split_tags};" + ";".join(scale_filters)
+
+        cmd: List[str] = [
             "ffmpeg",
             "-hide_banner",
             "-loglevel",
@@ -234,20 +329,43 @@ def _ensure_hls_for_media(media_path: Path) -> str:
             "-y",
             "-i",
             str(media_path),
-            "-map",
-            "0:v:0",
-            "-map",
-            "0:a?",
-            "-c:v",
-            "libx264",
-            "-preset",
-            preset,
-            "-crf",
-            crf,
-            "-c:a",
-            "aac",
-            "-b:a",
-            audio_bitrate,
+            "-filter_complex",
+            filter_complex,
+        ]
+
+        for i in range(n):
+            cmd += ["-map", f"[v{i}o]"]
+            if has_audio:
+                cmd += ["-map", "0:a?"]
+
+        cmd += ["-pix_fmt", "yuv420p"]
+
+        audio_bitrate = os.getenv("HLS_AUDIO_BITRATE", "160k").strip()
+        for i, (_h, b_kbps) in enumerate(variants):
+            maxrate = int(b_kbps * 1.07)
+            bufsize = int(b_kbps * 1.5)
+            cmd += [
+                f"-c:v:{i}",
+                "libx264",
+                "-preset",
+                preset,
+                "-crf",
+                crf,
+                f"-b:v:{i}",
+                f"{b_kbps}k",
+                f"-maxrate:v:{i}",
+                f"{maxrate}k",
+                f"-bufsize:v:{i}",
+                f"{bufsize}k",
+                "-sc_threshold",
+                "0",
+            ]
+            if has_audio:
+                cmd += [f"-c:a:{i}", "aac", f"-b:a:{i}", audio_bitrate]
+
+        cmd += ["-force_key_frames", f"expr:gte(t,n_forced*{hls_time})"]
+
+        cmd += [
             "-f",
             "hls",
             "-hls_time",
@@ -257,12 +375,20 @@ def _ensure_hls_for_media(media_path: Path) -> str:
             "-hls_flags",
             "independent_segments",
             "-hls_segment_filename",
-            str(tmp_dir / "seg_%05d.ts"),
-            str(tmp_dir / "index.m3u8"),
+            str(tmp_dir / "seg_%v_%05d.ts"),
+            "-master_pl_name",
+            "index.m3u8",
         ]
 
+        if has_audio:
+            var_map = " ".join([f"v:{i},a:{i}" for i in range(n)])
+        else:
+            var_map = " ".join([f"v:{i}" for i in range(n)])
+        cmd += ["-var_stream_map", var_map, str(tmp_dir / "v%v.m3u8")]
+
         try:
-            subprocess.run(cmd, check=True, capture_output=True)
+            with _HLS_JOB_SEM:
+                subprocess.run(cmd, check=True, capture_output=True)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=500, detail="ffmpeg not installed") from exc
         except subprocess.CalledProcessError as exc:
@@ -497,5 +623,9 @@ if __name__ == "__main__":
     host = os.getenv("VIDEO_SERVER_HOST", "0.0.0.0")
     port = int(os.getenv("VIDEO_SERVER_PORT", "8001"))
     reload = os.getenv("VIDEO_SERVER_RELOAD", "1").strip() not in {"0", "false", "False", "no", "NO"}
-    uvicorn.run("video_server:app", host=host, port=port, reload=reload)
+    workers = int(os.getenv("VIDEO_SERVER_WORKERS", "1").strip() or "1")
+    # Uvicorn ignores/limits workers when reload=True.
+    if reload:
+        workers = 1
+    uvicorn.run("video_server:app", host=host, port=port, reload=reload, workers=workers)
 

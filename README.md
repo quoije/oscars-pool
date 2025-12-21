@@ -47,6 +47,30 @@ Example:
 - Source: `http://localhost:8001/media/MyMovie.mkv`
 - The player will request: `http://localhost:8001/api/hls?source=MyMovie.mkv` and then play the returned `.m3u8`.
 
+### Multi-stream / adaptive bitrate
+HLS is generated as **multi-rendition adaptive bitrate** by default (a master playlist `index.m3u8` pointing to multiple variant streams).
+
+You can configure variants with:
+
+```bash
+export HLS_VARIANTS="1080:5500,720:3000,480:1500,360:900"
+```
+
+### Concurrency (many viewers at once)
+- **Serving** multiple viewers is handled by Uvicorn/FastAPI; for heavy traffic run with more workers:
+
+```bash
+export VIDEO_SERVER_RELOAD=0
+export VIDEO_SERVER_WORKERS=4
+python3 video_server.py
+```
+
+- **Transcoding** is CPU-heavy; it is throttled with:
+
+```bash
+export HLS_MAX_JOBS=2
+```
+
 ### Install
 
 ```bash
