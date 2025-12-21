@@ -117,7 +117,15 @@ window.onload = async function () {
       const isChecked = watchedMoviesInYear.some(watchedMovie => watchedMovie.imdb_id === movie.imdb_id);
       const watchedMovie = watchedMoviesInYear.find(wm => wm.imdb_id === movie.imdb_id);
       const watchedDate = watchedMovie ? new Date(watchedMovie.watchedDate).toLocaleString() : '';
-      const playerUrl = movie && movie._id ? `/player.html?id=${encodeURIComponent(movie._id)}` : (movie.vod_link || '#');
+      const hasVideoSrc = !!(movie && typeof movie.video_src === 'string' && movie.video_src.trim());
+      const hasEmbedSrc = !!(movie && typeof movie.embed_src === 'string' && movie.embed_src.trim());
+      const hasNewPlayerSource = hasVideoSrc || hasEmbedSrc;
+      const hasLegacy = !!(movie && typeof movie.vod_link === 'string' && movie.vod_link.trim());
+
+      // If the movie only has legacy `vod_link`, skip the player entirely and open the original URL in a new tab.
+      const playerUrl = (movie && movie._id && hasNewPlayerSource)
+        ? `/player.html?id=${encodeURIComponent(movie._id)}`
+        : (hasLegacy ? movie.vod_link : (movie && movie._id ? `/player.html?id=${encodeURIComponent(movie._id)}` : '#'));
 
       const movieDiv = document.createElement('div');
       movieDiv.classList.add('col-md-4', 'mb-4', 'movie-card');
