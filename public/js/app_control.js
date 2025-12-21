@@ -41,6 +41,19 @@ window.onload = async function () {
   const activeYearInput = document.getElementById('active_oscar_year');
   const saveActiveYearBtn = document.getElementById('save-active-year');
 
+  // Version control tab elements
+  const adminVersionTabBtn = document.getElementById('admin-version-tab');
+  const appVersionAlertEl = document.getElementById('app_version_alert');
+  const appVersionActiveSelectEl = document.getElementById('app_version_active_select');
+  const appVersionReloadBtn = document.getElementById('app_version_reload');
+  const appVersionSetActiveBtn = document.getElementById('app_version_set_active');
+  const appVersionPreviewEl = document.getElementById('app_version_preview');
+  const appVersionNewVersionEl = document.getElementById('app_version_new_version');
+  const appVersionNewMessageEl = document.getElementById('app_version_new_message');
+  const appVersionCreateBtn = document.getElementById('app_version_create');
+  const appVersionCreateAndActivateBtn = document.getElementById('app_version_create_and_activate');
+  const appVersionListEl = document.getElementById('app_version_list');
+
   // Oscar date per year (settings tab)
   const oscarDateYearSelect = document.getElementById('oscar_date_year');
   const oscarDateValueInput = document.getElementById('oscar_date_value');
@@ -106,6 +119,8 @@ window.onload = async function () {
   let winnerUsers = []; // admin list: {id, name, email, ...}
   let oscarDatesLoadedOnce = false;
   let oscarDatesByYear = {}; // { "2026": "2026-03-15" }
+  let appVersionLoadedOnce = false;
+  let appVersionState = { active: null, versions: [] };
 
   const DEFAULT_COMPLETION_MODAL = Object.freeze({
     title: 'Félicitations! very nice 🎉🎉🎉',
@@ -118,6 +133,15 @@ window.onload = async function () {
     responseEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
     responseEl.classList.add(kind === 'success' ? 'alert-success' : kind === 'warning' ? 'alert-warning' : 'alert-danger');
     responseEl.textContent = message;
+  }
+
+  function escapeHtml(raw) {
+    return String(raw || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   function sanitizeHtml(raw) {
@@ -142,6 +166,206 @@ window.onload = async function () {
       videoSrc: String(videoSrc || '').trim().slice(0, 2048),
       bodyHtml: String(bodyHtml || '').slice(0, 20000),
     };
+  }
+
+  async function fetchAppVersionState() {
+    const res = await fetch('/api/settings/app-version', { method: 'GET' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return {
+      active: data?.active && typeof data.active === 'object' ? data.active : null,
+      versions: Array.isArray(data?.versions) ? data.versions : [],
+    };
+  }
+
+  async function createAppVersionEntry({ version, message, activate }) {
+    const res = await fetch(`/api/settings/app-version?activate=${activate ? 'true' : 'false'}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ version, message }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return {
+      active: data?.active && typeof data.active === 'object' ? data.active : null,
+      versions: Array.isArray(data?.versions) ? data.versions : [],
+    };
+  }
+
+  async function setActiveAppVersion(id) {
+    const res = await fetch('/api/settings/app-version/active', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ id }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return {
+      active: data?.active && typeof data.active === 'object' ? data.active : null,
+      versions: Array.isArray(data?.versions) ? data.versions : [],
+    };
+  }
+
+  async function deleteAppVersionEntry(id) {
+    const res = await fetch(`/api/settings/app-version/${encodeURIComponent(String(id))}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return {
+      active: data?.active && typeof data.active === 'object' ? data.active : null,
+      versions: Array.isArray(data?.versions) ? data.versions : [],
+    };
+  }
+
+  function setAppVersionAlert(kind, message) {
+    if (!appVersionAlertEl) return;
+    appVersionAlertEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
+    appVersionAlertEl.classList.add(kind === 'success' ? 'alert-success' : kind === 'warning' ? 'alert-warning' : 'alert-danger');
+    appVersionAlertEl.textContent = message;
+  }
+
+  function hideAppVersionAlert() {
+    if (!appVersionAlertEl) return;
+    appVersionAlertEl.classList.add('d-none');
+    appVersionAlertEl.textContent = '';
+  }
+
+  async function refreshAppVersionPreview() {
+    if (!appVersionPreviewEl) return;
+    try {
+      const res = await fetch('/api/version', { method: 'GET' });
+      if (!res.ok) throw new Error(`Erreur (${res.status})`);
+      const data = await res.json().catch(() => ({}));
+      const line = `${data?.date || ''} - ${data?.version || ''} - ${data?.message || ''}`.trim();
+      appVersionPreviewEl.textContent = line || '—';
+      appVersionPreviewEl.style.whiteSpace = 'pre-wrap';
+    } catch (_) {
+      appVersionPreviewEl.textContent = '—';
+    }
+  }
+
+  function renderAppVersionUI() {
+    if (!appVersionActiveSelectEl || !appVersionListEl) return;
+    const versions = Array.isArray(appVersionState.versions) ? appVersionState.versions : [];
+    const activeId = appVersionState?.active?.id ? String(appVersionState.active.id) : '';
+
+    const previous = String(appVersionActiveSelectEl.value || '');
+    appVersionActiveSelectEl.innerHTML = '';
+
+    if (!versions.length) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Aucune version (crée-en une)';
+      opt.disabled = true;
+      opt.selected = true;
+      appVersionActiveSelectEl.appendChild(opt);
+      appVersionActiveSelectEl.disabled = true;
+      if (appVersionSetActiveBtn) appVersionSetActiveBtn.disabled = true;
+    } else {
+      versions.forEach((v) => {
+        const opt = document.createElement('option');
+        opt.value = String(v?.id || '');
+        const dateLabel = v?.dateISO ? formatDateTime(v.dateISO) : '—';
+        const msg = String(v?.message || '').trim();
+        const shortMsg = msg.length > 80 ? `${msg.slice(0, 77)}...` : msg;
+        opt.textContent = `${v?.version || '—'} — ${dateLabel}${shortMsg ? ` — ${shortMsg}` : ''}`;
+        appVersionActiveSelectEl.appendChild(opt);
+      });
+
+      const stillExists = versions.map((v) => String(v?.id || '')).includes(previous);
+      const desired = activeId || (stillExists ? previous : String(versions[0]?.id || ''));
+      appVersionActiveSelectEl.value = desired;
+      appVersionActiveSelectEl.disabled = false;
+      if (appVersionSetActiveBtn) appVersionSetActiveBtn.disabled = false;
+    }
+
+    if (!versions.length) {
+      appVersionListEl.textContent = '—';
+      return;
+    }
+
+    appVersionListEl.innerHTML = versions.map((v) => {
+      const id = String(v?.id || '');
+      const isActive = activeId && id === activeId;
+      const dateLabel = v?.dateISO ? formatDateTime(v.dateISO) : '—';
+      const msg = escapeHtml(String(v?.message || '').trim());
+      return `
+        <div class="d-flex justify-content-between align-items-start border rounded px-2 py-2 mb-2 bg-white">
+          <div class="me-2">
+            <div class="fw-semibold">
+              ${escapeHtml(String(v?.version || '—'))}
+              ${isActive ? '<span class="badge bg-warning text-dark ms-1">Active</span>' : ''}
+            </div>
+            <div class="small text-muted">${escapeHtml(dateLabel)}${msg ? ` — ${msg}` : ''}</div>
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-danger" data-app-version-delete="${escapeHtml(id)}">Supprimer</button>
+        </div>
+      `;
+    }).join('');
+
+    appVersionListEl.querySelectorAll('button[data-app-version-delete]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-app-version-delete');
+        if (!id) return;
+        const ok = window.confirm('Supprimer cette version ?');
+        if (!ok) return;
+        btn.disabled = true;
+        const old = btn.textContent;
+        btn.textContent = '...';
+        try {
+          hideAppVersionAlert();
+          appVersionState = await deleteAppVersionEntry(id);
+          appVersionLoadedOnce = true;
+          renderAppVersionUI();
+          await refreshAppVersionPreview();
+          setAppVersionAlert('success', 'Version supprimée.');
+        } catch (err) {
+          setAppVersionAlert('danger', err.message || 'Erreur réseau');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = old;
+        }
+      });
+    });
+  }
+
+  async function loadAppVersionTab(options = {}) {
+    const force = !!options.force;
+    if (!appVersionActiveSelectEl || !appVersionListEl) return;
+    if (appVersionLoadedOnce && !force) return;
+    try {
+      hideAppVersionAlert();
+      appVersionState = await fetchAppVersionState();
+      appVersionLoadedOnce = true;
+      renderAppVersionUI();
+      await refreshAppVersionPreview();
+    } catch (err) {
+      appVersionLoadedOnce = true;
+      appVersionState = { active: null, versions: [] };
+      renderAppVersionUI();
+      await refreshAppVersionPreview();
+      setAppVersionAlert('danger', err.message || 'Erreur réseau');
+    }
   }
 
   async function fetchCompletionModal() {
@@ -1389,6 +1613,84 @@ window.onload = async function () {
   if (adminBackupTabBtn) {
     adminBackupTabBtn.addEventListener('shown.bs.tab', () => loadBackups({ force: false }));
   }
+
+  // Version tab wiring
+  if (adminVersionTabBtn) {
+    adminVersionTabBtn.addEventListener('shown.bs.tab', () => loadAppVersionTab({ force: false }));
+  }
+  if (appVersionReloadBtn) {
+    appVersionReloadBtn.addEventListener('click', async () => {
+      appVersionReloadBtn.disabled = true;
+      const old = appVersionReloadBtn.textContent;
+      appVersionReloadBtn.textContent = 'Chargement...';
+      try {
+        await loadAppVersionTab({ force: true });
+        setAppVersionAlert('success', 'Rechargé.');
+      } finally {
+        appVersionReloadBtn.disabled = false;
+        appVersionReloadBtn.textContent = old;
+      }
+    });
+  }
+  if (appVersionSetActiveBtn && appVersionActiveSelectEl) {
+    appVersionSetActiveBtn.addEventListener('click', async () => {
+      const id = String(appVersionActiveSelectEl.value || '').trim();
+      if (!id) return;
+      appVersionSetActiveBtn.disabled = true;
+      const old = appVersionSetActiveBtn.textContent;
+      appVersionSetActiveBtn.textContent = '...';
+      try {
+        hideAppVersionAlert();
+        appVersionState = await setActiveAppVersion(id);
+        appVersionLoadedOnce = true;
+        renderAppVersionUI();
+        await refreshAppVersionPreview();
+        setAppVersionAlert('success', 'Version active mise à jour.');
+      } catch (err) {
+        setAppVersionAlert('danger', err.message || 'Erreur réseau');
+      } finally {
+        appVersionSetActiveBtn.disabled = false;
+        appVersionSetActiveBtn.textContent = old;
+      }
+    });
+  }
+
+  async function handleCreateAppVersion(activate) {
+    const version = String(appVersionNewVersionEl?.value || '').trim();
+    const message = String(appVersionNewMessageEl?.value || '').trim();
+    if (!version) {
+      setAppVersionAlert('warning', 'Version requise (ex: 1.0.0).');
+      return;
+    }
+    const btn = activate ? appVersionCreateAndActivateBtn : appVersionCreateBtn;
+    if (!btn) return;
+    btn.disabled = true;
+    const old = btn.textContent;
+    btn.textContent = '...';
+    try {
+      hideAppVersionAlert();
+      appVersionState = await createAppVersionEntry({ version, message, activate });
+      appVersionLoadedOnce = true;
+      if (appVersionNewVersionEl) appVersionNewVersionEl.value = '';
+      if (appVersionNewMessageEl) appVersionNewMessageEl.value = '';
+      renderAppVersionUI();
+      await refreshAppVersionPreview();
+      setAppVersionAlert('success', activate ? 'Version créée et activée.' : 'Version créée.');
+    } catch (err) {
+      setAppVersionAlert('danger', err.message || 'Erreur réseau');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = old;
+    }
+  }
+
+  if (appVersionCreateBtn) {
+    appVersionCreateBtn.addEventListener('click', () => handleCreateAppVersion(false));
+  }
+  if (appVersionCreateAndActivateBtn) {
+    appVersionCreateAndActivateBtn.addEventListener('click', () => handleCreateAppVersion(true));
+  }
+
   if (dbBackupRefreshBtn) {
     dbBackupRefreshBtn.addEventListener('click', async () => {
       dbBackupRefreshBtn.disabled = true;
