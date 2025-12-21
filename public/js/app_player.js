@@ -2,6 +2,160 @@ function decodeJwt(token) {
   return JSON.parse(atob(token.split('.')[1]));
 }
 
+function safeJsonParse(v) {
+  try { return JSON.parse(v); } catch (_) { return null; }
+}
+
+function progressStorageKey(userId, movieId) {
+  return `playback_progress:${String(userId || '')}:${String(movieId || '')}`;
+}
+
+async function fetchPlaybackProgress(movieId, token) {
+  try {
+    const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/progress`, {
+      method: 'GET',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+    });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    if (!data) return null;
+    const time = Number(data.time);
+    const duration = data.duration === null || data.duration === undefined ? null : Number(data.duration);
+    return {
+      time: Number.isFinite(time) && time >= 0 ? time : 0,
+      duration: duration !== null && Number.isFinite(duration) && duration > 0 ? duration : null,
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+async function savePlaybackProgress(movieId, token, { time, duration, keepalive } = {}) {
+  try {
+    await fetch(`/api/movies/${encodeURIComponent(movieId)}/progress`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ time, duration }),
+      keepalive: !!keepalive,
+    });
+  } catch (_) {
+    // best-effort
+  }
+}
+
+function setupVideoProgress({ videoEl, movieId, token, userId }) {
+  if (!videoEl || !movieId || !token || !userId) return () => {};
+
+  const key = progressStorageKey(userId, movieId);
+  let restored = false;
+  let intervalId = null;
+  let lastSavedAt = 0;
+  let lastSavedTime = -1;
+
+  function getSnapshot() {
+    const t = Number(videoEl.currentTime);
+    const d = Number(videoEl.duration);
+    return {
+      time: Number.isFinite(t) && t >= 0 ? t : 0,
+      duration: Number.isFinite(d) && d > 0 ? d : null,
+    };
+  }
+
+  async function restoreProgressOnce() {
+    if (restored) return;
+    restored = true;
+
+    // Prefer server progress, fall back to localStorage if offline.
+    const server = await fetchPlaybackProgress(movieId, token);
+    let targetTime = server?.time ?? 0;
+
+    if (!Number.isFinite(targetTime) || targetTime < 0) targetTime = 0;
+    if (targetTime <= 1) {
+      const local = safeJsonParse(localStorage.getItem(key));
+      const lt = Number(local?.time);
+      if (Number.isFinite(lt) && lt > 1) targetTime = lt;
+    }
+
+    const dur = Number(videoEl.duration);
+    if (!Number.isFinite(dur) || dur <= 0) return;
+
+    // Clamp to avoid seeking beyond the end.
+    const clamped = Math.min(Math.max(targetTime, 0), Math.max(0, dur - 3));
+    if (clamped > 1) {
+      try { videoEl.currentTime = clamped; } catch (_) {}
+    }
+  }
+
+  async function persist({ keepalive } = {}) {
+    // Throttle to avoid spamming the API
+    const now = Date.now();
+    if (!keepalive && now - lastSavedAt < 2000) return;
+
+    const snap = getSnapshot();
+    if (!Number.isFinite(snap.time)) return;
+
+    // Only save if it meaningfully changed (>= 1s)
+    if (lastSavedTime >= 0 && Math.abs(snap.time - lastSavedTime) < 1) return;
+
+    lastSavedAt = now;
+    lastSavedTime = snap.time;
+
+    try {
+      localStorage.setItem(key, JSON.stringify({ time: snap.time, duration: snap.duration, at: now }));
+    } catch (_) {}
+
+    await savePlaybackProgress(movieId, token, { ...snap, keepalive: !!keepalive });
+  }
+
+  function startInterval() {
+    if (intervalId) return;
+    intervalId = window.setInterval(() => { void persist(); }, 10000);
+  }
+
+  function stopInterval() {
+    if (!intervalId) return;
+    window.clearInterval(intervalId);
+    intervalId = null;
+  }
+
+  const onPlay = () => startInterval();
+  const onPause = () => { stopInterval(); void persist(); };
+  const onSeeked = () => { void persist(); };
+  const onEnded = () => { stopInterval(); void persist(); };
+  const onError = () => { stopInterval(); };
+  const onPageHide = () => { void persist({ keepalive: true }); };
+  const onVisibility = () => {
+    if (document.visibilityState === 'hidden') void persist({ keepalive: true });
+  };
+
+  videoEl.addEventListener('loadedmetadata', restoreProgressOnce, { once: true });
+  videoEl.addEventListener('play', onPlay);
+  videoEl.addEventListener('pause', onPause);
+  videoEl.addEventListener('seeked', onSeeked);
+  videoEl.addEventListener('ended', onEnded);
+  videoEl.addEventListener('error', onError);
+
+  window.addEventListener('pagehide', onPageHide);
+  document.addEventListener('visibilitychange', onVisibility);
+
+  // If metadata is already available, try immediately.
+  if (videoEl.readyState >= 1) void restoreProgressOnce();
+
+  return () => {
+    stopInterval();
+    videoEl.removeEventListener('play', onPlay);
+    videoEl.removeEventListener('pause', onPause);
+    videoEl.removeEventListener('seeked', onSeeked);
+    videoEl.removeEventListener('ended', onEnded);
+    videoEl.removeEventListener('error', onError);
+    window.removeEventListener('pagehide', onPageHide);
+    document.removeEventListener('visibilitychange', onVisibility);
+  };
+}
+
 function getQueryParam(name) {
   const url = new URL(window.location.href);
   return url.searchParams.get(name);
@@ -295,8 +449,9 @@ window.onload = async function () {
     return;
   }
 
+  let decoded = null;
   try {
-    const decoded = decodeJwt(token);
+    decoded = decodeJwt(token);
     const currentTime = Math.floor(Date.now() / 1000);
     if (decoded.exp && decoded.exp < currentTime) {
       localStorage.removeItem('auth_token');
@@ -364,6 +519,12 @@ window.onload = async function () {
     }
 
     await playVodLink(resolved.src);
+
+    // Only the <video> player supports reliable progress tracking (mp4/hls).
+    const videoEl = document.getElementById('video');
+    if (videoEl && !videoEl.classList.contains('d-none')) {
+      setupVideoProgress({ videoEl, movieId: id, token, userId: decoded?.id });
+    }
   } catch (err) {
     showAlert(err.message || 'Network error.');
   }

@@ -1,9 +1,11 @@
 const express = require("express");
 const Movie = require("../models/Movie");
 const User = require("../models/User");
+const PlaybackProgress = require("../models/PlaybackProgress");
 const axios = require("axios");
 const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
+const authenticate = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
@@ -386,6 +388,82 @@ router.put("/:id", async (req, res) => {
   } catch (err) {
     if (err instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Get playback progress for the current user (seconds)
+router.get("/:id/progress", authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid movie id" });
+    }
+
+    const userId = req.user?.id;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ message: "Invalid user" });
+    }
+
+    const progress = await PlaybackProgress.findOne({ userId, movieId: id }).select("time duration updatedAt");
+    return res.status(200).json({
+      time: typeof progress?.time === "number" ? progress.time : 0,
+      duration: typeof progress?.duration === "number" ? progress.duration : null,
+      updatedAt: progress?.updatedAt ? new Date(progress.updatedAt).toISOString() : null,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Update playback progress for the current user (seconds)
+router.put("/:id/progress", authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid movie id" });
+    }
+
+    const userId = req.user?.id;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ message: "Invalid user" });
+    }
+
+    const rawTime = req.body?.time;
+    const rawDuration = req.body?.duration;
+
+    let time = Number(rawTime);
+    if (!Number.isFinite(time) || time < 0) time = 0;
+
+    let duration = rawDuration === undefined || rawDuration === null ? null : Number(rawDuration);
+    if (duration !== null && (!Number.isFinite(duration) || duration <= 0)) duration = null;
+
+    if (duration !== null) {
+      // Clamp into [0, duration]
+      time = Math.min(Math.max(time, 0), duration);
+    }
+
+    // Best UX: if the user is basically at the end, reset to 0 so replay starts from the beginning.
+    if (duration !== null && duration - time <= 3) {
+      time = 0;
+    }
+
+    const updated = await PlaybackProgress.findOneAndUpdate(
+      { userId, movieId: id },
+      { $set: { time, duration, updatedAt: new Date() } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).select("time duration updatedAt");
+
+    return res.status(200).json({
+      time: updated?.time ?? 0,
+      duration: typeof updated?.duration === "number" ? updated.duration : null,
+      updatedAt: updated?.updatedAt ? new Date(updated.updatedAt).toISOString() : null,
+    });
+  } catch (err) {
+    // Handle rare unique-index races on first write
+    if (err?.code === 11000) {
+      return res.status(409).json({ message: "Progress already exists, retry." });
     }
     return res.status(500).json({ error: err.message });
   }
