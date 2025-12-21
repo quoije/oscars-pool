@@ -1,29 +1,99 @@
+function createPageLoader(options = {}) {
+  const title = String(options.title || 'Chargement…');
+  const subtitle = String(options.subtitle || 'Préparation de la page…');
+
+  let progress = 0;
+  let removed = false;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'page-loader-overlay';
+  overlay.setAttribute('role', 'status');
+  overlay.setAttribute('aria-live', 'polite');
+  overlay.setAttribute('aria-busy', 'true');
+
+  overlay.innerHTML = `
+    <div class="page-loader-card">
+      <p class="page-loader-title">${title}</p>
+      <p class="page-loader-subtitle" id="page-loader-subtitle">${subtitle}</p>
+      <div class="page-loader-progress" aria-hidden="true">
+        <div class="page-loader-bar" id="page-loader-bar"></div>
+      </div>
+      <div class="page-loader-actions d-none" id="page-loader-actions">
+        <button type="button" class="btn btn-sm btn-outline-dark" id="page-loader-retry">Réessayer</button>
+      </div>
+    </div>
+  `;
+
+  const barEl = () => overlay.querySelector('#page-loader-bar');
+  const subtitleEl = () => overlay.querySelector('#page-loader-subtitle');
+  const actionsEl = () => overlay.querySelector('#page-loader-actions');
+  const retryBtnEl = () => overlay.querySelector('#page-loader-retry');
+
+  function clampPct(p) {
+    const n = Number(p);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(100, n));
+  }
+
+  function setProgress(p) {
+    progress = clampPct(p);
+    const bar = barEl();
+    if (bar) bar.style.width = `${progress}%`;
+  }
+
+  function setSubtitle(text) {
+    const el = subtitleEl();
+    if (el) el.textContent = String(text || '');
+  }
+
+  function ensureMounted() {
+    if (removed) return;
+    if (!overlay.isConnected) {
+      document.body.classList.add('page-loading');
+      document.body.appendChild(overlay);
+    }
+  }
+
+  function hideAndRemoveSoon() {
+    if (removed) return;
+    overlay.classList.add('page-loader-hide');
+    overlay.setAttribute('aria-busy', 'false');
+    document.body.classList.remove('page-loading');
+    window.setTimeout(() => {
+      removed = true;
+      try { overlay.remove(); } catch (_) {}
+    }, 220);
+  }
+
+  function done() {
+    setProgress(100);
+    hideAndRemoveSoon();
+  }
+
+  function fail(message) {
+    setSubtitle(message || 'Erreur lors du chargement.');
+    setProgress(Math.max(progress, 90));
+    const actions = actionsEl();
+    if (actions) actions.classList.remove('d-none');
+    const btn = retryBtnEl();
+    if (btn) btn.onclick = () => window.location.reload();
+  }
+
+  ensureMounted();
+  setProgress(8);
+
+  return { setProgress, setSubtitle, done, fail };
+}
+
 window.onload = async function () {
+    const pageLoader = createPageLoader({
+      title: 'Chargement de la checklist',
+      subtitle: 'Récupération des données…'
+    });
+
     const token = localStorage.getItem('auth_token');
     const movieTableBody = document.getElementById('movie-table-body');
     const watchedRatioEl = document.getElementById('watched-ratio');
-
-    function showTableLoading() {
-      if (!movieTableBody) return;
-      movieTableBody.innerHTML = `
-        <tr>
-          <td colspan="3" class="text-center py-4" aria-live="polite" aria-busy="true">
-            <div class="d-inline-flex align-items-center gap-2" role="status" aria-label="Chargement">
-              <span class="text-muted">Chargement</span>
-              <span class="loading-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
-            </div>
-          </td>
-        </tr>
-      `;
-    }
-
-    function setInlineLoading(el, label = 'Chargement…') {
-      // Keep the header clean: no inline spinners, just text.
-      if (!el) return;
-      el.textContent = label;
-      el.setAttribute('aria-live', 'polite');
-      el.setAttribute('aria-busy', 'true');
-    }
 
     function showTableError(message) {
       if (!movieTableBody) return;
@@ -215,10 +285,9 @@ window.onload = async function () {
       window.location.href = '/';
     }
 
-    showTableLoading();
-    setInlineLoading(watchedRatioEl);
+    if (watchedRatioEl) watchedRatioEl.textContent = '—';
     const progressBarEl = document.getElementById('progress-bar');
-    // Avoid extra "loading" animations; the table loader is enough.
+    pageLoader.setProgress(18);
 
     let movies = [];
     let watchedMovies = [];
@@ -233,11 +302,14 @@ window.onload = async function () {
           const ratioPct = totalCount > 0 ? ((watchedCount / totalCount) * 100).toFixed(1) : '0.0';
           if (watchedRatioEl) watchedRatioEl.innerText = `Vu: ${watchedCount} / ${totalCount} (${ratioPct}%)`;
           updateProgressBar(watchedCount, totalCount, false);
+          pageLoader.setProgress(32);
           return summary;
         })
         .catch(() => null);
 
       // Fetch remaining data in parallel.
+      pageLoader.setSubtitle('Chargement de la liste des films…');
+      pageLoader.setProgress(26);
       const [completionModalContent, moviesRes] = await Promise.all([
         fetchCompletionModalContent(),
         fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}&view=checklist`, {
@@ -247,6 +319,7 @@ window.onload = async function () {
       ]);
 
       applyCompletionModalContent(completionModalContent);
+      pageLoader.setProgress(55);
 
       if (!moviesRes.ok) {
         localStorage.removeItem('auth_token');
@@ -255,6 +328,7 @@ window.onload = async function () {
       }
 
       movies = await moviesRes.json();
+      pageLoader.setProgress(62);
 
       // Sort movies alphabetically by title
       movies.sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
@@ -265,6 +339,7 @@ window.onload = async function () {
       if (progressBarEl) progressBarEl.removeAttribute('aria-busy');
     } catch (e) {
       showTableError('Impossible de charger la checklist. Réessaie dans quelques instants.');
+      pageLoader.fail('Impossible de charger la checklist. Vérifie ta connexion puis réessaie.');
       return;
     }
 
@@ -410,6 +485,10 @@ window.onload = async function () {
     const moviesLeft = totalMoviesCount - watchedMoviesCount;
     const moviesPerDay = daysLeft > 0 ? (moviesLeft / daysLeft).toFixed(2) : moviesLeft;
     document.getElementById('movies-per-day').textContent = `À voir par jour: ${moviesPerDay} films`;
+
+    pageLoader.setSubtitle('Finalisation de l’affichage…');
+    pageLoader.setProgress(92);
+    pageLoader.done();
 
     document.getElementById('log-off').addEventListener('click', () => {
       localStorage.removeItem('auth_token');

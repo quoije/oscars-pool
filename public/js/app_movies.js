@@ -1,21 +1,123 @@
-window.onload = async function () {
-    function setLoading(el) {
-      if (!el) return;
-      el.innerHTML = `
-        <div class="loading-indicator" role="status" aria-live="polite" aria-busy="true" aria-label="Chargement">
-          <span class="text-muted">Chargement</span>
-          <span class="loading-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
-        </div>
-      `;
-    }
+function createPageLoader(options = {}) {
+  const title = String(options.title || 'Chargement…');
+  const subtitle = String(options.subtitle || 'Préparation de la page…');
 
-    function setInlineLoading(el, label = 'Chargement…') {
-      // Keep the header clean: no inline spinners, just text.
-      if (!el) return;
-      el.textContent = label;
-      el.setAttribute('aria-live', 'polite');
-      el.setAttribute('aria-busy', 'true');
+  let progress = 0;
+  let removed = false;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'page-loader-overlay';
+  overlay.setAttribute('role', 'status');
+  overlay.setAttribute('aria-live', 'polite');
+  overlay.setAttribute('aria-busy', 'true');
+
+  overlay.innerHTML = `
+    <div class="page-loader-card">
+      <p class="page-loader-title">${title}</p>
+      <p class="page-loader-subtitle" id="page-loader-subtitle">${subtitle}</p>
+      <div class="page-loader-progress" aria-hidden="true">
+        <div class="page-loader-bar" id="page-loader-bar"></div>
+      </div>
+      <div class="page-loader-actions d-none" id="page-loader-actions">
+        <button type="button" class="btn btn-sm btn-outline-dark" id="page-loader-retry">Réessayer</button>
+      </div>
+    </div>
+  `;
+
+  const barEl = () => overlay.querySelector('#page-loader-bar');
+  const subtitleEl = () => overlay.querySelector('#page-loader-subtitle');
+  const actionsEl = () => overlay.querySelector('#page-loader-actions');
+  const retryBtnEl = () => overlay.querySelector('#page-loader-retry');
+
+  function clampPct(p) {
+    const n = Number(p);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(100, n));
+  }
+
+  function setProgress(p) {
+    progress = clampPct(p);
+    const bar = barEl();
+    if (bar) bar.style.width = `${progress}%`;
+  }
+
+  function setSubtitle(text) {
+    const el = subtitleEl();
+    if (el) el.textContent = String(text || '');
+  }
+
+  function ensureMounted() {
+    if (removed) return;
+    if (!overlay.isConnected) {
+      document.body.classList.add('page-loading');
+      document.body.appendChild(overlay);
     }
+  }
+
+  function hideAndRemoveSoon() {
+    if (removed) return;
+    overlay.classList.add('page-loader-hide');
+    overlay.setAttribute('aria-busy', 'false');
+    document.body.classList.remove('page-loading');
+    window.setTimeout(() => {
+      removed = true;
+      try { overlay.remove(); } catch (_) {}
+    }, 220);
+  }
+
+  function done() {
+    setProgress(100);
+    hideAndRemoveSoon();
+  }
+
+  function fail(message) {
+    setSubtitle(message || 'Erreur lors du chargement.');
+    setProgress(Math.max(progress, 90));
+    const actions = actionsEl();
+    if (actions) actions.classList.remove('d-none');
+    const btn = retryBtnEl();
+    if (btn) btn.onclick = () => window.location.reload();
+  }
+
+  ensureMounted();
+  setProgress(8);
+
+  return { setProgress, setSubtitle, done, fail };
+}
+
+async function waitForImagesIn(containerEl, onProgress) {
+  if (!containerEl) return;
+  const imgs = Array.from(containerEl.querySelectorAll('img'));
+  if (imgs.length === 0) return;
+
+  let resolved = 0;
+  const total = imgs.length;
+  const notify = () => {
+    if (typeof onProgress === 'function') onProgress(resolved, total);
+  };
+
+  await Promise.race([
+    Promise.all(
+      imgs.map((img) => new Promise((resolve) => {
+        const finish = () => {
+          resolved += 1;
+          notify();
+          resolve();
+        };
+        if (img.complete) return finish();
+        img.addEventListener('load', finish, { once: true });
+        img.addEventListener('error', finish, { once: true });
+      }))
+    ),
+    new Promise((resolve) => window.setTimeout(resolve, 7000)), // safety timeout
+  ]);
+}
+
+window.onload = async function () {
+    const pageLoader = createPageLoader({
+      title: 'Chargement des films',
+      subtitle: 'Récupération des données…'
+    });
 
     function setLoadError(el, message) {
       if (!el) return;
@@ -159,11 +261,7 @@ window.onload = async function () {
     }
 
     const moviesList = document.getElementById('movies-list');
-    setLoading(moviesList);
-
-    // Make header stats feel responsive (these used to wait for the heavy movies payload).
-    setInlineLoading(document.getElementById('movies-last-updated'));
-    setInlineLoading(document.getElementById('watched-ratio'));
+    pageLoader.setProgress(18);
 
     let watchedMoviesInYear = [];
 
@@ -173,6 +271,7 @@ window.onload = async function () {
         .then((data) => {
           watchedMoviesInYear = Array.isArray(data?.watchedMovies) ? data.watchedMovies : [];
           applySummaryToHeader(data);
+          pageLoader.setProgress(32);
           return data;
         })
         .catch(() => {
@@ -184,6 +283,7 @@ window.onload = async function () {
           return null;
         });
 
+      pageLoader.setProgress(28);
       const res = await fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}`, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
@@ -196,8 +296,10 @@ window.onload = async function () {
       }
 
       const movies = await res.json();
+      pageLoader.setProgress(55);
       // If summary is still in flight, wait for it before rendering watched banners.
       await summaryPromise;
+      pageLoader.setProgress(62);
 
       // Sort movies alphabetically by title (server also sorts, but keep client as a fallback)
       movies.sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
@@ -245,8 +347,18 @@ window.onload = async function () {
           </div>`;
         moviesList.appendChild(movieDiv);
       });
+
+      pageLoader.setSubtitle('Finalisation de l’affichage…');
+      pageLoader.setProgress(80);
+      await waitForImagesIn(moviesList, (loaded, total) => {
+        // Move 80% -> 98% as posters resolve
+        const pct = 80 + (loaded / Math.max(1, total)) * 18;
+        pageLoader.setProgress(pct);
+      });
+      pageLoader.done();
     } catch (e) {
       setLoadError(moviesList, 'Impossible de charger la liste des films. Réessaie dans quelques instants.');
+      pageLoader.fail('Impossible de charger les films. Vérifie ta connexion puis réessaie.');
     }
 
     document.getElementById('log-off').addEventListener('click', function () {
