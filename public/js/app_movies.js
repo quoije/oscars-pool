@@ -63,12 +63,16 @@ function createPageLoader(options = {}) {
 
   function ensureMounted() {
     if (removed) return;
-    if (!overlay.isConnected) {
-      updateOverlayTopOffset();
-      document.body.classList.add('page-loading');
-      document.body.appendChild(overlay);
+    // IMPORTANT: even if the overlay is preloaded in HTML (already connected),
+    // we still need to compute the navbar offset. Otherwise it defaults to 0px
+    // and the blur covers the header.
+    updateOverlayTopOffset();
+    document.body.classList.add('page-loading');
 
-      // Keep the overlay aligned if the navbar height changes (mobile collapse, resize, etc.)
+    if (!overlay.isConnected) document.body.appendChild(overlay);
+
+    // Keep the overlay aligned if the navbar height changes (mobile collapse, resize, etc.)
+    if (!navResizeObserver) {
       const nav = document.querySelector('nav.navbar');
       if (nav && typeof ResizeObserver !== 'undefined') {
         try {

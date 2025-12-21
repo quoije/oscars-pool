@@ -1,25 +1,132 @@
-window.onload = async function () {
+function createPageLoader(options = {}) {
+  const title = String(options.title || 'Chargement…');
+  // Subtitle kept for backwards-compat with callers, but we no longer render text in the UI.
+  const subtitle = String(options.subtitle || 'Préparation de la page…');
+
+  let progress = 0;
+  let removed = false;
+  let navResizeObserver = null;
+
+  // Reuse a preloaded overlay if present (prevents initial "clear" flash).
+  const preloadedOverlay = document.getElementById('page-loader-overlay');
+  const overlay = preloadedOverlay || document.createElement('div');
+  if (!preloadedOverlay) {
+    overlay.className = 'page-loader-overlay';
+    overlay.setAttribute('role', 'status');
+    overlay.setAttribute('aria-live', 'polite');
+    overlay.setAttribute('aria-busy', 'true');
+
+    overlay.innerHTML = `
+      <div class="page-loader-card page-loader-card--baronly">
+        <span class="visually-hidden">${title}</span>
+        <div class="page-loader-progress" aria-hidden="true">
+          <div class="page-loader-bar" id="page-loader-bar"></div>
+        </div>
+      </div>
+    `;
+  } else {
+    // Keep screen reader label up to date.
+    const label = overlay.querySelector('.visually-hidden');
+    if (label) label.textContent = title;
+  }
+
+  const barEl = () => overlay.querySelector('#page-loader-bar');
+
+  function clampPct(p) {
+    const n = Number(p);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(100, n));
+  }
+
+  function setProgress(p) {
+    progress = clampPct(p);
+    const bar = barEl();
+    if (bar) bar.style.width = `${progress}%`;
+  }
+
+  function setSubtitle(_) {
+    // Intentionally no-op (we only show the bar now).
+  }
+
+  function getNavHeightPx() {
+    const nav = document.querySelector('nav.navbar');
+    if (!nav) return 0;
+    const rect = nav.getBoundingClientRect();
+    const h = Number(rect?.height) || 0;
+    return h > 0 ? Math.round(h) : 0;
+  }
+
+  function updateOverlayTopOffset() {
+    // Scope the offset to this overlay instance (no global CSS var).
+    overlay.style.setProperty('--page-loader-top', `${getNavHeightPx()}px`);
+  }
+
+  function ensureMounted() {
+    if (removed) return;
+
+    // IMPORTANT: even if the overlay is preloaded in HTML (already connected),
+    // we still need to compute the navbar offset. Otherwise it defaults to 0px
+    // and the blur covers the header.
+    updateOverlayTopOffset();
+    document.body.classList.add('page-loading');
+
+    if (!overlay.isConnected) document.body.appendChild(overlay);
+
+    // Keep the overlay aligned if the navbar height changes (mobile collapse, resize, etc.)
+    if (!navResizeObserver) {
+      const nav = document.querySelector('nav.navbar');
+      if (nav && typeof ResizeObserver !== 'undefined') {
+        try {
+          navResizeObserver = new ResizeObserver(() => updateOverlayTopOffset());
+          navResizeObserver.observe(nav);
+        } catch (_) {
+          navResizeObserver = null;
+        }
+      }
+    }
+  }
+
+  function hideAndRemoveSoon() {
+    if (removed) return;
+    overlay.classList.add('page-loader-hide');
+    overlay.setAttribute('aria-busy', 'false');
+    document.body.classList.remove('page-loading');
+    window.setTimeout(() => {
+      removed = true;
+      if (navResizeObserver) {
+        try { navResizeObserver.disconnect(); } catch (_) {}
+        navResizeObserver = null;
+      }
+      try { overlay.remove(); } catch (_) {}
+    }, 220);
+  }
+
+  function done() {
+    setProgress(100);
+    hideAndRemoveSoon();
+  }
+
+  function fail(_) {
+    // Don't block the UI on errors: let the page render its own error message.
+    setProgress(Math.max(progress, 95));
+    window.setTimeout(() => hideAndRemoveSoon(), 200);
+  }
+
+  ensureMounted();
+  setProgress(8);
+
+  return { setProgress, setSubtitle, done, fail };
+}
+
+window.addEventListener('DOMContentLoaded', async function () {
+    const pageLoader = createPageLoader({
+      title: 'Chargement des statistiques',
+      subtitle: 'Récupération des données…'
+    });
+
     const token = localStorage.getItem('auth_token');
     let winnersCache = null;
     let completionsCache = null;
-
-    function setTableBodyLoading(tbodyId, colspan) {
-      const tbody = document.getElementById(tbodyId);
-      if (!tbody) return;
-      const span = Number.isFinite(Number(colspan)) ? Number(colspan) : 1;
-      tbody.innerHTML = `
-        <tr>
-          <td colspan="${span}" class="text-center py-4" aria-live="polite" aria-busy="true">
-            <div class="d-inline-flex align-items-center gap-2">
-              <div class="spinner-border text-secondary" role="status" aria-label="Chargement">
-                <span class="visually-hidden">Chargement...</span>
-              </div>
-              <span class="text-muted">Chargement…</span>
-            </div>
-          </td>
-        </tr>
-      `;
-    }
 
     async function fetchActiveYear() {
       try {
@@ -247,16 +354,15 @@ window.onload = async function () {
     }
 
     try {
+      pageLoader.setProgress(12);
+
       // Show loading states immediately (avoid "blank" panels)
       const table = document.querySelector('.user-table');
-      const spinner = document.getElementById('loading-spinner');
       const statsError = document.getElementById('stats-error');
-      if (spinner) spinner.classList.remove('d-none');
       if (table) table.classList.add('d-none');
       if (statsError) statsError.classList.add('d-none');
-      setTableBodyLoading('winners-table-body', 2);
-      setTableBodyLoading('completers-table-body', 4);
 
+      pageLoader.setProgress(20);
       const activeYear = await fetchActiveYear();
       if (activeYear) {
         document.title = `Pool Oscars ${activeYear} - Statistiques des utilisateurs`;
@@ -265,6 +371,7 @@ window.onload = async function () {
       }
 
       const statsUrl = activeYear ? `/api/users/stats?year=${encodeURIComponent(String(activeYear))}` : '/api/users/stats';
+      pageLoader.setProgress(32);
       const [statsRes, winners, completions] = await Promise.all([
         fetch(statsUrl, {
           method: 'GET',
@@ -283,6 +390,7 @@ window.onload = async function () {
         throw new Error('Failed to fetch user stats');
       }
 
+      pageLoader.setProgress(70);
       const stats = await statsRes.json();
       const userTableBody = document.getElementById('user-table-body');
 
@@ -304,10 +412,10 @@ window.onload = async function () {
         userTableBody.appendChild(userRow);
       });
 
-      // Hide spinner and show table after loading
-      if (spinner) spinner.classList.add('d-none');
+      // Show table after loading
       if (table) table.classList.remove('d-none');
       if (statsError) statsError.classList.add('d-none');
+      pageLoader.setProgress(92);
 
       // Add event listener for user links
       document.querySelectorAll('.user-link').forEach(link => {
@@ -334,12 +442,12 @@ window.onload = async function () {
           modal.show();
         });
       });
+
+      pageLoader.done();
     } catch (error) {
       console.error('Error loading user statistics:', error);
-      const spinner = document.getElementById('loading-spinner');
       const table = document.querySelector('.user-table');
       const statsError = document.getElementById('stats-error');
-      if (spinner) spinner.classList.add('d-none');
       if (table) table.classList.add('d-none');
       if (statsError) {
         statsError.textContent = "Impossible de charger le classement pour le moment.";
@@ -354,6 +462,7 @@ window.onload = async function () {
         if (completionsCache === null) completionsCache = await fetchCompletions();
         renderCompletions(completionsCache);
       } catch (_) {}
+      pageLoader.fail();
     }
 
     // Log-off functionality
@@ -361,4 +470,4 @@ window.onload = async function () {
       localStorage.removeItem('auth_token');
       window.location.href = '/';
     });
-  };
+  });
