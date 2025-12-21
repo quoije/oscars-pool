@@ -18,7 +18,7 @@ Little nodejs + mongodb app that I hack together with ChatGPT and Cursor to keep
 - Version endpoint backed by latest GitHub commit (cached)
 
 ## Setup
-Create a `.env` file at the project root (same folder as `package.json`). It’s not committed to git—each machine needs its own values.
+Create a `.env` file at the project root (same folder as `package.json`).
 
 Minimal steps:
 
