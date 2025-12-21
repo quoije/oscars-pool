@@ -74,6 +74,30 @@ footer {
     opacity: 1;
   }
 
+  /* Avoid initial navbar "blur flash" before JS computes the exact height. */
+  body.page-loading .page-loader-overlay {
+    top: var(--page-loader-top, 72px);
+  }
+
+  /* Reserve space for username so it doesn't "pop" the layout. */
+  #user-name {
+    display: inline-block;
+    min-width: 8ch;
+    white-space: nowrap;
+  }
+
+  /*
+    Reserve space for the Admin button even when hidden.
+    This prevents a visible re-layout when we discover admin status from the token.
+  */
+  @media (min-width: 992px) {
+    nav.navbar #admin-control-link.d-none {
+      display: inline-block !important;
+      visibility: hidden !important;
+      pointer-events: none;
+    }
+  }
+
   .page-loader-overlay.page-loader-hide {
     opacity: 0;
     pointer-events: none;
