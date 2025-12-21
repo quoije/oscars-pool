@@ -6,6 +6,7 @@ const path = require("path");
 const zlib = require("zlib");
 const readline = require("readline");
 const multer = require("multer");
+const { Transform } = require("stream");
 
 // Use MongoDB Extended JSON to preserve ObjectId/Date/etc.
 // bson is a transitive dependency of mongoose (mongodb driver).
@@ -20,6 +21,26 @@ const router = express.Router();
 
 const BACKUP_DIR = path.join(process.cwd(), "backups");
 const MAX_UPLOAD_BYTES = 250 * 1024 * 1024; // 250MB
+// SECURITY: protect against gzip "zip bombs" (small upload -> massive output).
+// This caps the *decompressed* stream size during restore.
+const MAX_RESTORE_UNZIPPED_BYTES = 1024 * 1024 * 1024; // 1GB
+
+function createByteLimitStream(maxBytes) {
+  let seen = 0;
+  return new Transform({
+    transform(chunk, _enc, cb) {
+      seen += chunk.length;
+      if (seen > maxBytes) {
+        const err = new Error("Restore failed: decompressed data is too large");
+        // mimic our handler's error shape
+        err.statusCode = 413;
+        cb(err);
+        return;
+      }
+      cb(null, chunk);
+    },
+  });
+}
 
 function requireAdmin(req) {
   const token = req.headers.authorization?.split(" ")[1];
@@ -251,12 +272,28 @@ router.post("/db/restore", upload.single("backup"), async (req, res) => {
       return res.status(400).json({ message: "No backup file uploaded" });
     }
     uploadedPath = file.path;
+    // Best-effort: refuse obviously wrong file names (UI expects .ndjson.gz).
+    const original = String(file.originalname || "").trim().toLowerCase();
+    if (original && !original.endsWith(".gz")) {
+      const err = new Error("Invalid backup file (expected a .gz file)");
+      err.statusCode = 400;
+      throw err;
+    }
 
     const db = mongoose.connection.db;
     const gunzip = zlib.createGunzip();
-    const input = fs.createReadStream(uploadedPath).pipe(gunzip);
+    const byteLimit = createByteLimitStream(MAX_RESTORE_UNZIPPED_BYTES);
+    const input = fs.createReadStream(uploadedPath).pipe(gunzip).pipe(byteLimit);
 
     const rl = readline.createInterface({ input, crlfDelay: Infinity });
+    // Ensure stream errors don't become unhandled.
+    let streamError = null;
+    input.on("error", (e) => {
+      streamError = e;
+      try {
+        rl.close();
+      } catch (_) {}
+    });
 
     let meta = null;
     let currentCollection = null;
@@ -347,6 +384,9 @@ router.post("/db/restore", upload.single("backup"), async (req, res) => {
     }
 
     await flushBatch();
+    if (streamError) {
+      throw streamError;
+    }
 
     // Cleanup upload after successful restore
     try {
