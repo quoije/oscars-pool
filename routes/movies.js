@@ -9,6 +9,29 @@ const authenticate = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
+// Small in-memory cache to reduce repeated DB reads on slow networks (Render).
+// This is safe because movie lists are identical for all users and change rarely.
+const MOVIES_CACHE_TTL_MS = Number(process.env.MOVIES_CACHE_TTL_MS || "30000"); // 30s
+const _cache = new Map(); // key -> { expiresAt:number, value:any }
+
+function cacheGet(key) {
+  const hit = _cache.get(key);
+  if (!hit) return null;
+  if (Date.now() > hit.expiresAt) {
+    _cache.delete(key);
+    return null;
+  }
+  return hit.value;
+}
+
+function cacheSet(key, value) {
+  _cache.set(key, { expiresAt: Date.now() + MOVIES_CACHE_TTL_MS, value });
+}
+
+function cacheClear() {
+  _cache.clear();
+}
+
 function parseOscarYear(raw) {
   if (raw === undefined || raw === null || raw === "") return null;
   const n = Number(raw);
@@ -73,10 +96,20 @@ async function fetchMovieDetailsFromOmdb(imdb_id) {
 // Get available Oscar years (distinct years from movies)
 router.get("/years", async (req, res) => {
   try {
+    const cacheKey = "movies:years";
+    const cached = cacheGet(cacheKey);
+    if (cached) {
+      res.set("Cache-Control", "public, max-age=60");
+      return res.status(200).json(cached);
+    }
+
     const years = await Movie.distinct("year");
     const cleaned = years
       .filter((y) => typeof y === "number" && Number.isFinite(y))
       .sort((a, b) => b - a);
+
+    cacheSet(cacheKey, cleaned);
+    res.set("Cache-Control", "public, max-age=60");
     res.status(200).json(cleaned);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -88,7 +121,31 @@ router.get("/", async (req, res) => {
   try {
     const year = parseOscarYear(req.query.year);
     const filter = year ? { year } : {};
-    const movies = await Movie.find(filter);
+
+    // Clients:
+    // - films page needs details (poster, description, player sources)
+    // - checklist page only needs imdb_id + title
+    const view = String(req.query.view || "").trim().toLowerCase();
+    const isChecklist = view === "checklist" || view === "compact";
+
+    const projection = isChecklist
+      ? "imdb_id title"
+      : "imdb_id title description rating poster year category vod_link player_mode video_src embed_src updatedAt createdAt";
+
+    const cacheKey = `movies:list:${year || "all"}:${isChecklist ? "checklist" : "films"}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) {
+      res.set("Cache-Control", "public, max-age=30");
+      return res.status(200).json(cached);
+    }
+
+    const movies = await Movie.find(filter)
+      .select(projection)
+      .sort({ title: 1 })
+      .lean();
+
+    cacheSet(cacheKey, movies);
+    res.set("Cache-Control", "public, max-age=30");
     res.status(200).json(movies);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -106,7 +163,17 @@ router.get("/last-update", async (req, res) => {
     const year = parseOscarYear(req.query.year);
     const filter = year ? { year } : {};
 
-    const latestMovie = await Movie.findOne(filter).sort({ updatedAt: -1, createdAt: -1, _id: -1 });
+    const cacheKey = `movies:last-update:${year || "all"}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) {
+      res.set("Cache-Control", "public, max-age=30");
+      return res.status(200).json(cached);
+    }
+
+    const latestMovie = await Movie.findOne(filter)
+      .select("updatedAt createdAt")
+      .sort({ updatedAt: -1, createdAt: -1, _id: -1 })
+      .lean();
     if (!latestMovie) {
       return res.status(200).json({ lastUpdated: null });
     }
@@ -116,7 +183,10 @@ router.get("/last-update", async (req, res) => {
       latestMovie.createdAt ||
       (typeof latestMovie._id?.getTimestamp === "function" ? latestMovie._id.getTimestamp() : null);
 
-    return res.status(200).json({ lastUpdated: lastUpdated ? new Date(lastUpdated).toISOString() : null });
+    const payload = { lastUpdated: lastUpdated ? new Date(lastUpdated).toISOString() : null };
+    cacheSet(cacheKey, payload);
+    res.set("Cache-Control", "public, max-age=30");
+    return res.status(200).json(payload);
   } catch (error) {
     if (error instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Invalid or expired token" });
@@ -132,7 +202,7 @@ router.get("/watchedMovies", async (req, res) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET); // Verify token
-    const user = await User.findById(decoded.id); // Get user by ID
+    const user = await User.findById(decoded.id).select("watchedMovies").lean(); // Get user by ID
     if (!user) return res.status(404).json({ message: "User not found" });
 
     res.status(200).json(user.watchedMovies); // Return the list of watched movies
@@ -242,6 +312,7 @@ router.post("/add", async (req, res) => {
     });
 
     await movie.save();
+    cacheClear();
 
     res.status(201).json({ message: "Movie added successfully!" });
   } catch (err) {
@@ -279,6 +350,7 @@ router.delete("/delete", async (req, res) => {
     const deletedImdbIds = moviesToDelete.map((m) => m.imdb_id).filter(Boolean);
 
     const result = await Movie.deleteMany(filter);
+    cacheClear();
 
     if (deletedImdbIds.length > 0) {
       await User.updateMany(
@@ -411,6 +483,7 @@ router.put("/:id", async (req, res) => {
     }
 
     await movie.save();
+    cacheClear();
     return res.status(200).json(movie);
   } catch (err) {
     if (err instanceof jwt.JsonWebTokenError) {
@@ -504,7 +577,7 @@ router.get("/:id", async (req, res) => {
       return res.status(400).json({ message: "Invalid movie id" });
     }
 
-    const movie = await Movie.findById(id);
+    const movie = await Movie.findById(id).lean();
     if (!movie) return res.status(404).json({ message: "Movie not found" });
     return res.status(200).json(movie);
   } catch (err) {
