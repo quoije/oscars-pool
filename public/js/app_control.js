@@ -212,23 +212,79 @@ window.onload = async function () {
     }
   }
 
-  const userResetResponseEl = document.getElementById('user-reset-response');
-  const userResetForm = document.getElementById('reset-user-password-form');
-  const userResetEmailEl = document.getElementById('reset_user_email');
-
   // Admin users list elements
   const adminUsersBody = document.getElementById('admin-users-body');
   const refreshUsersBtn = document.getElementById('refresh-users');
   const adminUsersCountEl = document.getElementById('admin-users-count');
   const adminUsersTabBtn = document.getElementById('admin-users-tab');
 
-  let usersLoadedOnce = false;
+  // Admin user modals
+  const resetUserPasswordModalEl = document.getElementById('resetUserPasswordModal');
+  const resetUserPasswordModal = resetUserPasswordModalEl ? new bootstrap.Modal(resetUserPasswordModalEl) : null;
+  const resetUserLabelEl = document.getElementById('reset_user_label');
+  const resetUserEmailLabelEl = document.getElementById('reset_user_email_label');
+  const resetUserModalResponseEl = document.getElementById('reset-user-modal-response');
+  const resetUserModalResultEl = document.getElementById('reset-user-modal-result');
+  const resetUserTempPasswordEl = document.getElementById('reset-user-temp-password');
+  const resetUserExpiresAtEl = document.getElementById('reset-user-expires-at');
+  const confirmResetUserPasswordBtn = document.getElementById('confirm-reset-user-password');
+  const copyTempPasswordBtn = document.getElementById('copy-temp-password');
 
-  function showUserResetResponse(kind, message) {
-    if (!userResetResponseEl) return;
-    userResetResponseEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
-    userResetResponseEl.classList.add(kind === 'success' ? 'alert-success' : kind === 'warning' ? 'alert-warning' : 'alert-danger');
-    userResetResponseEl.textContent = message;
+  const deleteUserModalEl = document.getElementById('deleteUserModal');
+  const deleteUserModal = deleteUserModalEl ? new bootstrap.Modal(deleteUserModalEl) : null;
+  const deleteUserLabelEl = document.getElementById('delete_user_label');
+  const deleteUserEmailLabelEl = document.getElementById('delete_user_email_label');
+  const deleteUserVerifyInputEl = document.getElementById('delete_user_verify_input');
+  const deleteUserModalResponseEl = document.getElementById('delete-user-modal-response');
+  const confirmDeleteUserBtn = document.getElementById('confirm-delete-user');
+
+  let usersLoadedOnce = false;
+  let currentResetTarget = null;
+  let currentDeleteTarget = null;
+
+  function setAlert(el, kind, message) {
+    if (!el) return;
+    el.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
+    el.classList.add(kind === 'success' ? 'alert-success' : kind === 'warning' ? 'alert-warning' : 'alert-danger');
+    el.textContent = message;
+  }
+
+  function hideAlert(el) {
+    if (!el) return;
+    el.classList.add('d-none');
+    el.textContent = '';
+  }
+
+  function resetResetUserModalUi() {
+    hideAlert(resetUserModalResponseEl);
+    if (resetUserModalResultEl) resetUserModalResultEl.classList.add('d-none');
+    if (resetUserTempPasswordEl) resetUserTempPasswordEl.textContent = '—';
+    if (resetUserExpiresAtEl) resetUserExpiresAtEl.textContent = '';
+    if (confirmResetUserPasswordBtn) confirmResetUserPasswordBtn.disabled = false;
+  }
+
+  function openResetUserModal(user) {
+    currentResetTarget = user || null;
+    if (!resetUserPasswordModal) return;
+    resetResetUserModalUi();
+    if (resetUserLabelEl) resetUserLabelEl.textContent = user?.name ? user.name : '(sans nom)';
+    if (resetUserEmailLabelEl) resetUserEmailLabelEl.textContent = user?.email || '';
+    resetUserPasswordModal.show();
+  }
+
+  function resetDeleteUserModalUi() {
+    hideAlert(deleteUserModalResponseEl);
+    if (deleteUserVerifyInputEl) deleteUserVerifyInputEl.value = '';
+    if (confirmDeleteUserBtn) confirmDeleteUserBtn.disabled = true;
+  }
+
+  function openDeleteUserModal(user) {
+    currentDeleteTarget = user || null;
+    if (!deleteUserModal) return;
+    resetDeleteUserModalUi();
+    if (deleteUserLabelEl) deleteUserLabelEl.textContent = user?.name ? user.name : '(sans nom)';
+    if (deleteUserEmailLabelEl) deleteUserEmailLabelEl.textContent = user?.email || '';
+    deleteUserModal.show();
   }
 
   function setUsersCount(count) {
@@ -242,7 +298,7 @@ window.onload = async function () {
     setUsersCount(list.length);
 
     if (!list.length) {
-      adminUsersBody.innerHTML = '<tr><td colspan="3" class="text-muted">Aucun utilisateur.</td></tr>';
+      adminUsersBody.innerHTML = '<tr><td colspan="4" class="text-muted">Aucun utilisateur.</td></tr>';
       return;
     }
 
@@ -281,9 +337,34 @@ window.onload = async function () {
         });
       }
 
+      const tdActions = document.createElement('td');
+      tdActions.className = 'text-nowrap';
+
+      const resetBtn = document.createElement('button');
+      resetBtn.type = 'button';
+      resetBtn.className = 'btn btn-outline-danger btn-sm me-1';
+      resetBtn.textContent = 'Reset MDP';
+      resetBtn.addEventListener('click', () => openResetUserModal(u));
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.type = 'button';
+      deleteBtn.className = 'btn btn-outline-danger btn-sm';
+      deleteBtn.textContent = 'Supprimer';
+
+      const isSelf = String(u?.id || '') && String(u.id) === String(decoded?.id || '');
+      if (isSelf || u?.admin) {
+        deleteBtn.disabled = true;
+        deleteBtn.title = isSelf ? 'Impossible de supprimer ton propre compte' : 'Suppression des admins désactivée';
+      }
+
+      deleteBtn.addEventListener('click', () => openDeleteUserModal(u));
+      tdActions.appendChild(resetBtn);
+      tdActions.appendChild(deleteBtn);
+
       tr.appendChild(tdName);
       tr.appendChild(tdEmail);
       tr.appendChild(tdStatus);
+      tr.appendChild(tdActions);
       adminUsersBody.appendChild(tr);
     });
   }
@@ -309,7 +390,7 @@ window.onload = async function () {
     if (!adminUsersBody) return;
     if (usersLoadedOnce && !force) return;
 
-    adminUsersBody.innerHTML = '<tr><td colspan="3" class="text-muted">Chargement…</td></tr>';
+    adminUsersBody.innerHTML = '<tr><td colspan="4" class="text-muted">Chargement…</td></tr>';
     setUsersCount(null);
 
     try {
@@ -318,7 +399,7 @@ window.onload = async function () {
       users.sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), 'fr', { sensitivity: 'base' }));
       renderAdminUsers(users);
     } catch (err) {
-      adminUsersBody.innerHTML = `<tr><td colspan="3" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
+      adminUsersBody.innerHTML = `<tr><td colspan="4" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
       setUsersCount(null);
     }
   }
@@ -427,37 +508,108 @@ window.onload = async function () {
     }
   }
 
-  if (userResetForm && userResetEmailEl) {
-    userResetForm.addEventListener('submit', async function (e) {
-      e.preventDefault();
-      const email = (userResetEmailEl.value || '').trim();
-      if (!email) {
-        showUserResetResponse('warning', 'Email invalide.');
-        return;
+  if (deleteUserVerifyInputEl && confirmDeleteUserBtn) {
+    deleteUserVerifyInputEl.addEventListener('input', () => {
+      const expected = String(currentDeleteTarget?.email || '').trim();
+      const typed = String(deleteUserVerifyInputEl.value || '').trim();
+      confirmDeleteUserBtn.disabled = !(expected && typed && expected === typed);
+    });
+  }
+
+  if (copyTempPasswordBtn) {
+    copyTempPasswordBtn.addEventListener('click', async () => {
+      const text = String(resetUserTempPasswordEl?.textContent || '').trim();
+      if (!text || text === '—') return;
+      try {
+        await navigator.clipboard.writeText(text);
+        setAlert(resetUserModalResponseEl, 'success', 'Copié.');
+        setTimeout(() => hideAlert(resetUserModalResponseEl), 1200);
+      } catch (_) {
+        // Fallback: select text for manual copy
+        setAlert(resetUserModalResponseEl, 'warning', 'Impossible de copier automatiquement. Copie manuellement.');
       }
+    });
+  }
+
+  if (confirmResetUserPasswordBtn) {
+    confirmResetUserPasswordBtn.addEventListener('click', async () => {
+      const target = currentResetTarget;
+      const userId = String(target?.id || '').trim();
+      if (!userId) return;
+
+      confirmResetUserPasswordBtn.disabled = true;
+      resetResetUserModalUi();
+      setAlert(resetUserModalResponseEl, 'warning', 'Génération du mot de passe temporaire...');
 
       try {
-        showUserResetResponse('warning', 'Génération du mot de passe temporaire...');
         const res = await fetch('/api/users/admin/reset-temp-password', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`,
           },
-          body: JSON.stringify({ email }),
+          body: JSON.stringify({ userId }),
         });
-
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          showUserResetResponse('danger', data.message || data.error || `Erreur (${res.status})`);
+          setAlert(resetUserModalResponseEl, 'danger', data.message || data.error || `Erreur (${res.status})`);
+          confirmResetUserPasswordBtn.disabled = false;
           return;
         }
 
-        const label = data?.user?.name ? `${data.user.name} (${data.user.email})` : email;
-        const expiresAt = data?.expiresAt ? ` Expire: ${data.expiresAt}` : '';
-        showUserResetResponse('success', `Temp password pour ${label}: ${data.tempPassword}.${expiresAt}`);
+        hideAlert(resetUserModalResponseEl);
+        if (resetUserTempPasswordEl) resetUserTempPasswordEl.textContent = data?.tempPassword || '—';
+        if (resetUserExpiresAtEl) {
+          resetUserExpiresAtEl.textContent = data?.expiresAt ? `Expire: ${data.expiresAt}` : '';
+        }
+        if (resetUserModalResultEl) resetUserModalResultEl.classList.remove('d-none');
+        setAlert(resetUserModalResponseEl, 'success', 'Mot de passe temporaire généré. Copie-le et envoie-le à l’utilisateur.');
+        confirmResetUserPasswordBtn.disabled = false;
+        await loadAdminUsers({ force: true });
       } catch (err) {
-        showUserResetResponse('danger', err.message || 'Erreur réseau');
+        setAlert(resetUserModalResponseEl, 'danger', err.message || 'Erreur réseau');
+        confirmResetUserPasswordBtn.disabled = false;
+      }
+    });
+  }
+
+  if (confirmDeleteUserBtn) {
+    confirmDeleteUserBtn.addEventListener('click', async () => {
+      const target = currentDeleteTarget;
+      const userId = String(target?.id || '').trim();
+      if (!userId) return;
+
+      confirmDeleteUserBtn.disabled = true;
+      hideAlert(deleteUserModalResponseEl);
+      setAlert(deleteUserModalResponseEl, 'warning', 'Suppression...');
+
+      try {
+        const res = await fetch('/api/users/admin/delete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({ userId }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setAlert(deleteUserModalResponseEl, 'danger', data.message || data.error || `Erreur (${res.status})`);
+          // Keep disabled until the input matches again.
+          const expected = String(target?.email || '').trim();
+          const typed = String(deleteUserVerifyInputEl?.value || '').trim();
+          confirmDeleteUserBtn.disabled = !(expected && typed && expected === typed);
+          return;
+        }
+
+        setAlert(deleteUserModalResponseEl, 'success', data.message || 'Utilisateur supprimé.');
+        await loadAdminUsers({ force: true });
+        // Close shortly after success
+        setTimeout(() => {
+          try { deleteUserModal?.hide(); } catch (_) {}
+        }, 600);
+      } catch (err) {
+        setAlert(deleteUserModalResponseEl, 'danger', err.message || 'Erreur réseau');
       }
     });
   }

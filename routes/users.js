@@ -5,6 +5,7 @@ const crypto = require("crypto");
 const User = require("../models/User");
 const Movie = require("../models/Movie");
 const Setting = require("../models/Setting");
+const PlaybackProgress = require("../models/PlaybackProgress");
 const axios = require("axios");
 
 const router = express.Router();
@@ -292,6 +293,46 @@ router.get("/admin/list", verifyToken, async (req, res) => {
         mustChangePassword: !!u.mustChangePassword,
       }))
     );
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Admin: delete a user (and related playback progress)
+router.post("/admin/delete", verifyToken, async (req, res) => {
+  if (!isAdminFromDecoded(req.user)) {
+    return res.status(403).json({ message: "You do not have admin privileges" });
+  }
+
+  const { email, userId } = req.body || {};
+  const emailNorm = typeof email === "string" ? email.trim() : "";
+  const idNorm = typeof userId === "string" ? userId.trim() : "";
+
+  if (!emailNorm && !idNorm) {
+    return res.status(400).json({ message: "Email ou userId requis." });
+  }
+
+  try {
+    const user = emailNorm ? await User.findOne({ email: emailNorm }) : await User.findById(idNorm);
+    if (!user) return res.status(404).json({ message: "User not found" });
+
+    // Safety: prevent deleting yourself from the admin UI.
+    if (String(user._id) === String(req.user?.id || "")) {
+      return res.status(400).json({ message: "Impossible de supprimer ton propre compte." });
+    }
+
+    // Safety: prevent deleting admin accounts via the UI endpoint.
+    if (user.role === 69) {
+      return res.status(400).json({ message: "Impossible de supprimer un compte admin via cette interface." });
+    }
+
+    await PlaybackProgress.deleteMany({ userId: user._id });
+    await User.deleteOne({ _id: user._id });
+
+    return res.status(200).json({
+      message: "Utilisateur supprimé.",
+      user: { id: String(user._id), name: user.name, email: user.email },
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
