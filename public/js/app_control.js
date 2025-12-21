@@ -219,6 +219,9 @@ window.onload = async function () {
   const adminUsersTabBtn = document.getElementById('admin-users-tab');
 
   // Admin: add user form elements
+  const openAddUserModalBtn = document.getElementById('open-add-user-modal');
+  const addUserModalEl = document.getElementById('addUserModal');
+  const addUserModal = addUserModalEl ? new bootstrap.Modal(addUserModalEl) : null;
   const addUserForm = document.getElementById('add-user-form');
   const addUserNameEl = document.getElementById('add_user_name');
   const addUserEmailEl = document.getElementById('add_user_email');
@@ -277,6 +280,16 @@ window.onload = async function () {
       try { addUserForm.reset(); } catch (_) {}
     }
     if (addUserSubmitBtn) addUserSubmitBtn.disabled = false;
+  }
+
+  function openAddUserModal() {
+    if (!addUserModal) return;
+    resetAddUserUi({ resetForm: true });
+    try { addUserModal.show(); } catch (_) {}
+    // Focus name field (best effort)
+    setTimeout(() => {
+      try { addUserNameEl?.focus(); } catch (_) {}
+    }, 50);
   }
 
   function resetResetUserModalUi() {
@@ -566,6 +579,17 @@ window.onload = async function () {
       } catch (_) {
         setAlert(addUserResponseEl, 'warning', 'Impossible de copier automatiquement. Copie manuellement.');
       }
+    });
+  }
+
+  if (openAddUserModalBtn) {
+    openAddUserModalBtn.addEventListener('click', () => openAddUserModal());
+  }
+
+  if (addUserModalEl) {
+    // Whenever the modal is opened, clear previous result/state.
+    addUserModalEl.addEventListener('shown.bs.modal', () => {
+      resetAddUserUi({ resetForm: true });
     });
   }
 
