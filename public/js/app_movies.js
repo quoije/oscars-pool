@@ -10,6 +10,18 @@ window.onload = async function () {
       `;
     }
 
+    function setInlineLoading(el, label = 'Chargement…') {
+      if (!el) return;
+      el.innerHTML = `
+        <span class="d-inline-flex align-items-center gap-2" aria-live="polite" aria-busy="true">
+          <span class="spinner-border spinner-border-sm text-secondary" role="status" aria-label="Chargement">
+            <span class="visually-hidden">Chargement...</span>
+          </span>
+          <span>${label}</span>
+        </span>
+      `;
+    }
+
     function setLoadError(el, message) {
       if (!el) return;
       el.innerHTML = `
@@ -49,28 +61,37 @@ window.onload = async function () {
       return Number.isNaN(d.getTime()) ? null : d;
     }
 
-    async function fetchMoviesLastUpdated(year, token) {
-      const el = document.getElementById('movies-last-updated');
-      if (!el) return;
+    async function fetchMoviesSummary(year, token) {
+      const res = await fetch(`/api/movies/summary?year=${encodeURIComponent(String(year))}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error('Failed to fetch movies summary');
+      return await res.json();
+    }
 
-      try {
-        const res = await fetch(`/api/movies/last-update?year=${encodeURIComponent(String(year))}`, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` },
-        });
-        if (!res.ok) return;
+    function applySummaryToHeader(summary) {
+      const lastUpdatedEl = document.getElementById('movies-last-updated');
+      const ratioEl = document.getElementById('watched-ratio');
 
-        const data = await res.json();
-        const lastUpdatedIso = data?.lastUpdated;
-        if (!lastUpdatedIso) return;
-
-        const d = new Date(lastUpdatedIso);
-        if (Number.isNaN(d.getTime())) return;
-
-        el.textContent = d.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
-      } catch (_) {
-        // Keep the default placeholder (—)
+      const lastUpdatedIso = summary?.lastUpdated;
+      if (lastUpdatedEl) {
+        if (lastUpdatedIso) {
+          const d = new Date(lastUpdatedIso);
+          if (!Number.isNaN(d.getTime())) {
+            lastUpdatedEl.textContent = d.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+          } else {
+            lastUpdatedEl.textContent = '—';
+          }
+        } else {
+          lastUpdatedEl.textContent = '—';
+        }
       }
+
+      const total = Number(summary?.totalMoviesCount) || 0;
+      const watched = Number(summary?.watchedMoviesCount) || 0;
+      const ratioPct = total > 0 ? ((watched / total) * 100).toFixed(1) : '0.0';
+      if (ratioEl) ratioEl.innerText = `Vu: ${watched} / ${total} (${ratioPct}%)`;
     }
 
     const activeYear = await fetchActiveYear();
@@ -78,24 +99,41 @@ window.onload = async function () {
     const oscarYearEl = document.getElementById('oscar-year');
     if (oscarYearEl) oscarYearEl.textContent = String(activeYear);
 
-    const oscarEffectiveDate = await fetchOscarEffectiveDate(activeYear);
-    const targetDate =
-      parseLocalNoonFromIsoDate(oscarEffectiveDate) ||
-      new Date(`March 15, ${activeYear} 12:00:00`);
-
+    // Render countdown immediately with a deterministic fallback (then refine from settings).
     const oscarDayMonthEl = document.getElementById('oscar-date-day-month');
+    const timeLeftEl = document.getElementById('time-left');
+    const fallbackDate = parseLocalNoonFromIsoDate(`${activeYear}-03-15`) || new Date(`March 15, ${activeYear} 12:00:00`);
     if (oscarDayMonthEl) {
       try {
-        oscarDayMonthEl.textContent = targetDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+        oscarDayMonthEl.textContent = fallbackDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
       } catch (_) {
         oscarDayMonthEl.textContent = '15 mars';
       }
     }
+    if (timeLeftEl) {
+      const currentDate = new Date();
+      const timeDifference = fallbackDate - currentDate;
+      const daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
+      timeLeftEl.textContent = `${daysLeft} jours`;
+    }
 
-    const currentDate = new Date();
-    const timeDifference = targetDate - currentDate;
-    const daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
-    document.getElementById('time-left').textContent = `${daysLeft} jours`;
+    fetchOscarEffectiveDate(activeYear).then((oscarEffectiveDate) => {
+      const targetDate =
+        parseLocalNoonFromIsoDate(oscarEffectiveDate) ||
+        fallbackDate;
+
+      if (oscarDayMonthEl) {
+        try {
+          oscarDayMonthEl.textContent = targetDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+        } catch (_) {}
+      }
+      if (timeLeftEl) {
+        const currentDate = new Date();
+        const timeDifference = targetDate - currentDate;
+        const daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
+        timeLeftEl.textContent = `${daysLeft} jours`;
+      }
+    }).catch(() => {});
 
     const token = localStorage.getItem('auth_token');
     if (token) {
@@ -128,21 +166,33 @@ window.onload = async function () {
     const moviesList = document.getElementById('movies-list');
     setLoading(moviesList);
 
-    // Populate "Dernière mise à jour des films" banner (per active year)
-    await fetchMoviesLastUpdated(activeYear, token);
+    // Make header stats feel responsive (these used to wait for the heavy movies payload).
+    setInlineLoading(document.getElementById('movies-last-updated'));
+    setInlineLoading(document.getElementById('watched-ratio'));
+
+    let watchedMoviesInYear = [];
 
     try {
-      // Fetch movies + watched list in parallel (Render latency is high).
-      const [res, watchedRes] = await Promise.all([
-        fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}`, {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` },
-        }),
-        fetch('/api/movies/watchedMovies', {
-          method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` },
+      // Start summary fetch immediately so header can update ASAP.
+      const summaryPromise = fetchMoviesSummary(activeYear, token)
+        .then((data) => {
+          watchedMoviesInYear = Array.isArray(data?.watchedMovies) ? data.watchedMovies : [];
+          applySummaryToHeader(data);
+          return data;
         })
-      ]);
+        .catch(() => {
+          // Leave the placeholders (—) if summary fails; movies list can still load.
+          const lastUpdatedEl = document.getElementById('movies-last-updated');
+          if (lastUpdatedEl) lastUpdatedEl.textContent = '—';
+          const ratioEl = document.getElementById('watched-ratio');
+          if (ratioEl) ratioEl.textContent = '—';
+          return null;
+        });
+
+      const res = await fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}`, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` },
+        });
 
       if (!res.ok) {
         localStorage.removeItem('auth_token');
@@ -151,17 +201,11 @@ window.onload = async function () {
       }
 
       const movies = await res.json();
+      // If summary is still in flight, wait for it before rendering watched banners.
+      await summaryPromise;
 
       // Sort movies alphabetically by title (server also sorts, but keep client as a fallback)
       movies.sort((a, b) => a.title.localeCompare(b.title, 'fr', { sensitivity: 'base' }));
-
-      let watchedMovies = [];
-      if (watchedRes.ok) {
-        watchedMovies = await watchedRes.json();
-      }
-
-      const movieImdbIds = new Set(movies.map((m) => m.imdb_id).filter(Boolean));
-      const watchedMoviesInYear = watchedMovies.filter((wm) => movieImdbIds.has(wm.imdb_id));
 
       const totalMoviesCount = movies.length;
       const watchedMoviesCount = watchedMoviesInYear.length;
