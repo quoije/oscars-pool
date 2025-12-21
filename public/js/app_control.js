@@ -726,12 +726,12 @@ window.onload = async function () {
   async function loadMoviesForManagement() {
     const year = manageYearSelect.value;
     const url = year ? `/api/movies?year=${encodeURIComponent(year)}` : '/api/movies';
-    adminMoviesBody.innerHTML = `<tr><td colspan="5" class="text-muted">Chargement…</td></tr>`;
+    adminMoviesBody.innerHTML = `<tr><td colspan="6" class="text-muted">Chargement…</td></tr>`;
 
     try {
       const res = await fetch(url, { method: 'GET' });
       if (!res.ok) {
-        adminMoviesBody.innerHTML = `<tr><td colspan="5" class="text-danger">Erreur lors du chargement (${res.status})</td></tr>`;
+        adminMoviesBody.innerHTML = `<tr><td colspan="6" class="text-danger">Erreur lors du chargement (${res.status})</td></tr>`;
         return;
       }
       const movies = await res.json();
@@ -739,13 +739,39 @@ window.onload = async function () {
       moviesById = new Map(movies.map((m) => [m._id, m]));
 
       if (!movies.length) {
-        adminMoviesBody.innerHTML = `<tr><td colspan="5" class="text-muted">Aucun film.</td></tr>`;
+        adminMoviesBody.innerHTML = `<tr><td colspan="6" class="text-muted">Aucun film.</td></tr>`;
         updateSelectionUI();
         return;
       }
 
+      function buildPlayerBadges(m) {
+        const badges = [];
+        const hasVideo = !!(m && m.video_src);
+        const hasEmbed = !!(m && m.embed_src);
+        const hasLegacy = !!(m && m.vod_link);
+
+        if (hasVideo) badges.push({ text: 'Video', cls: 'bg-primary' });
+        if (hasEmbed) badges.push({ text: 'Embed', cls: 'bg-info text-dark' });
+        if (hasLegacy) badges.push({ text: 'Legacy', cls: 'bg-secondary' });
+
+        const modeRaw = String(m?.player_mode || 'auto').toLowerCase();
+        const mode = (modeRaw === 'video' || modeRaw === 'embed' || modeRaw === 'auto') ? modeRaw : 'auto';
+        const modeText = mode === 'auto' ? 'Auto' : mode === 'video' ? 'Mode: Video' : 'Mode: Embed';
+        badges.push({ text: modeText, cls: 'bg-light text-dark border' });
+
+        if (!hasVideo && !hasEmbed && !hasLegacy) {
+          return [{ text: '—', cls: 'bg-light text-dark border' }];
+        }
+        return badges;
+      }
+
       adminMoviesBody.innerHTML = '';
       movies.forEach((m) => {
+        const badges = buildPlayerBadges(m);
+        const badgesHtml = badges
+          .map((b) => `<span class="badge ${b.cls} me-1 mb-1">${b.text}</span>`)
+          .join('');
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>
@@ -755,6 +781,7 @@ window.onload = async function () {
             <div class="fw-semibold">${m.title || '(sans titre)'}</div>
             <div class="text-muted small">${m.imdb_id || ''}</div>
           </td>
+          <td>${badgesHtml}</td>
           <td>${m.category || ''}</td>
           <td>${m.year || ''}</td>
           <td class="text-end">
@@ -776,7 +803,7 @@ window.onload = async function () {
 
       updateSelectionUI();
     } catch (err) {
-      adminMoviesBody.innerHTML = `<tr><td colspan="5" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
+      adminMoviesBody.innerHTML = `<tr><td colspan="6" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
     }
   }
 
