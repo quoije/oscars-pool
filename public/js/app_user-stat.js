@@ -1,5 +1,7 @@
 window.onload = async function () {
     const token = localStorage.getItem('auth_token');
+    let winnersCache = null;
+    let completionsCache = null;
 
     async function fetchActiveYear() {
       try {
@@ -172,6 +174,11 @@ window.onload = async function () {
         fetchCompletions(),
       ]);
 
+      winnersCache = winners;
+      completionsCache = completions;
+      renderWinners(winnersCache);
+      renderCompletions(completionsCache);
+
       if (!statsRes.ok) {
         throw new Error('Failed to fetch user stats');
       }
@@ -180,9 +187,7 @@ window.onload = async function () {
       const userTableBody = document.getElementById('user-table-body');
       const table = document.querySelector('.user-table');
       const spinner = document.getElementById('loading-spinner');
-
-      renderWinners(winners);
-      renderCompletions(completions);
+      const statsError = document.getElementById('stats-error');
 
       // Ensure watchedRatio is treated as a number and sort in descending order
       stats.sort((a, b) => parseFloat(b.watchedRatio) - parseFloat(a.watchedRatio));
@@ -205,6 +210,7 @@ window.onload = async function () {
       // Hide spinner and show table after loading
       spinner.style.display = 'none';
       table.style.display = 'table';
+      if (statsError) statsError.classList.add('d-none');
 
       // Add event listener for user links
       document.querySelectorAll('.user-link').forEach(link => {
@@ -233,9 +239,24 @@ window.onload = async function () {
       });
     } catch (error) {
       console.error('Error loading user statistics:', error);
+      const spinner = document.getElementById('loading-spinner');
+      const table = document.querySelector('.user-table');
+      const statsError = document.getElementById('stats-error');
+      if (spinner) spinner.style.display = 'none';
+      if (table) table.style.display = 'none';
+      if (statsError) {
+        statsError.textContent = "Impossible de charger le classement pour le moment.";
+        statsError.classList.remove('d-none');
+      }
       // Still attempt to render these sections even if stats fail (best effort)
-      try { renderWinners(await fetchWinners()); } catch (_) {}
-      try { renderCompletions(await fetchCompletions()); } catch (_) {}
+      try {
+        if (winnersCache === null) winnersCache = await fetchWinners();
+        renderWinners(winnersCache);
+      } catch (_) {}
+      try {
+        if (completionsCache === null) completionsCache = await fetchCompletions();
+        renderCompletions(completionsCache);
+      } catch (_) {}
     }
 
     // Log-off functionality

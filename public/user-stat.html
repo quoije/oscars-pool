@@ -30,6 +30,14 @@
     .navbar-toggler-icon {
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
     }
+
+    /* Stats tabs */
+    .stats-tabs .nav-link {
+      font-weight: 600;
+    }
+    .stats-tab-panel {
+      padding-top: 1rem;
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -61,43 +69,69 @@
 
 <div class="container mt-5">
   <h2>Statistiques des utilisateurs</h2>
-  
-  <!-- Winners section -->
-  <div class="mt-4">
-    <h4 class="mb-2">Gagnants</h4>
-    <div class="text-muted mb-2">Définis dans l’admin (optionnel).</div>
-    <div id="winners-list" class="list-group mb-4">
-      <div class="list-group-item text-muted">Chargement…</div>
+
+  <!-- Tabs -->
+  <ul class="nav nav-tabs stats-tabs mt-3" id="statsTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="tab-ranking" data-bs-toggle="tab" data-bs-target="#pane-ranking" type="button" role="tab" aria-controls="pane-ranking" aria-selected="true">
+        Classement
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-winners" data-bs-toggle="tab" data-bs-target="#pane-winners" type="button" role="tab" aria-controls="pane-winners" aria-selected="false">
+        Gagnants
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-completion" data-bs-toggle="tab" data-bs-target="#pane-completion" type="button" role="tab" aria-controls="pane-completion" aria-selected="false">
+        100%
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content stats-tab-panel" id="statsTabsContent">
+    <!-- Ranking tab -->
+    <div class="tab-pane fade show active" id="pane-ranking" role="tabpanel" aria-labelledby="tab-ranking" tabindex="0">
+      <div id="stats-error" class="alert alert-danger d-none" role="alert"></div>
+
+      <!-- Spinner shown while loading -->
+      <div id="loading-spinner" class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+
+      <!-- Table for users and movies watched -->
+      <table class="table user-table" style="display: none;">
+        <thead>
+          <tr>
+            <th scope="col">Nom</th>
+            <th scope="col">Total des films regardés (pts)</th>
+            <th scope="col">Ratio</th>
+          </tr>
+        </thead>
+        <tbody id="user-table-body">
+          <!-- User rows will be inserted here -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Winners tab -->
+    <div class="tab-pane fade" id="pane-winners" role="tabpanel" aria-labelledby="tab-winners" tabindex="0">
+      <h4 class="mb-2">Gagnants</h4>
+      <div class="text-muted mb-2">Définis dans l’admin (optionnel).</div>
+      <div id="winners-list" class="list-group mb-4">
+        <div class="list-group-item text-muted">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- 100% completers tab -->
+    <div class="tab-pane fade" id="pane-completion" role="tabpanel" aria-labelledby="tab-completion" tabindex="0">
+      <h4 class="mb-2">Utilisateurs ayant terminé 100% (par année)</h4>
+      <div class="text-muted mb-2">Completion = 100% pour l’année (tous les films de l’année vus).</div>
+      <div id="completers-by-year" class="mb-4">
+        <div class="text-muted">Chargement…</div>
+      </div>
     </div>
   </div>
-
-  <!-- 100% completers section -->
-  <div class="mt-4">
-    <h4 class="mb-2">Utilisateurs ayant terminé 100% (par année)</h4>
-    <div class="text-muted mb-2">Completion = 100% pour l’année (tous les films de l’année vus).</div>
-    <div id="completers-by-year" class="mb-4">
-      <div class="text-muted">Chargement…</div>
-    </div>
-  </div>
-
-  <!-- Spinner shown while loading -->
-  <div id="loading-spinner" class="spinner-border text-primary" role="status">
-    <span class="visually-hidden">Loading...</span>
-  </div>
-  
-  <!-- Table for users and movies watched -->
-  <table class="table user-table" style="display: none;">
-    <thead>
-      <tr>
-        <th scope="col">Nom</th>
-        <th scope="col">Total des films regardés (pts)</th>
-        <th scope="col">Ratio</th>
-      </tr>
-    </thead>
-    <tbody id="user-table-body">
-      <!-- User rows will be inserted here -->
-    </tbody>
-  </table>
 </div>
 
 <!-- Modal for displaying movies watched -->
