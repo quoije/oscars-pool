@@ -41,6 +41,13 @@ window.onload = async function () {
   const activeYearInput = document.getElementById('active_oscar_year');
   const saveActiveYearBtn = document.getElementById('save-active-year');
 
+  // Oscar date per year (settings tab)
+  const oscarDateYearSelect = document.getElementById('oscar_date_year');
+  const oscarDateValueInput = document.getElementById('oscar_date_value');
+  const saveOscarDateBtn = document.getElementById('save-oscar-date');
+  const clearOscarDateBtn = document.getElementById('clear-oscar-date');
+  const oscarDateCurrentEl = document.getElementById('oscar-date-current');
+
   // Modal 100% elements
   const completionModalTitleEl = document.getElementById('completion_modal_title');
   const completionModalBodyTextEl = document.getElementById('completion_modal_body_text');
@@ -97,6 +104,8 @@ window.onload = async function () {
   let winnerUsersLoadedOnce = false;
   let winnersByYear = new Map(); // year -> [{ year, userId, name, points }]
   let winnerUsers = []; // admin list: {id, name, email, ...}
+  let oscarDatesLoadedOnce = false;
+  let oscarDatesByYear = {}; // { "2026": "2026-03-15" }
 
   const DEFAULT_COMPLETION_MODAL = Object.freeze({
     title: 'Félicitations! very nice 🎉🎉🎉',
@@ -474,6 +483,81 @@ window.onload = async function () {
     return n;
   }
 
+  function isIsoDateString(value) {
+    return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim());
+  }
+
+  async function fetchOscarDates() {
+    const res = await fetch('/api/settings/oscar-dates', { method: 'GET' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return data?.dates && typeof data.dates === 'object' ? data.dates : {};
+  }
+
+  async function ensureOscarDatesLoaded(options = {}) {
+    const force = !!options.force;
+    if (oscarDatesLoadedOnce && !force) return;
+    try {
+      oscarDatesByYear = await fetchOscarDates();
+      oscarDatesLoadedOnce = true;
+    } catch (_) {
+      oscarDatesByYear = {};
+      oscarDatesLoadedOnce = true;
+    }
+  }
+
+  async function setOscarDateForYear(year, dateStrOrEmpty) {
+    const res = await fetch(`/api/settings/oscar-date/${encodeURIComponent(String(year))}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ date: dateStrOrEmpty }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  function renderOscarDatesCurrent(cleanedYears) {
+    if (!oscarDateCurrentEl) return;
+    const years = Array.isArray(cleanedYears) ? cleanedYears : [];
+    if (!years.length) {
+      oscarDateCurrentEl.textContent = '—';
+      return;
+    }
+
+    const lines = years.map((y) => {
+      const key = String(y);
+      const val = oscarDatesByYear && typeof oscarDatesByYear === 'object' ? oscarDatesByYear[key] : null;
+      const date = (typeof val === 'string' && isIsoDateString(val)) ? val : '— (défaut: 03-15)';
+      return `${key}: ${date}`;
+    });
+
+    oscarDateCurrentEl.textContent = lines.join('\n');
+    oscarDateCurrentEl.style.whiteSpace = 'pre';
+  }
+
+  function applyOscarDateSelection() {
+    if (!oscarDateYearSelect || !oscarDateValueInput) return;
+    const y = parseYear(oscarDateYearSelect.value);
+    if (!y) {
+      oscarDateValueInput.value = '';
+      return;
+    }
+    const key = String(y);
+    const val = oscarDatesByYear && typeof oscarDatesByYear === 'object' ? oscarDatesByYear[key] : null;
+    oscarDateValueInput.value = (typeof val === 'string' && isIsoDateString(val)) ? val : '';
+  }
+
   async function fetchWinners() {
     const res = await fetch('/api/settings/winners', { method: 'GET' });
     const data = await res.json().catch(() => ({}));
@@ -801,6 +885,84 @@ window.onload = async function () {
         }
       });
     }
+  }
+
+  // Oscar date (settings tab) wiring
+  if (oscarDateYearSelect) {
+    oscarDateYearSelect.addEventListener('change', () => {
+      applyOscarDateSelection();
+    });
+  }
+
+  if (saveOscarDateBtn && oscarDateYearSelect && oscarDateValueInput) {
+    saveOscarDateBtn.addEventListener('click', async () => {
+      const y = parseYear(oscarDateYearSelect.value);
+      if (!y) {
+        showResponse('warning', 'Année invalide. Exemple attendu: 2026');
+        return;
+      }
+
+      const dateValue = String(oscarDateValueInput.value || '').trim();
+      if (dateValue && !isIsoDateString(dateValue)) {
+        showResponse('warning', 'Date invalide. Format attendu: YYYY-MM-DD');
+        return;
+      }
+
+      saveOscarDateBtn.disabled = true;
+      if (clearOscarDateBtn) clearOscarDateBtn.disabled = true;
+      const oldText = saveOscarDateBtn.textContent;
+      saveOscarDateBtn.textContent = 'Enregistrement...';
+
+      try {
+        const result = await setOscarDateForYear(y, dateValue);
+        if (result?.date) {
+          oscarDatesByYear[String(y)] = String(result.date);
+          showResponse('success', `Date Oscars enregistrée pour ${y}: ${result.date}`);
+        } else {
+          delete oscarDatesByYear[String(y)];
+          showResponse('success', `Date Oscars effacée pour ${y} (retour au défaut: 15 mars).`);
+        }
+
+        await refreshYears();
+      } catch (err) {
+        showResponse('danger', err.message || 'Erreur réseau');
+      } finally {
+        saveOscarDateBtn.disabled = false;
+        if (clearOscarDateBtn) clearOscarDateBtn.disabled = false;
+        saveOscarDateBtn.textContent = oldText;
+        applyOscarDateSelection();
+      }
+    });
+  }
+
+  if (clearOscarDateBtn && oscarDateYearSelect && oscarDateValueInput) {
+    clearOscarDateBtn.addEventListener('click', async () => {
+      const y = parseYear(oscarDateYearSelect.value);
+      if (!y) {
+        showResponse('warning', 'Année invalide. Exemple attendu: 2026');
+        return;
+      }
+
+      clearOscarDateBtn.disabled = true;
+      if (saveOscarDateBtn) saveOscarDateBtn.disabled = true;
+      const oldText = clearOscarDateBtn.textContent;
+      clearOscarDateBtn.textContent = 'Effacement...';
+
+      try {
+        oscarDateValueInput.value = '';
+        await setOscarDateForYear(y, '');
+        delete oscarDatesByYear[String(y)];
+        showResponse('success', `Date Oscars effacée pour ${y} (retour au défaut: 15 mars).`);
+        await refreshYears();
+      } catch (err) {
+        showResponse('danger', err.message || 'Erreur réseau');
+      } finally {
+        clearOscarDateBtn.disabled = false;
+        if (saveOscarDateBtn) saveOscarDateBtn.disabled = false;
+        clearOscarDateBtn.textContent = oldText;
+        applyOscarDateSelection();
+      }
+    });
   }
 
   if (deleteUserVerifyInputEl && confirmDeleteUserBtn) {
@@ -1402,6 +1564,9 @@ window.onload = async function () {
         .filter((y) => Number.isInteger(y) && y >= 1900 && y <= 3000)
         .sort((a, b) => b - a);
 
+      // Ensure Oscar dates cache is loaded (for settings UI).
+      await ensureOscarDatesLoaded();
+
       // Rebuild manage dropdown from scratch (so removed years disappear)
       const previousSelection = manageYearSelect.value;
       manageYearSelect.innerHTML = '';
@@ -1470,6 +1635,48 @@ window.onload = async function () {
           activeYearInput.value = desired;
         }
       }
+
+      // Oscar date year dropdown (settings tab)
+      if (oscarDateYearSelect && oscarDateValueInput && saveOscarDateBtn && clearOscarDateBtn) {
+        const previousOscarYearSelection = String(oscarDateYearSelect.value || '');
+        oscarDateYearSelect.innerHTML = '';
+
+        if (cleanedYears.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'Aucune année (ajoute un film)';
+          opt.disabled = true;
+          opt.selected = true;
+          oscarDateYearSelect.appendChild(opt);
+          oscarDateYearSelect.disabled = true;
+          oscarDateValueInput.disabled = true;
+          saveOscarDateBtn.disabled = true;
+          clearOscarDateBtn.disabled = true;
+        } else {
+          cleanedYears.forEach((y) => {
+            const opt = document.createElement('option');
+            opt.value = String(y);
+            opt.textContent = String(y);
+            oscarDateYearSelect.appendChild(opt);
+          });
+
+          const desired =
+            (previousOscarYearSelection && cleanedYears.map(String).includes(previousOscarYearSelection))
+              ? previousOscarYearSelection
+              : (activeYear && cleanedYears.map(String).includes(String(activeYear)))
+                ? String(activeYear)
+                : String(cleanedYears[0]);
+
+          oscarDateYearSelect.disabled = false;
+          oscarDateValueInput.disabled = false;
+          saveOscarDateBtn.disabled = false;
+          clearOscarDateBtn.disabled = false;
+          oscarDateYearSelect.value = desired;
+        }
+      }
+
+      applyOscarDateSelection();
+      renderOscarDatesCurrent(cleanedYears);
 
       // Winners year dropdown (optional tab)
       setWinnerYearOptions(cleanedYears);

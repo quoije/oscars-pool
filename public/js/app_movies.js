@@ -11,6 +11,24 @@ window.onload = async function () {
       }
     }
 
+    async function fetchOscarEffectiveDate(year) {
+      try {
+        const res = await fetch(`/api/settings/oscar-date?year=${encodeURIComponent(String(year))}`, { method: 'GET' });
+        if (!res.ok) throw new Error('Failed to fetch oscar date');
+        const data = await res.json();
+        const effectiveDate = typeof data?.effectiveDate === 'string' ? data.effectiveDate : null;
+        return effectiveDate && /^\d{4}-\d{2}-\d{2}$/.test(effectiveDate) ? effectiveDate : `${year}-03-15`;
+      } catch (_) {
+        return `${year}-03-15`;
+      }
+    }
+
+    function parseLocalNoonFromIsoDate(dateStr) {
+      // Use local noon to avoid DST/midnight edge cases for "days left" math.
+      const d = new Date(`${dateStr}T12:00:00`);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+
     async function fetchMoviesLastUpdated(year, token) {
       const el = document.getElementById('movies-last-updated');
       if (!el) return;
@@ -40,7 +58,20 @@ window.onload = async function () {
     const oscarYearEl = document.getElementById('oscar-year');
     if (oscarYearEl) oscarYearEl.textContent = String(activeYear);
 
-    const targetDate = new Date(`March 15, ${activeYear}`);
+    const oscarEffectiveDate = await fetchOscarEffectiveDate(activeYear);
+    const targetDate =
+      parseLocalNoonFromIsoDate(oscarEffectiveDate) ||
+      new Date(`March 15, ${activeYear} 12:00:00`);
+
+    const oscarDayMonthEl = document.getElementById('oscar-date-day-month');
+    if (oscarDayMonthEl) {
+      try {
+        oscarDayMonthEl.textContent = targetDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+      } catch (_) {
+        oscarDayMonthEl.textContent = '15 mars';
+      }
+    }
+
     const currentDate = new Date();
     const timeDifference = targetDate - currentDate;
     const daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
