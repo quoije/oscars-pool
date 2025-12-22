@@ -321,3 +321,14 @@ footer {
     height: 18px;
     margin-left: 0;
   }
+
+  /* Admin → Settings: keep controls compact */
+  .admin-settings-narrow {
+    max-width: 520px;
+  }
+
+  @media (max-width: 576px) {
+    .admin-settings-narrow {
+      max-width: 100%;
+    }
+  }
