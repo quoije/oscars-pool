@@ -418,6 +418,7 @@
                 <thead>
                   <tr>
                     <th style="width: 1%;">Sel.</th>
+                    <th style="width: 1%;">ID</th>
                     <th>Titre</th>
                     <th style="width: 12%;">Player</th>
                     <th style="width: 20%;">Catégorie</th>
@@ -426,7 +427,7 @@
                   </tr>
                 </thead>
                 <tbody id="admin-movies-body">
-                  <tr><td colspan="6" class="text-muted">Charge la liste…</td></tr>
+                  <tr><td colspan="7" class="text-muted">Charge la liste…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -678,6 +679,14 @@
       </div>
       <div class="modal-body">
         <input type="hidden" id="edit_movie_id">
+
+        <div class="mb-3">
+          <div class="text-muted small mb-1">Movie ID</div>
+          <div class="d-flex gap-2 align-items-center">
+            <code class="flex-grow-1" id="edit_movie_id_label">—</code>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="copy-movie-id">Copier</button>
+          </div>
+        </div>
 
         <div class="row g-3">
           <div class="col-md-6">

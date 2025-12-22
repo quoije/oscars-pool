@@ -32,17 +32,26 @@ async function fetchPlaybackProgress(movieId, token) {
 
 async function savePlaybackProgress(movieId, token, { time, duration, keepalive } = {}) {
   try {
-    await fetch(`/api/movies/${encodeURIComponent(movieId)}/progress`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ time, duration }),
-      keepalive: !!keepalive,
-    });
+    // Retry once on rare upsert races (409).
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/progress`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ time, duration }),
+        keepalive: !!keepalive,
+      });
+      if (res.ok) return true;
+      if (res.status === 409) continue;
+      if (res.status === 401) return false;
+      return true; // best-effort; don't break playback on other errors
+    }
+    return true;
   } catch (_) {
     // best-effort
+    return true;
   }
 }
 
@@ -54,13 +63,16 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
   let intervalId = null;
   let lastSavedAt = 0;
   let lastSavedTime = -1;
+  let lastSaveStatus = '—';
+  let seekSaveTimer = null;
 
   function getSnapshot() {
     const t = Number(videoEl.currentTime);
     const d = Number(videoEl.duration);
     return {
-      time: Number.isFinite(t) && t >= 0 ? t : 0,
-      duration: Number.isFinite(d) && d > 0 ? d : null,
+      // Use whole seconds to keep saved values stable.
+      time: Number.isFinite(t) && t >= 0 ? Math.floor(t) : 0,
+      duration: Number.isFinite(d) && d > 0 ? Math.floor(d) : null,
     };
   }
 
@@ -86,19 +98,24 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
     const clamped = Math.min(Math.max(targetTime, 0), Math.max(0, dur - 3));
     if (clamped > 1) {
       try { videoEl.currentTime = clamped; } catch (_) {}
+      lastSaveStatus = `Reprise à ${formatClock(clamped)}.`;
+      setProgressStatus(lastSaveStatus);
+    } else {
+      lastSaveStatus = 'Lecture depuis le début.';
+      setProgressStatus(lastSaveStatus);
     }
   }
 
-  async function persist({ keepalive } = {}) {
+  async function persist({ keepalive, force } = {}) {
     // Throttle to avoid spamming the API
     const now = Date.now();
-    if (!keepalive && now - lastSavedAt < 2000) return;
+    if (!force && !keepalive && now - lastSavedAt < 1500) return;
 
     const snap = getSnapshot();
     if (!Number.isFinite(snap.time)) return;
 
     // Only save if it meaningfully changed (>= 1s)
-    if (lastSavedTime >= 0 && Math.abs(snap.time - lastSavedTime) < 1) return;
+    if (!force && lastSavedTime >= 0 && Math.abs(snap.time - lastSavedTime) < 1) return;
 
     lastSavedAt = now;
     lastSavedTime = snap.time;
@@ -107,12 +124,28 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
       localStorage.setItem(key, JSON.stringify({ time: snap.time, duration: snap.duration, at: now }));
     } catch (_) {}
 
-    await savePlaybackProgress(movieId, token, { ...snap, keepalive: !!keepalive });
+    setProgressStatus('Sauvegarde…');
+    const ok = await savePlaybackProgress(movieId, token, { ...snap, keepalive: !!keepalive });
+    if (ok === false) {
+      // Token expired mid-playback; stop spamming requests and prompt user.
+      stopInterval();
+      try { localStorage.removeItem('auth_token'); } catch (_) {}
+      lastSaveStatus = 'Connexion requise pour sauvegarder.';
+      setProgressStatus(lastSaveStatus);
+      showAlertVariant('Session expirée. Reconnecte-toi pour continuer à sauvegarder la progression.', 'warning');
+      return;
+    }
+    lastSaveStatus = `Sauvegardé à ${formatClock(snap.time)}.`;
+    setProgressStatus(lastSaveStatus);
   }
 
   function startInterval() {
     if (intervalId) return;
-    intervalId = window.setInterval(() => { void persist(); }, 10000);
+    // Safety-net; primary saving happens via timeupdate throttling.
+    intervalId = window.setInterval(() => {
+      if (videoEl.paused || videoEl.seeking) return;
+      void persist();
+    }, 8000);
   }
 
   function stopInterval() {
@@ -122,21 +155,32 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
   }
 
   const onPlay = () => startInterval();
-  const onPause = () => { stopInterval(); void persist(); };
-  const onSeeked = () => { void persist(); };
+  const onPause = () => { stopInterval(); void persist({ force: true }); };
+  const onSeeking = () => {
+    // While scrubbing, browsers fire many events; debounce a forced save so it lands quickly.
+    if (seekSaveTimer) window.clearTimeout(seekSaveTimer);
+    seekSaveTimer = window.setTimeout(() => { void persist({ force: true }); }, 400);
+  };
+  const onSeeked = () => { void persist({ force: true }); };
   const onEnded = () => { stopInterval(); void persist(); };
   const onError = () => { stopInterval(); };
-  const onPageHide = () => { void persist({ keepalive: true }); };
+  const onTimeUpdate = () => {
+    if (videoEl.paused || videoEl.seeking) return;
+    void persist();
+  };
+  const onPageHide = () => { void persist({ keepalive: true, force: true }); };
   const onVisibility = () => {
-    if (document.visibilityState === 'hidden') void persist({ keepalive: true });
+    if (document.visibilityState === 'hidden') void persist({ keepalive: true, force: true });
   };
 
   videoEl.addEventListener('loadedmetadata', restoreProgressOnce, { once: true });
   videoEl.addEventListener('play', onPlay);
   videoEl.addEventListener('pause', onPause);
+  videoEl.addEventListener('seeking', onSeeking);
   videoEl.addEventListener('seeked', onSeeked);
   videoEl.addEventListener('ended', onEnded);
   videoEl.addEventListener('error', onError);
+  videoEl.addEventListener('timeupdate', onTimeUpdate);
 
   window.addEventListener('pagehide', onPageHide);
   document.addEventListener('visibilitychange', onVisibility);
@@ -146,13 +190,17 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
 
   return () => {
     stopInterval();
+    if (seekSaveTimer) window.clearTimeout(seekSaveTimer);
     videoEl.removeEventListener('play', onPlay);
     videoEl.removeEventListener('pause', onPause);
+    videoEl.removeEventListener('seeking', onSeeking);
     videoEl.removeEventListener('seeked', onSeeked);
     videoEl.removeEventListener('ended', onEnded);
     videoEl.removeEventListener('error', onError);
+    videoEl.removeEventListener('timeupdate', onTimeUpdate);
     window.removeEventListener('pagehide', onPageHide);
     document.removeEventListener('visibilitychange', onVisibility);
+    if (lastSaveStatus) setProgressStatus(lastSaveStatus);
   };
 }
 
@@ -188,6 +236,21 @@ function setSourceLabel(text) {
   if (!el) return;
   el.textContent = text || '—';
   el.title = text || '';
+}
+
+function setProgressStatus(text) {
+  const el = document.getElementById('progress-status');
+  if (!el) return;
+  el.textContent = text || '—';
+}
+
+function formatClock(seconds) {
+  const s = Math.max(0, Math.floor(Number(seconds) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
 function setHeader(movie) {
@@ -336,6 +399,58 @@ function setOpenOriginal(raw) {
   }
 }
 
+function isApiVideoUrl(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return false;
+  if (s.startsWith('/api/video/')) return true;
+  try {
+    const u = new URL(s);
+    return u.pathname.startsWith('/api/video/');
+  } catch (_) {
+    return false;
+  }
+}
+
+function toVideoSessionUrl(videoSrc) {
+  const s = String(videoSrc || '').trim();
+  if (!s) return null;
+  if (s.startsWith('/')) return '/api/video/session';
+  try {
+    const u = new URL(s);
+    return new URL('/api/video/session', u.origin).toString();
+  } catch (_) {
+    return null;
+  }
+}
+
+async function ensureVideoSessionForSource(videoSrc, token) {
+  // Only needed for our protected /api/video/* streams.
+  if (!token) return;
+  if (!isApiVideoUrl(videoSrc)) return;
+  const sessionUrl = toVideoSessionUrl(videoSrc);
+  if (!sessionUrl) return;
+
+  // If sessionUrl is cross-origin, we need credentials so the cookie is stored for that domain.
+  const isCrossOrigin = (() => {
+    try {
+      const u = new URL(sessionUrl, window.location.origin);
+      return u.origin !== window.location.origin;
+    } catch (_) {
+      return false;
+    }
+  })();
+
+  try {
+    await fetch(sessionUrl, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+      ...(isCrossOrigin ? { credentials: 'include' } : {}),
+    });
+  } catch (_) {
+    // best-effort
+  }
+}
+
 async function playVodLink(vodLink) {
   const raw = normalizeVodLink(vodLink);
   if (!raw) {
@@ -359,6 +474,21 @@ async function playVodLink(vodLink) {
   if (vimeo) {
     setSourceLabel('Vimeo (embed)');
     showEmbedPlayer(vimeo);
+    return;
+  }
+
+  // App/Python protected video endpoint (no file extension, but it's still a direct <video> stream).
+  if (isApiVideoUrl(raw)) {
+    setSourceLabel('Server video stream (/api/video)');
+    const videoEl = showVideoPlayer();
+    if (!videoEl) return;
+    videoEl.src = raw;
+    videoEl.addEventListener('error', () => {
+      // If the browser can't play it (or CORS blocks), fall back to iframe.
+      setSourceLabel('Embed (fallback)');
+      showEmbedPlayer(raw);
+    }, { once: true });
+    try { videoEl.load(); } catch (_) {}
     return;
   }
 
@@ -504,15 +634,6 @@ window.onload = async function () {
 
     setHeader(movie);
 
-    // Allow <video> to call /api/video/* without Authorization headers by using a cookie.
-    // Best-effort: if it fails, external video_src URLs can still work.
-    try {
-      await fetch('/api/video/session', {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
-      });
-    } catch (_) {}
-
     const resolved = resolveMovieSource(movie);
     if (!resolved?.src) {
       setOpenOriginal(null);
@@ -521,6 +642,10 @@ window.onload = async function () {
       showAlert('No playable source configured for this movie.');
       return;
     }
+
+    // Allow <video> to call protected /api/video/* sources without Authorization headers by using a cookie.
+    // If the source is on a different origin (Python video host), we call THAT host’s /api/video/session.
+    await ensureVideoSessionForSource(resolved.src, token);
 
     if (resolved.isLegacy) {
       // Legacy source: never embed it in the player.
@@ -536,7 +661,10 @@ window.onload = async function () {
     // Only the <video> player supports reliable progress tracking (mp4/hls).
     const videoEl = document.getElementById('video');
     if (videoEl && !videoEl.classList.contains('d-none')) {
+      setProgressStatus('Prépare la reprise…');
       setupVideoProgress({ videoEl, movieId: id, token, userId: decoded?.id });
+    } else {
+      setProgressStatus('—');
     }
   } catch (err) {
     showAlert(err.message || 'Network error.');
