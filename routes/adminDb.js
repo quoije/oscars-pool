@@ -152,6 +152,9 @@ async function listBackupFiles() {
 router.get("/db/backups", async (req, res) => {
   try {
     requireAdmin(req);
+    // Admin + auth-scoped data: never allow caching.
+    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
+    res.setHeader("Vary", "Authorization");
     const backups = await listBackupFiles();
     return res.status(200).json({ backups });
   } catch (err) {
@@ -227,6 +230,8 @@ router.post("/db/backup", async (req, res) => {
 router.get("/db/backups/:name", async (req, res) => {
   try {
     requireAdmin(req);
+    res.setHeader("Cache-Control", "private, no-store, must-revalidate");
+    res.setHeader("Vary", "Authorization");
     const safe = safeBackupFileName(req.params?.name);
     if (!safe) return res.status(400).json({ message: "Invalid backup name" });
 

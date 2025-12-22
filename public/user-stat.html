@@ -84,6 +84,7 @@
     <li class="nav-item" role="presentation">
       <button class="nav-link active" id="tab-ranking" data-bs-toggle="tab" data-bs-target="#pane-ranking" type="button" role="tab" aria-controls="pane-ranking" aria-selected="true">
         Classement
+        <span id="stats-active-year-badge" class="badge bg-dark ms-2 d-none" aria-label="Année active"></span>
       </button>
     </li>
     <li class="nav-item" role="presentation">
@@ -141,20 +142,18 @@
     <!-- 100% completers tab -->
     <div class="tab-pane fade" id="pane-completion" role="tabpanel" aria-labelledby="tab-completion" tabindex="0">
       <h4 class="mb-2">Utilisateurs ayant terminé 100% (par année)</h4>
-      <div class="text-muted mb-2">Completion = 100% pour l’année (tous les films de l’année vus).</div>
       <div class="table-responsive mb-4">
         <table class="table table-sm table-striped align-middle mb-0">
           <thead>
             <tr>
               <th scope="col" style="width: 110px;">Année</th>
-              <th scope="col" style="width: 140px;">Finisseur(s)</th>
               <th scope="col" style="width: 140px;">Total films</th>
               <th scope="col">Noms</th>
             </tr>
           </thead>
           <tbody id="completers-table-body">
             <tr>
-              <td colspan="4" class="text-center py-4 text-muted" aria-live="polite" aria-busy="true">Chargement…</td>
+              <td colspan="3" class="text-center py-4 text-muted" aria-live="polite" aria-busy="true">Chargement…</td>
             </tr>
           </tbody>
         </table>
@@ -165,16 +164,19 @@
 
 <!-- Modal for displaying movies watched -->
 <div class="modal fade" id="moviesModal" tabindex="-1" aria-labelledby="moviesModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="moviesModalLabel">Films regardés</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <ul id="movie-list" class="list-group">
-          <!-- Movie titles will be inserted here -->
-        </ul>
+        <div class="d-flex flex-column gap-3">
+          <div id="movies-summary" class="text-muted small"></div>
+
+          <div id="movies-empty" class="text-muted d-none">Aucun film à afficher.</div>
+          <div id="movie-grid" class="stats-movies-grid" aria-live="polite"></div>
+        </div>
       </div>
     </div>
   </div>

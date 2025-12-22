@@ -219,3 +219,116 @@ footer {
   .watched-badge {
     z-index: 2;
   }
+
+  /* Stats → "Films regardés" modal */
+  .stats-movies-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+
+  .stats-movie-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 14px;
+  }
+
+  .stats-movie-item--clickable {
+    cursor: pointer;
+  }
+
+  .stats-movie-item--clickable:hover {
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.14);
+  }
+
+  .stats-movie-poster {
+    width: 56px;
+    height: 84px;
+    border-radius: 10px;
+    object-fit: cover;
+    background: rgba(0, 0, 0, 0.06);
+    flex: 0 0 auto;
+  }
+
+  .stats-movie-poster.stats-movie-poster--empty {
+    background: linear-gradient(135deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03));
+  }
+
+  .stats-movie-title {
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  .stats-movie-meta {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: center;
+    font-size: 0.875rem;
+  }
+
+  .stats-movie-details {
+    margin-top: 6px;
+  }
+
+  .stats-movie-details summary {
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.85rem;
+    color: rgba(0, 0, 0, 0.6);
+    list-style: none;
+  }
+
+  .stats-movie-details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .stats-movie-details summary::before {
+    content: "›";
+    display: inline-block;
+    margin-right: 6px;
+    transform: rotate(0deg);
+    transition: transform 120ms ease;
+  }
+
+  .stats-movie-details[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .stats-movie-details-body {
+    margin-top: 6px;
+    padding-left: 14px;
+    line-height: 1.25rem;
+    overflow-wrap: anywhere;
+  }
+
+  .stats-movie-imdb {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.2rem 0.45rem;
+    line-height: 1.1;
+  }
+
+  .stats-movie-imdb .imdb-icon {
+    width: 18px;
+    height: 18px;
+    margin-left: 0;
+  }
+
+  /* Admin → Settings: keep controls compact */
+  .admin-settings-narrow {
+    max-width: 520px;
+  }
+
+  @media (max-width: 576px) {
+    .admin-settings-narrow {
+      max-width: 100%;
+    }
+  }

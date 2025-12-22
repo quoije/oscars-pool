@@ -165,7 +165,7 @@ window.onload = async function () {
   }
 
   async function fetchPlayerUi() {
-    const res = await fetch('/api/settings/player-admin-status-ui', { method: 'GET' });
+    const res = await fetch('/api/settings/player-admin-status-ui', { method: 'GET', cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = data.message || data.error || `Erreur (${res.status})`;
@@ -254,7 +254,7 @@ window.onload = async function () {
   }
 
   async function fetchAppVersionState() {
-    const res = await fetch('/api/settings/app-version', { method: 'GET' });
+    const res = await fetch('/api/settings/app-version', { method: 'GET', cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = data.message || data.error || `Erreur (${res.status})`;
@@ -338,7 +338,7 @@ window.onload = async function () {
   async function refreshAppVersionPreview() {
     if (!appVersionPreviewEl) return;
     try {
-      const res = await fetch('/api/version', { method: 'GET' });
+      const res = await fetch('/api/version', { method: 'GET', cache: 'no-store' });
       if (!res.ok) throw new Error(`Erreur (${res.status})`);
       const data = await res.json().catch(() => ({}));
       const line = `${data?.date || ''} - ${data?.version || ''} - ${data?.message || ''}`.trim();
@@ -462,7 +462,7 @@ window.onload = async function () {
   }
 
   async function fetchCompletionModal() {
-    const res = await fetch('/api/settings/completion-modal', { method: 'GET' });
+    const res = await fetch('/api/settings/completion-modal', { method: 'GET', cache: 'no-store' });
     if (!res.ok) throw new Error(`Erreur (${res.status})`);
     const data = await res.json().catch(() => ({}));
     return normalizeCompletionModal(data);
@@ -763,7 +763,8 @@ window.onload = async function () {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
-      }
+      },
+      cache: 'no-store',
     });
 
     const data = await res.json().catch(() => ([]));
@@ -805,7 +806,7 @@ window.onload = async function () {
   }
 
   async function fetchOscarDates() {
-    const res = await fetch('/api/settings/oscar-dates', { method: 'GET' });
+    const res = await fetch('/api/settings/oscar-dates', { method: 'GET', cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = data.message || data.error || `Erreur (${res.status})`;
@@ -876,7 +877,7 @@ window.onload = async function () {
   }
 
   async function fetchWinners() {
-    const res = await fetch('/api/settings/winners', { method: 'GET' });
+    const res = await fetch('/api/settings/winners', { method: 'GET', cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = data.message || data.error || `Erreur (${res.status})`;
@@ -1129,7 +1130,7 @@ window.onload = async function () {
 
   async function fetchActiveYear() {
     try {
-      const res = await fetch('/api/settings/year', { method: 'GET' });
+      const res = await fetch('/api/settings/year', { method: 'GET', cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch active year');
       const data = await res.json();
       const year = Number(data?.year);
@@ -1536,6 +1537,7 @@ window.onload = async function () {
     const res = await fetch('/api/admin/db/backups', {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${token}` },
+      cache: 'no-store',
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -1935,11 +1937,6 @@ window.onload = async function () {
       return;
     }
 
-    if (!vod_link && !video_src && !video_file && !embed_src) {
-      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / video_file / embed_src).');
-      return;
-    }
-
     try {
       const res = await fetch('/api/movies/add', {
         method: 'POST',
@@ -1973,7 +1970,7 @@ window.onload = async function () {
 
   async function refreshYears() {
     try {
-      const yearsRes = await fetch('/api/movies/years');
+      const yearsRes = await fetch('/api/movies/years', { cache: 'no-store' });
       const years = yearsRes.ok ? await yearsRes.json() : [];
       const cleanedYears = (Array.isArray(years) ? years : [])
         .map((y) => Number(y))
@@ -2187,11 +2184,6 @@ window.onload = async function () {
       return;
     }
 
-    if (!vod_link && !video_src && !video_file && !embed_src) {
-      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / video_file / embed_src).');
-      return;
-    }
-
     const body = {
       imdb_id,
       year: yearRaw === '' ? null : year,
@@ -2255,7 +2247,7 @@ window.onload = async function () {
     adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-muted">Chargement…</td></tr>`;
 
     try {
-      const res = await fetch(url, { method: 'GET' });
+      const res = await fetch(url, { method: 'GET', cache: 'no-store' });
       if (!res.ok) {
         adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-danger">Erreur lors du chargement (${res.status})</td></tr>`;
         return;
