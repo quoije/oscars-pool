@@ -264,11 +264,39 @@ footer {
     font-size: 0.875rem;
   }
 
-  .stats-movie-category {
-    max-width: 100%;
-    overflow: hidden;
-    white-space: nowrap;
-    text-overflow: ellipsis;
+  .stats-movie-details {
+    margin-top: 6px;
+  }
+
+  .stats-movie-details summary {
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.85rem;
+    color: rgba(0, 0, 0, 0.6);
+    list-style: none;
+  }
+
+  .stats-movie-details summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .stats-movie-details summary::before {
+    content: "›";
+    display: inline-block;
+    margin-right: 6px;
+    transform: rotate(0deg);
+    transition: transform 120ms ease;
+  }
+
+  .stats-movie-details[open] summary::before {
+    transform: rotate(90deg);
+  }
+
+  .stats-movie-details-body {
+    margin-top: 6px;
+    padding-left: 14px;
+    line-height: 1.25rem;
+    overflow-wrap: anywhere;
   }
 
   .stats-movie-imdb {

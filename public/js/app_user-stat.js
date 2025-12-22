@@ -502,14 +502,6 @@ window.addEventListener('DOMContentLoaded', async function () {
           const meta = document.createElement('div');
           meta.className = 'stats-movie-meta';
 
-          if (category) {
-            const cat = document.createElement('div');
-            cat.className = 'stats-movie-category text-muted small';
-            cat.title = category;
-            cat.textContent = category;
-            meta.appendChild(cat);
-          }
-
           if (rating !== null && rating > 0) {
             const r = document.createElement('span');
             r.className = 'text-muted';
@@ -531,6 +523,23 @@ window.addEventListener('DOMContentLoaded', async function () {
 
           main.appendChild(topRow);
           if (meta.childNodes.length) main.appendChild(meta);
+
+          // Optional: keep long strings (like category) out of the main layout.
+          if (category) {
+            const details = document.createElement('details');
+            details.className = 'stats-movie-details';
+
+            const summary = document.createElement('summary');
+            summary.textContent = 'Détails';
+            details.appendChild(summary);
+
+            const body = document.createElement('div');
+            body.className = 'stats-movie-details-body text-muted small';
+            body.textContent = category;
+            details.appendChild(body);
+
+            main.appendChild(details);
+          }
 
           item.appendChild(poster);
           item.appendChild(main);
