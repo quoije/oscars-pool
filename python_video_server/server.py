@@ -19,11 +19,19 @@ def _env_str(name: str, default: str = "") -> str:
     return v.strip() if isinstance(v, str) and v.strip() else default
 
 
-JWT_SECRET = _env_str("JWT_SECRET")
-MONGO_URI = _env_str("MONGO_URI")
-VIDEO_FILES_DIR = Path(_env_str("VIDEO_FILES_DIR", str(Path.cwd() / "public" / "video"))).resolve()
-COOKIE_MAX_AGE_SECONDS = int(_env_str("VIDEO_SESSION_MAX_AGE_SECONDS", "28800"))  # 8h
-COOKIE_SAMESITE = _env_str("VIDEO_COOKIE_SAMESITE", "Lax")  # Lax|Strict|None
+def _jwt_secret() -> str:
+    # Read env at runtime (important on Windows/uvicorn worker reloads).
+    return _env_str("JWT_SECRET")
+
+
+def _mongo_uri() -> str:
+    # Read env at runtime (important on Windows/uvicorn worker reloads).
+    return _env_str("MONGO_URI")
+
+
+def _video_files_dir() -> Path:
+    # Read env at runtime (important on Windows/uvicorn worker reloads).
+    return Path(_env_str("VIDEO_FILES_DIR", str(Path.cwd() / "public" / "video"))).resolve()
 
 
 def _parse_bearer(authorization: Optional[str]) -> str:
@@ -101,18 +109,20 @@ def _get_token(req: Request, authorization: Optional[str]) -> str:
 def _verify_token(token: str) -> dict:
     if not token:
         raise HTTPException(status_code=401, detail="Missing video auth token")
-    if not JWT_SECRET:
+    secret = _jwt_secret()
+    if not secret:
         raise HTTPException(status_code=500, detail="JWT_SECRET is not configured")
     try:
-        return jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        return jwt.decode(token, secret, algorithms=["HS256"])
     except jwt.PyJWTError:
         raise HTTPException(status_code=401, detail="Invalid or expired video auth token")
 
 
 def _mongo_client() -> MongoClient:
-    if not MONGO_URI:
+    uri = _mongo_uri()
+    if not uri:
         raise HTTPException(status_code=500, detail="MONGO_URI is not configured")
-    return MongoClient(MONGO_URI)
+    return MongoClient(uri)
 
 
 app = FastAPI()
@@ -144,14 +154,16 @@ def create_video_session(request: Request, response: Response, authorization: Op
 
     secure = request.url.scheme == "https" or (request.headers.get("x-forwarded-proto") == "https")
     encoded = quote(token, safe="")
-    samesite = (COOKIE_SAMESITE or "Lax").strip().lower()
+    cookie_max_age_seconds = int(_env_str("VIDEO_SESSION_MAX_AGE_SECONDS", "28800"))  # 8h
+    cookie_samesite = _env_str("VIDEO_COOKIE_SAMESITE", "Lax")  # Lax|Strict|None
+    samesite = (cookie_samesite or "Lax").strip().lower()
     if samesite not in ("lax", "strict", "none"):
         samesite = "lax"
     samesite_attr = "None" if samesite == "none" else ("Strict" if samesite == "strict" else "Lax")
     cookie_parts = [
         f"video_auth={encoded}",
         "Path=/api/video",
-        f"Max-Age={COOKIE_MAX_AGE_SECONDS}",
+        f"Max-Age={cookie_max_age_seconds}",
         f"SameSite={samesite_attr}",
         "HttpOnly",
     ]
@@ -189,8 +201,9 @@ def stream_video(
     if not _is_safe_relative_file(video_file):
         raise HTTPException(status_code=400, detail="Invalid video_file path")
 
-    full_path = (VIDEO_FILES_DIR / video_file).resolve()
-    if not str(full_path).startswith(str(VIDEO_FILES_DIR) + os.sep) and full_path != VIDEO_FILES_DIR:
+    video_dir = _video_files_dir()
+    full_path = (video_dir / video_file).resolve()
+    if not str(full_path).startswith(str(video_dir) + os.sep) and full_path != video_dir:
         raise HTTPException(status_code=400, detail="Invalid video_file path")
     if not full_path.exists() or not full_path.is_file():
         raise HTTPException(status_code=404, detail="Video file not found on server")
@@ -245,6 +258,6 @@ def healthz():
     return {
         "ok": True,
         "time": datetime.now(timezone.utc).isoformat(),
-        "video_files_dir": str(VIDEO_FILES_DIR),
+        "video_files_dir": str(_video_files_dir()),
     }
 
