@@ -667,6 +667,23 @@ router.put("/:id/progress", authenticate, async (req, res) => {
       time = Math.min(Math.max(time, 0), durationCandidate);
     }
 
+    // Defensive guard:
+    // On some reload/startup sequences (especially on hosted environments),
+    // the client can emit an early "time=0" save *before* it has restored the
+    // user's previous progress (and before it knows duration).
+    // If we already have a meaningful progress saved, never let a "0 with unknown duration"
+    // overwrite it.
+    if (time === 0 && durationCandidate === null) {
+      const existing = await PlaybackProgress.findOne({ userId, movieId: id }).select("time duration updatedAt");
+      if (existing && typeof existing.time === "number" && existing.time > 1) {
+        return res.status(200).json({
+          time: existing.time ?? 0,
+          duration: typeof existing.duration === "number" ? existing.duration : null,
+          updatedAt: existing.updatedAt ? new Date(existing.updatedAt).toISOString() : null,
+        });
+      }
+    }
+
     // Auto-check the movie in the checklist when the user reaches the "credit roll".
     // Keep it simple: use the timestamp ratio (>= 95%).
     const reachedCreditRoll = durationCandidate !== null && durationCandidate > 0 && time / durationCandidate >= 0.95;
