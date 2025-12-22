@@ -645,6 +645,7 @@ router.put("/:id/progress", authenticate, async (req, res) => {
 
     const rawTime = req.body?.time;
     const rawDuration = req.body?.duration;
+    const rawImdbId = req.body?.imdb_id;
 
     let time = Number(rawTime);
     if (!Number.isFinite(time) || time < 0) time = 0;
@@ -660,6 +661,10 @@ router.put("/:id/progress", authenticate, async (req, res) => {
       time = Math.min(Math.max(time, 0), duration);
     }
 
+    // Auto-check the movie in the checklist when the user reaches the "credit roll".
+    // Keep it simple: use the timestamp ratio (>= 95%).
+    const reachedCreditRoll = duration !== null && duration > 0 && time / duration >= 0.95;
+
     // Best UX: if the user is basically at the end, reset to 0 so replay starts from the beginning.
     if (duration !== null && duration - time <= 3) {
       time = 0;
@@ -670,6 +675,27 @@ router.put("/:id/progress", authenticate, async (req, res) => {
       { $set: { time, duration, updatedAt: new Date() } },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).select("time duration updatedAt");
+
+    // If they hit the 95% threshold, mark as watched for checklist.
+    // Prefer imdb_id provided by the client; fall back to DB lookup if absent/invalid.
+    if (reachedCreditRoll) {
+      let imdbId = typeof rawImdbId === "string" ? rawImdbId.trim() : "";
+      if (!isValidImdbId(imdbId)) imdbId = "";
+
+      if (!imdbId) {
+        const movieDoc = await Movie.findById(id).select("imdb_id").lean();
+        const mImdb = typeof movieDoc?.imdb_id === "string" ? movieDoc.imdb_id.trim() : "";
+        if (isValidImdbId(mImdb)) imdbId = mImdb;
+      }
+
+      if (imdbId) {
+        // Only add if not already present; if user manually unchecked, it can be re-added on next 95% hit.
+        await User.updateOne(
+          { _id: userId, "watchedMovies.imdb_id": { $ne: imdbId } },
+          { $push: { watchedMovies: { imdb_id: imdbId, watchedDate: new Date() } } }
+        );
+      }
+    }
 
     return res.status(200).json({
       time: updated?.time ?? 0,

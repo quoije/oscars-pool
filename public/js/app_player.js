@@ -55,17 +55,21 @@ async function fetchPlaybackProgress(movieId, token) {
   }
 }
 
-async function savePlaybackProgress(movieId, token, { time, duration, keepalive } = {}) {
+async function savePlaybackProgress(movieId, token, { time, duration, imdbId, keepalive } = {}) {
   try {
     // Retry once on rare upsert races (409).
     for (let attempt = 0; attempt < 2; attempt += 1) {
+      const payload = { time, duration };
+      const safeImdb = typeof imdbId === 'string' ? imdbId.trim() : '';
+      if (safeImdb) payload.imdb_id = safeImdb;
+
       const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/progress`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ time, duration }),
+        body: JSON.stringify(payload),
         keepalive: !!keepalive,
       });
       if (res.ok) return true;
@@ -80,7 +84,7 @@ async function savePlaybackProgress(movieId, token, { time, duration, keepalive 
   }
 }
 
-function setupVideoProgress({ videoEl, movieId, token, userId }) {
+function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
   if (!videoEl || !movieId || !token || !userId) return () => {};
 
   const key = progressStorageKey(userId, movieId);
@@ -162,7 +166,7 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
 
     // Icon-only saving indicator (avoid noisy text updates).
     setProgressUi({ state: 'saving', text: '', showText: false, ariaText: 'Sauvegarde…' });
-    const ok = await savePlaybackProgress(movieId, token, { ...snap, keepalive: !!keepalive });
+    const ok = await savePlaybackProgress(movieId, token, { ...snap, imdbId, keepalive: !!keepalive });
     if (ok === false) {
       // Token expired mid-playback; stop spamming requests and prompt user.
       stopInterval();
@@ -803,7 +807,7 @@ window.onload = async function () {
       setProgressUi({ state: 'preparing', text: 'Reprise', showText: true, ariaText: 'Prépare la reprise…' });
       const userId = normalizeUserId(decoded);
       if (userId) {
-        setupVideoProgress({ videoEl, movieId: id, token, userId });
+        setupVideoProgress({ videoEl, movieId: id, token, userId, imdbId: movie?.imdb_id });
       } else {
         // Avoid a "stuck" progress state if the token payload is unexpected.
         setProgressUi({ state: 'warning', text: '—', showText: true, ariaText: "Impossible d'identifier l'utilisateur pour sauvegarder la progression." });
