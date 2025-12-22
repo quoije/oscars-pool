@@ -137,3 +137,6 @@ dist
 
 # ayylmao
 ayylmao.js
+
+# Python video server - generated TLS material (certbot state)
+python_video_server/certs/
