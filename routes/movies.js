@@ -620,6 +620,9 @@ router.get("/:id/progress", authenticate, async (req, res) => {
     }
 
     const progress = await PlaybackProgress.findOne({ userId, movieId: id }).select("time duration updatedAt");
+    // User-specific: never allow shared/proxy caching.
+    res.set("Cache-Control", "private, no-store, must-revalidate");
+    res.set("Vary", "Authorization");
     return res.status(200).json({
       time: typeof progress?.time === "number" ? progress.time : 0,
       duration: typeof progress?.duration === "number" ? progress.duration : null,
@@ -652,27 +655,33 @@ router.put("/:id/progress", authenticate, async (req, res) => {
     // Store whole seconds for stable, consistent resume behavior.
     time = Math.floor(time);
 
-    let duration = rawDuration === undefined || rawDuration === null ? null : Number(rawDuration);
-    if (duration !== null && (!Number.isFinite(duration) || duration <= 0)) duration = null;
-    if (duration !== null) duration = Math.floor(duration);
+    // Duration is best-effort from the client.
+    // IMPORTANT: if the client sends null/undefined (common before metadata loads),
+    // do NOT wipe an existing duration in DB (we simply don't update the field).
+    let durationCandidate = rawDuration === undefined || rawDuration === null ? null : Number(rawDuration);
+    if (durationCandidate !== null && (!Number.isFinite(durationCandidate) || durationCandidate <= 0)) durationCandidate = null;
+    if (durationCandidate !== null) durationCandidate = Math.floor(durationCandidate);
 
-    if (duration !== null) {
+    if (durationCandidate !== null) {
       // Clamp into [0, duration]
-      time = Math.min(Math.max(time, 0), duration);
+      time = Math.min(Math.max(time, 0), durationCandidate);
     }
 
     // Auto-check the movie in the checklist when the user reaches the "credit roll".
     // Keep it simple: use the timestamp ratio (>= 95%).
-    const reachedCreditRoll = duration !== null && duration > 0 && time / duration >= 0.95;
+    const reachedCreditRoll = durationCandidate !== null && durationCandidate > 0 && time / durationCandidate >= 0.95;
 
     // Best UX: if the user is basically at the end, reset to 0 so replay starts from the beginning.
-    if (duration !== null && duration - time <= 3) {
+    if (durationCandidate !== null && durationCandidate - time <= 3) {
       time = 0;
     }
 
+    const updateSet = { time, updatedAt: new Date() };
+    if (durationCandidate !== null) updateSet.duration = durationCandidate;
+
     const updated = await PlaybackProgress.findOneAndUpdate(
       { userId, movieId: id },
-      { $set: { time, duration, updatedAt: new Date() } },
+      { $set: updateSet },
       { upsert: true, new: true, setDefaultsOnInsert: true }
     ).select("time duration updatedAt");
 

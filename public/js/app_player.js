@@ -59,7 +59,11 @@ async function savePlaybackProgress(movieId, token, { time, duration, imdbId, ke
   try {
     // Retry once on rare upsert races (409).
     for (let attempt = 0; attempt < 2; attempt += 1) {
-      const payload = { time, duration };
+      const payload = { time };
+      // Don't send duration when unknown; avoids wiping server-side duration.
+      if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0) {
+        payload.duration = duration;
+      }
       const safeImdb = typeof imdbId === 'string' ? imdbId.trim() : '';
       if (safeImdb) payload.imdb_id = safeImdb;
 
