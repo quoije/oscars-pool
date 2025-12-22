@@ -13,6 +13,7 @@ const COMPLETION_MODAL_KEY = "completion_modal_content";
 const WINNERS_BY_YEAR_KEY = "winners_by_year";
 const OSCAR_DATES_BY_YEAR_KEY = "oscar_date_by_year";
 const APP_VERSION_KEY = "app_version_control";
+const PLAYER_ADMIN_STATUS_UI_KEY = "player_admin_status_ui";
 
 const crypto = require("crypto");
 
@@ -21,6 +22,12 @@ const DEFAULT_COMPLETION_MODAL = Object.freeze({
   bodyText: "",
   videoSrc: "video/reward.mp4",
   bodyHtml: "",
+});
+
+const DEFAULT_PLAYER_ADMIN_STATUS_UI = Object.freeze({
+  // Controls the admin-only debug/status block in player.html
+  showSource: true,
+  showProgress: true,
 });
 
 function parseOscarYear(raw) {
@@ -144,6 +151,13 @@ function normalizeCompletionModal(rawValue) {
     videoSrc: String(videoSrc || "").slice(0, 2048).trim(),
     bodyHtml: sanitizeHtml(String(bodyHtml || "").slice(0, 20000)),
   };
+}
+
+function normalizePlayerAdminStatusUi(rawValue) {
+  const v = rawValue && typeof rawValue === "object" && !Array.isArray(rawValue) ? rawValue : {};
+  const showSource = v.showSource === undefined ? DEFAULT_PLAYER_ADMIN_STATUS_UI.showSource : !!v.showSource;
+  const showProgress = v.showProgress === undefined ? DEFAULT_PLAYER_ADMIN_STATUS_UI.showProgress : !!v.showProgress;
+  return { showSource, showProgress };
 }
 
 function createId() {
@@ -428,6 +442,45 @@ router.get("/app-version", async (req, res) => {
     return res.status(200).json({ active, versions: control.versions });
   } catch (_) {
     return res.status(200).json({ active: null, versions: [] });
+  }
+});
+
+// Public: get player admin status UI flags (source/progress visibility)
+router.get("/player-admin-status-ui", async (req, res) => {
+  try {
+    const existing = await Setting.findOne({ key: PLAYER_ADMIN_STATUS_UI_KEY }).select("value");
+    const normalized = normalizePlayerAdminStatusUi(existing?.value);
+    return res.status(200).json(normalized);
+  } catch (_) {
+    return res.status(200).json(DEFAULT_PLAYER_ADMIN_STATUS_UI);
+  }
+});
+
+// Admin-only: update player admin status UI flags
+// Body: { showSource?: boolean, showProgress?: boolean }
+router.put("/player-admin-status-ui", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+
+    const normalized = normalizePlayerAdminStatusUi(req.body);
+    const updated = await Setting.findOneAndUpdate(
+      { key: PLAYER_ADMIN_STATUS_UI_KEY },
+      { $set: { value: normalized } },
+      { upsert: true, new: true }
+    ).select("value");
+
+    return res.status(200).json(normalizePlayerAdminStatusUi(updated?.value));
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
   }
 });
 

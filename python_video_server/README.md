@@ -11,69 +11,129 @@ This is a small standalone server that mirrors the app’s `/api/video/:id` beha
 ```bash
 python -m pip install -r python_video_server/requirements.txt
 export MONGO_URI="..."
+export MONGO_DB_NAME="..."                            # optional; required if MONGO_URI doesn't include /<dbName>
 export JWT_SECRET="..."
 export VIDEO_FILES_DIR="/absolute/path/to/public/video"  # optional (default: ./public/video)
 export VIDEO_SESSION_MAX_AGE_SECONDS="28800"             # optional (default: 8h)
 uvicorn python_video_server.server:app --host 0.0.0.0 --port 8000
 ```
 
-## HTTPS (Let’s Encrypt, Python-only)
-
-This server can be served over HTTPS by running `uvicorn` with `--ssl-certfile` and `--ssl-keyfile`.
-To obtain/renew a trusted cert from Let’s Encrypt **without installing system certbot**, this repo includes a small wrapper that uses the **`certbot` Python package**.
-
-### 1) Issue a certificate (HTTP-01 standalone)
-
-Requirements:
-- Your domain’s DNS `A/AAAA` records must point to this machine.
-- Port **80** must be reachable from the internet for the ACME challenge.
+## Extra environment variables (optional)
 
 ```bash
-python3 -m pip install -r python_video_server/requirements.txt
+# CORS (needed when the main app is on a different origin)
+export CORS_ALLOW_ORIGINS="https://your-app.example.com"  # default: "*"
 
-# Staging by default (recommended first). Add --production when it works.
-sudo -E python3 -m python_video_server.letsencrypt certonly \
-  --email you@example.com \
-  --domains example.com,www.example.com
+# Cookie behavior for /api/video/session
+export VIDEO_COOKIE_SAMESITE="Lax"                        # Lax|Strict|None (default: Lax)
+
+# Mongo TLS / connectivity troubleshooting (Atlas, odd hosts, etc.)
+export MONGO_TLS_CA_FILE="/path/to/ca.pem"                # prefer a valid CA bundle
+export MONGO_TLS_FORCE_TLS12="1"                          # force TLS 1.2 if TLS 1.3 breaks
+export MONGO_TLS_INSECURE="1"                             # NOT recommended; debug only
+export MONGO_SERVER_SELECTION_TIMEOUT_MS="8000"
+export MONGO_CONNECT_TIMEOUT_MS="8000"
+export MONGO_SOCKET_TIMEOUT_MS="20000"
 ```
 
-### 1b) Issue a certificate (DNS-01 manual TXT record — no port 80, no root)
+## Video auth / usage
 
-If your host already uses port **80** (or you don't have permission to bind it), use DNS-01.
-This does **not** require any inbound ports on the machine, but you must be able to edit DNS for the domain.
+`GET /api/video/{movieId}` accepts auth in three ways (in priority order):
+
+1) `video_auth` cookie (best for browser `<video>` tags)
+2) `Authorization: Bearer <token>` header
+3) `?token=<token>` query param (debug only; tokens in URLs leak via logs/referrers)
+
+### Browser `<video>` (cookie flow)
+
+Because HTML `<video>` cannot send an `Authorization` header, the pattern is:
+
+1. Your JS calls `POST /api/video/session` with `Authorization: Bearer <token>`
+2. The server responds `204` and sets a `video_auth` cookie (scoped to `/api/video`)
+3. Your `<video>` loads `/api/video/{movieId}` and the cookie is used automatically
+
+Example (curl):
 
 ```bash
-python3 -m pip install -r python_video_server/requirements.txt
+# 1) exchange header token -> cookie
+curl -i -X POST "https://video.example.com/api/video/session" \
+  -H "Authorization: Bearer $JWT"
 
-# Add --production when staging works.
-python3 -m python_video_server.letsencrypt certonly \
-  --challenge dns \
-  --email you@example.com \
-  --domains example.com,www.example.com
+# 2) then the <video> element can simply use:
+# https://video.example.com/api/video/<movieId>
 ```
 
-During issuance, certbot will prompt you to create a TXT record like:
-- Name: `_acme-challenge.example.com`
-- Type: `TXT`
-- Value: (a token certbot prints)
+Cross-site note (frontend on a different origin):
+- Set `CORS_ALLOW_ORIGINS` to your exact app origin (not `*`) and ensure your frontend uses `credentials: "include"` on the `/api/video/session` request.
+- If the video host is cross-site, you’ll usually need `VIDEO_COOKIE_SAMESITE=None` **and** HTTPS, otherwise browsers may block the cookie.
 
-After it propagates, press Enter and certbot will continue.
-
-If you run into a situation where the prompt/token only shows up in logs, you can try the hook-based mode:
+### Non-browser clients (header flow)
 
 ```bash
-python3 -m python_video_server.letsencrypt certonly \
-  --challenge dns \
-  --dns-hooks \
-  --email you@example.com \
-  --domains example.com,www.example.com
+curl -I "https://video.example.com/api/video/<movieId>" \
+  -H "Authorization: Bearer $JWT"
 ```
 
-Certificates will be written under:
+### Token in URL (debug flow)
+
+```bash
+curl -I "https://video.example.com/api/video/<movieId>?token=$JWT"
+```
+
+### Seeking / Range requests (example)
+
+```bash
+curl -i "https://video.example.com/api/video/<movieId>" \
+  -H "Authorization: Bearer $JWT" \
+  -H "Range: bytes=0-1023"
+```
+
+## HTTPS (optional)
+
+You can run behind a reverse proxy/ingress, or run `uvicorn` with TLS directly:
+
+```bash
+uvicorn python_video_server.server:app --host 0.0.0.0 --port 443 \
+  --ssl-certfile /path/to/fullchain.pem \
+  --ssl-keyfile  /path/to/privkey.pem
+```
+
+Notes:
+- If you’re behind a proxy, forward `X-Forwarded-Proto: https` so `/api/video/session` can set `Secure` cookies correctly.
+
+## Let’s Encrypt certs (python-only helper)
+
+This repo includes `python_video_server/letsencrypt.py`, a wrapper around the **certbot Python package** (no system `certbot` needed).
+
+Certificates (and certbot state) are stored under:
 - `python_video_server/certs/config/live/<primary-domain>/fullchain.pem`
 - `python_video_server/certs/config/live/<primary-domain>/privkey.pem`
 
-### 2) Run the video server on 443 with TLS
+You can override the storage directory with `LETSENCRYPT_BASE_DIR` (optional).
+
+### Issue a cert (HTTP-01 standalone, easiest)
+
+Requirements:
+- DNS `A/AAAA` records point to this host
+- Port **80** reachable from the internet
+- You can bind port 80 (often requires `sudo`)
+
+```bash
+python -m pip install -r python_video_server/requirements.txt
+
+# staging by default (recommended first)
+sudo -E python -m python_video_server.letsencrypt certonly \
+  --email you@example.com \
+  --domains example.com,www.example.com
+
+# production (real cert)
+sudo -E python -m python_video_server.letsencrypt certonly \
+  --email you@example.com \
+  --domains example.com,www.example.com \
+  --production
+```
+
+Then run uvicorn with those certs:
 
 ```bash
 sudo -E uvicorn python_video_server.server:app --host 0.0.0.0 --port 443 \
@@ -81,18 +141,28 @@ sudo -E uvicorn python_video_server.server:app --host 0.0.0.0 --port 443 \
   --ssl-keyfile  python_video_server/certs/config/live/example.com/privkey.pem
 ```
 
-Notes:
-- Binding to ports **80/443** usually requires `sudo` (or a reverse proxy / port forwarding).
-- If you’re behind a proxy/ingress, keep sending `X-Forwarded-Proto: https` so `/api/video/session` sets `Secure` cookies correctly.
+### Issue a cert (DNS-01 manual TXT, no port 80)
 
-### 3) Renew certificates
+Use this if you cannot expose/bind port 80. Certbot will prompt you to create a TXT record.
 
 ```bash
-# Dry-run renewal (safe)
-sudo -E python3 -m python_video_server.letsencrypt renew --dry-run
+python -m pip install -r python_video_server/requirements.txt
 
-# Actual renew (typically run via cron/systemd timer)
-sudo -E python3 -m python_video_server.letsencrypt renew --production
+python -m python_video_server.letsencrypt certonly \
+  --challenge dns \
+  --email you@example.com \
+  --domains example.com,www.example.com \
+  --production
+```
+
+### Renew certs
+
+```bash
+# dry-run (safe)
+sudo -E python -m python_video_server.letsencrypt renew --dry-run
+
+# real renewal
+sudo -E python -m python_video_server.letsencrypt renew --production
 ```
 
 ## Endpoints
