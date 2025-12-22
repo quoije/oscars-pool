@@ -889,6 +889,8 @@ window.onload = async function () {
     if (decoded.admin) {
       const adminLink = document.getElementById('admin-control-link');
       if (adminLink) adminLink.classList.remove('d-none');
+      const adminStatus = document.getElementById('player-admin-status');
+      if (adminStatus) adminStatus.classList.remove('d-none');
     }
 
     const logoffBtn = document.getElementById('log-off');
