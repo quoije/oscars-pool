@@ -648,9 +648,12 @@ router.put("/:id/progress", authenticate, async (req, res) => {
 
     let time = Number(rawTime);
     if (!Number.isFinite(time) || time < 0) time = 0;
+    // Store whole seconds for stable, consistent resume behavior.
+    time = Math.floor(time);
 
     let duration = rawDuration === undefined || rawDuration === null ? null : Number(rawDuration);
     if (duration !== null && (!Number.isFinite(duration) || duration <= 0)) duration = null;
+    if (duration !== null) duration = Math.floor(duration);
 
     if (duration !== null) {
       // Clamp into [0, duration]

@@ -32,17 +32,26 @@ async function fetchPlaybackProgress(movieId, token) {
 
 async function savePlaybackProgress(movieId, token, { time, duration, keepalive } = {}) {
   try {
-    await fetch(`/api/movies/${encodeURIComponent(movieId)}/progress`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ time, duration }),
-      keepalive: !!keepalive,
-    });
+    // Retry once on rare upsert races (409).
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/progress`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ time, duration }),
+        keepalive: !!keepalive,
+      });
+      if (res.ok) return true;
+      if (res.status === 409) continue;
+      if (res.status === 401) return false;
+      return true; // best-effort; don't break playback on other errors
+    }
+    return true;
   } catch (_) {
     // best-effort
+    return true;
   }
 }
 
@@ -59,8 +68,9 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
     const t = Number(videoEl.currentTime);
     const d = Number(videoEl.duration);
     return {
-      time: Number.isFinite(t) && t >= 0 ? t : 0,
-      duration: Number.isFinite(d) && d > 0 ? d : null,
+      // Use whole seconds to keep saved values stable.
+      time: Number.isFinite(t) && t >= 0 ? Math.floor(t) : 0,
+      duration: Number.isFinite(d) && d > 0 ? Math.floor(d) : null,
     };
   }
 
@@ -107,7 +117,13 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
       localStorage.setItem(key, JSON.stringify({ time: snap.time, duration: snap.duration, at: now }));
     } catch (_) {}
 
-    await savePlaybackProgress(movieId, token, { ...snap, keepalive: !!keepalive });
+    const ok = await savePlaybackProgress(movieId, token, { ...snap, keepalive: !!keepalive });
+    if (ok === false) {
+      // Token expired mid-playback; stop spamming requests and prompt user.
+      stopInterval();
+      try { localStorage.removeItem('auth_token'); } catch (_) {}
+      showAlertVariant('Session expirée. Reconnecte-toi pour continuer à sauvegarder la progression.', 'warning');
+    }
   }
 
   function startInterval() {

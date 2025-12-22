@@ -89,7 +89,10 @@ router.post("/session", (req, res) => {
     jwt.verify(token, process.env.JWT_SECRET);
     // Cookie scoped to /api/video so it doesn't leak broadly.
     // httpOnly helps a bit, even though the JWT originally lives in localStorage.
-    const maxAgeSeconds = 60 * 60 * 8; // 8h
+    const maxAgeSecondsRaw = typeof process.env.VIDEO_SESSION_MAX_AGE_SECONDS === "string" ? process.env.VIDEO_SESSION_MAX_AGE_SECONDS.trim() : "";
+    const maxAgeSeconds = Number.isFinite(Number(maxAgeSecondsRaw)) && Number(maxAgeSecondsRaw) > 0
+      ? Math.floor(Number(maxAgeSecondsRaw))
+      : 60 * 60 * 8; // 8h
     const cookie = [
       `video_auth=${encodeURIComponent(token)}`,
       "Path=/api/video",

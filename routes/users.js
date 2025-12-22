@@ -76,6 +76,9 @@ function isAdminFromDecoded(decoded) {
 
 function signUserToken(user) {
   const isAdmin = user.role === 69;
+  const expiresIn = typeof process.env.JWT_EXPIRES_IN === "string" && process.env.JWT_EXPIRES_IN.trim()
+    ? process.env.JWT_EXPIRES_IN.trim()
+    : "8h";
   return jwt.sign(
     {
       id: user._id,
@@ -84,7 +87,7 @@ function signUserToken(user) {
       mustChangePassword: !!user.mustChangePassword,
     },
     process.env.JWT_SECRET,
-    { expiresIn: "1h" }
+    { expiresIn }
   );
 }
 
