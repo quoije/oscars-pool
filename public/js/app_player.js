@@ -430,6 +430,21 @@ async function playVodLink(vodLink) {
     return;
   }
 
+  // App/Python protected video endpoint (no file extension, but it's still a direct <video> stream).
+  if (isApiVideoUrl(raw)) {
+    setSourceLabel('Server video stream (/api/video)');
+    const videoEl = showVideoPlayer();
+    if (!videoEl) return;
+    videoEl.src = raw;
+    videoEl.addEventListener('error', () => {
+      // If the browser can't play it (or CORS blocks), fall back to iframe.
+      setSourceLabel('Embed (fallback)');
+      showEmbedPlayer(raw);
+    }, { once: true });
+    try { videoEl.load(); } catch (_) {}
+    return;
+  }
+
   // Direct video file
   if (looksLikeVideoFile(raw)) {
     setSourceLabel('Direct video file');
