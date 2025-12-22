@@ -93,6 +93,8 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
 
   const key = progressStorageKey(userId, movieId);
   let restored = false;
+  let restoreInProgress = false;
+  let pendingRestoreTime = null; // number | null
   let restoreServerPromise = null;
   let intervalId = null;
   let lastSavedAt = 0;
@@ -135,10 +137,16 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
     restored = true;
 
     if (clamped > 1) {
+      // Block any progress saves until the seek completes; otherwise we can overwrite
+      // server progress with an early "0s" save during reload/startup.
+      pendingRestoreTime = clamped;
+      restoreInProgress = true;
       try { videoEl.currentTime = clamped; } catch (_) {}
       lastSaveStatus = `Reprise · ${formatClock(clamped)}`;
       setProgressUi({ state: 'info', text: lastSaveStatus, showText: true, ariaText: `Reprise à ${formatClock(clamped)}` });
     } else {
+      pendingRestoreTime = null;
+      restoreInProgress = false;
       lastSaveStatus = 'Début';
       setProgressUi({ state: 'info', text: 'Début', showText: true, ariaText: 'Lecture depuis le début' });
     }
@@ -151,12 +159,30 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
   }
 
   async function persist({ keepalive, force } = {}) {
+    // Never persist until the resume logic finished; otherwise the first "0s" timeupdate
+    // on reload can overwrite the user's saved progress on the server.
+    if (!restored) {
+      void tryRestoreProgress();
+      return;
+    }
+    if (restoreInProgress) return;
+
     // Throttle to avoid spamming the API
     const now = Date.now();
     if (!force && !keepalive && now - lastSavedAt < 1500) return;
 
     const snap = getSnapshot();
     if (!Number.isFinite(snap.time)) return;
+
+    if (pendingRestoreTime !== null) {
+      // Some browsers may not fire seeked reliably. Only start saving once we
+      // observe that currentTime actually reached the restored position.
+      if (snap.time >= Math.max(0, Math.floor(pendingRestoreTime) - 1)) {
+        pendingRestoreTime = null;
+      } else {
+        return;
+      }
+    }
 
     // Only save if it meaningfully changed (>= 1s)
     if (!force && lastSavedTime >= 0 && Math.abs(snap.time - lastSavedTime) < 1) return;
@@ -211,7 +237,13 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
     if (seekSaveTimer) window.clearTimeout(seekSaveTimer);
     seekSaveTimer = window.setTimeout(() => { void persist({ force: true }); }, 400);
   };
-  const onSeeked = () => { void persist({ force: true }); };
+  const onSeeked = () => {
+    if (restoreInProgress) {
+      restoreInProgress = false;
+      pendingRestoreTime = null;
+    }
+    void persist({ force: true });
+  };
   const onEnded = () => { stopInterval(); void persist(); };
   const onError = () => { stopInterval(); };
   const onTimeUpdate = () => {
