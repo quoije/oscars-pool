@@ -41,6 +41,12 @@ window.onload = async function () {
   const activeYearInput = document.getElementById('active_oscar_year');
   const saveActiveYearBtn = document.getElementById('save-active-year');
 
+  // Player UI (settings tab): show/hide admin status blocks in player.html
+  const playerUiShowSourceEl = document.getElementById('player_ui_show_source');
+  const playerUiShowProgressEl = document.getElementById('player_ui_show_progress');
+  const playerUiReloadBtn = document.getElementById('player_ui_reload');
+  const playerUiSaveBtn = document.getElementById('player_ui_save');
+
   // Version control tab elements
   const adminVersionTabBtn = document.getElementById('admin-version-tab');
   const appVersionAlertEl = document.getElementById('app_version_alert');
@@ -132,6 +138,11 @@ window.onload = async function () {
     bodyHtml: '',
   });
 
+  const DEFAULT_PLAYER_UI = Object.freeze({
+    showSource: true,
+    showProgress: true,
+  });
+
   function showResponse(kind, message) {
     responseEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
     responseEl.classList.add(kind === 'success' ? 'alert-success' : kind === 'warning' ? 'alert-warning' : 'alert-danger');
@@ -145,6 +156,66 @@ window.onload = async function () {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  function normalizePlayerUi(value) {
+    const v = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+    const showSource = v.showSource === undefined ? DEFAULT_PLAYER_UI.showSource : !!v.showSource;
+    const showProgress = v.showProgress === undefined ? DEFAULT_PLAYER_UI.showProgress : !!v.showProgress;
+    return { showSource, showProgress };
+  }
+
+  async function fetchPlayerUi() {
+    const res = await fetch('/api/settings/player-admin-status-ui', { method: 'GET' });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return normalizePlayerUi(data);
+  }
+
+  async function savePlayerUi(payload) {
+    const res = await fetch('/api/settings/player-admin-status-ui', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return normalizePlayerUi(data);
+  }
+
+  function setPlayerUiForm(value) {
+    if (!playerUiShowSourceEl || !playerUiShowProgressEl) return;
+    playerUiShowSourceEl.checked = !!value.showSource;
+    playerUiShowProgressEl.checked = !!value.showProgress;
+  }
+
+  function getPlayerUiFormValue() {
+    return normalizePlayerUi({
+      showSource: !!playerUiShowSourceEl?.checked,
+      showProgress: !!playerUiShowProgressEl?.checked,
+    });
+  }
+
+  async function loadPlayerUiIntoUi() {
+    // If the section isn't present (older HTML), skip gracefully.
+    if (!playerUiShowSourceEl) return;
+    try {
+      const value = await fetchPlayerUi();
+      setPlayerUiForm(value);
+    } catch (err) {
+      // Keep defaults so admin can still set something.
+      setPlayerUiForm(DEFAULT_PLAYER_UI);
+      showResponse('warning', err.message || 'Impossible de charger les réglages du lecteur.');
+    }
   }
 
   async function copyToClipboard(text) {
@@ -2337,6 +2408,41 @@ window.onload = async function () {
 
   hookModal100Inputs();
   await loadCompletionModalIntoUi();
+  await loadPlayerUiIntoUi();
+
+  if (playerUiReloadBtn) {
+    playerUiReloadBtn.addEventListener('click', async () => {
+      playerUiReloadBtn.disabled = true;
+      const old = playerUiReloadBtn.textContent;
+      playerUiReloadBtn.textContent = 'Chargement...';
+      try {
+        await loadPlayerUiIntoUi();
+        showResponse('success', 'Réglages du lecteur rechargés.');
+      } finally {
+        playerUiReloadBtn.disabled = false;
+        playerUiReloadBtn.textContent = old;
+      }
+    });
+  }
+
+  if (playerUiSaveBtn) {
+    playerUiSaveBtn.addEventListener('click', async () => {
+      playerUiSaveBtn.disabled = true;
+      const old = playerUiSaveBtn.textContent;
+      playerUiSaveBtn.textContent = 'Enregistrement...';
+      try {
+        const payload = getPlayerUiFormValue();
+        const saved = await savePlayerUi(payload);
+        setPlayerUiForm(saved);
+        showResponse('success', 'Réglages du lecteur enregistrés.');
+      } catch (err) {
+        showResponse('danger', err.message || 'Erreur réseau');
+      } finally {
+        playerUiSaveBtn.disabled = false;
+        playerUiSaveBtn.textContent = old;
+      }
+    });
+  }
 
   if (saveActiveYearBtn && activeYearInput) {
     saveActiveYearBtn.addEventListener('click', async () => {
