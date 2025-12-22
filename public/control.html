@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pool Oscars - Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="./css/app.css" rel="stylesheet">
+  <link rel="preload" as="image" href="img/logo_w.png">
+  <script src="./js/app_header_boot.js" defer></script>
+  <style>
+    .navbar-custom {
+      background-color: black;
+      color: white;
+    }
+    .navbar-custom .navbar-brand,
+    .navbar-custom .nav-link {
+      color: white;
+    }
+    .navbar-custom .nav-link:hover {
+      color: #ddd;
+    }
+    .navbar-toggler {
+      border-color: white;
+    }
+    .navbar-toggler-icon {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+    }
+  </style>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-custom">
+  <div class="container">
+    <a class="navbar-brand" style="margin-left: -7px;">
+      <img src="img/logo_w.png" width="220" height="70" loading="eager" fetchpriority="high" decoding="async" style="max-width: 220px; height: 70px; object-fit: contain;">
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <div class="navbar-nav">
+        <a href="movies.html" class="nav-link btn btn-outline-light me-2">Films</a>
+        <a href="checklist.html" class="nav-link btn btn-outline-light me-2">Checklist</a>
+        <a href="user-stat.html" class="nav-link btn btn-outline-light me-2">Statistiques</a>
+        <a href="control.html" class="nav-link btn btn-warning me-2">Admin</a>
+      </div>
+      <div class="d-flex ms-auto mt-2 mt-lg-0 align-items-center">
+        <span id="user-name" class="navbar-text me-3"></span>
+        <button id="log-off" class="btn btn-danger">Déconnexion</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="container mt-5">
+  <div class="mb-3">
+    <h2 class="mb-0">Admin</h2>
+    <div class="text-muted">Paramètres, utilisateurs et gestion des films.</div>
+  </div>
+
+  <div id="response" class="alert d-none" role="alert"></div>
+
+  <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="admin-settings-tab" data-bs-toggle="tab" data-bs-target="#admin-settings" type="button" role="tab" aria-controls="admin-settings" aria-selected="true">
+        Réglages
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="admin-movies-tab" data-bs-toggle="tab" data-bs-target="#admin-movies" type="button" role="tab" aria-controls="admin-movies" aria-selected="false">
+        Films
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="admin-users-tab" data-bs-toggle="tab" data-bs-target="#admin-users" type="button" role="tab" aria-controls="admin-users" aria-selected="false">
+        Utilisateurs
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="admin-modal-100-tab" data-bs-toggle="tab" data-bs-target="#admin-modal-100" type="button" role="tab" aria-controls="admin-modal-100" aria-selected="false">
+        Modal 100%
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="admin-winners-tab" data-bs-toggle="tab" data-bs-target="#admin-winners" type="button" role="tab" aria-controls="admin-winners" aria-selected="false">
+        Gagnants
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="admin-backup-tab" data-bs-toggle="tab" data-bs-target="#admin-backup" type="button" role="tab" aria-controls="admin-backup" aria-selected="false">
+        Backup / Restore
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="admin-version-tab" data-bs-toggle="tab" data-bs-target="#admin-version" type="button" role="tab" aria-controls="admin-version" aria-selected="false">
+        Version
+      </button>
+    </li>
+  </ul>
+
+  <div class="tab-content pt-3">
+    <div class="tab-pane fade show active" id="admin-settings" role="tabpanel" aria-labelledby="admin-settings-tab">
+      <div class="row g-3">
+        <div class="col-12 col-xl-8">
+          <div class="card p-3">
+            <h4 class="mb-1">Année active</h4>
+            <p class="text-muted mb-3">
+              Cette année pilote tout le site (films affichés, checklist et statistiques).
+            </p>
+            <div class="mb-3">
+              <label for="active_oscar_year" class="form-label">Année active</label>
+              <select class="form-select" id="active_oscar_year"></select>
+              <div class="form-text">La liste est basée sur les années présentes dans les films.</div>
+            </div>
+            <div class="d-flex justify-content-end">
+              <button type="button" id="save-active-year" class="btn btn-warning">Appliquer l’année</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xl-8">
+          <div class="card p-3">
+            <h4 class="mb-1">Date des Oscars (par année)</h4>
+            <p class="text-muted mb-3">
+              Configure la date exacte de la cérémonie pour le <strong>compte à rebours</strong> sur Films &amp; Checklist.
+              Si non défini, la date par défaut reste <code>15 mars</code> (comportement actuel).
+            </p>
+
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label for="oscar_date_year" class="form-label">Année</label>
+                <select class="form-select" id="oscar_date_year"></select>
+                <div class="form-text">Basé sur les années présentes dans les films.</div>
+              </div>
+              <div class="col-md-4">
+                <label for="oscar_date_value" class="form-label">Date</label>
+                <input type="date" class="form-control" id="oscar_date_value">
+                <div class="form-text">Format: YYYY-MM-DD.</div>
+              </div>
+              <div class="col-md-4 d-flex align-items-end justify-content-end gap-2">
+                <button type="button" id="clear-oscar-date" class="btn btn-outline-danger">Effacer</button>
+                <button type="button" id="save-oscar-date" class="btn btn-warning">Enregistrer</button>
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <div class="text-muted small mb-1">Dates configurées</div>
+              <div id="oscar-date-current" class="border rounded p-2 bg-light">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="admin-version" role="tabpanel" aria-labelledby="admin-version-tab">
+      <div class="row g-3">
+        <div class="col-12 col-xxl-6">
+          <div class="card p-3">
+            <h4 class="mb-1">Version active (footer)</h4>
+            <div class="text-muted mb-3">
+              Remplace complètement le checker GitHub. La version affichée dans le footer vient de la DB et peut être changée ici.
+            </div>
+
+            <div id="app_version_alert" class="alert d-none" role="alert"></div>
+
+            <div class="mb-3">
+              <label for="app_version_active_select" class="form-label">Choisir la version active</label>
+              <select id="app_version_active_select" class="form-select"></select>
+              <div class="form-text">Cette sélection impacte ce que les utilisateurs voient dans le footer.</div>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2">
+              <button type="button" id="app_version_reload" class="btn btn-outline-primary">Recharger</button>
+              <button type="button" id="app_version_set_active" class="btn btn-warning">Définir active</button>
+            </div>
+
+            <div class="mt-3">
+              <div class="text-muted small mb-1">Aperçu (format footer)</div>
+              <div id="app_version_preview" class="border rounded p-2 bg-light">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xxl-6">
+          <div class="card p-3">
+            <h4 class="mb-1">Créer une nouvelle version</h4>
+            <div class="text-muted mb-3">
+              Ajoute une entrée dans l’historique, puis tu peux la rendre active.
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label for="app_version_new_version" class="form-label">Version</label>
+                <input id="app_version_new_version" type="text" class="form-control" placeholder="ex: 1.0.1" maxlength="80">
+              </div>
+              <div class="col-md-8">
+                <label for="app_version_new_message" class="form-label">Message (optionnel)</label>
+                <input id="app_version_new_message" type="text" class="form-control" placeholder="ex: Hotfix login" maxlength="500">
+              </div>
+              <div class="col-12 d-flex flex-wrap justify-content-end gap-2">
+                <button type="button" id="app_version_create" class="btn btn-primary">Créer</button>
+                <button type="button" id="app_version_create_and_activate" class="btn btn-warning">Créer &amp; activer</button>
+              </div>
+            </div>
+
+            <div class="mt-3">
+              <div class="text-muted small mb-2">Historique</div>
+              <div id="app_version_list" class="border rounded bg-white app-version-list">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="admin-modal-100" role="tabpanel" aria-labelledby="admin-modal-100-tab">
+      <div class="row g-3">
+        <div class="col-12 col-xxl-6">
+          <div class="card p-3">
+            <h4 class="mb-1">Contenu “Modal 100%”</h4>
+            <p class="text-muted mb-3">
+              Contenu affiché quand un utilisateur a vu 100% des films dans la checklist.
+            </p>
+
+            <div class="mb-3">
+              <label for="completion_modal_title" class="form-label">Titre</label>
+              <input type="text" class="form-control" id="completion_modal_title" maxlength="200" placeholder="Félicitations! ...">
+            </div>
+
+            <div class="mb-3">
+              <label for="completion_modal_body_text" class="form-label">Texte (optionnel)</label>
+              <textarea class="form-control" id="completion_modal_body_text" rows="4" placeholder="Texte affiché dans le modal (retours à la ligne conservés)"></textarea>
+              <div class="form-text">Affiché en texte brut (safe). Laisse vide si tu n’en veux pas.</div>
+            </div>
+
+            <div class="mb-3">
+              <label for="completion_modal_body_html" class="form-label">HTML (optionnel)</label>
+              <textarea class="form-control font-monospace" id="completion_modal_body_html" rows="6" placeholder="<p>…</p>"></textarea>
+              <div class="form-text">
+                Affiché comme HTML (le serveur retire les <code>&lt;script&gt;</code> et les handlers <code>on*</code>).
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="completion_modal_video_src" class="form-label">Video src (optionnel)</label>
+              <input type="text" class="form-control" id="completion_modal_video_src" maxlength="2048" placeholder="video/reward.mp4">
+              <div class="form-text">Chemin relatif (ex: <code>video/reward.mp4</code>) ou URL complète. Vide = pas de vidéo.</div>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2">
+              <button type="button" id="completion_modal_reload" class="btn btn-outline-secondary">Recharger</button>
+              <button type="button" id="completion_modal_save" class="btn btn-warning">Enregistrer</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xxl-6">
+          <div class="card p-3">
+            <h4 class="mb-1">Aperçu</h4>
+            <div class="text-muted mb-3">Aperçu live (non sauvegardé tant que tu n’enregistres pas).</div>
+
+            <div class="border rounded p-3 bg-white">
+              <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                <div class="fw-semibold" id="completion_modal_preview_title">—</div>
+                <span class="badge bg-secondary">Preview</span>
+              </div>
+              <div id="completion_modal_preview_custom" class="text-start d-none"></div>
+              <div id="completion_modal_preview_text" class="text-start" style="white-space: pre-wrap;"></div>
+
+              <div class="mt-3">
+                <video id="completion_modal_preview_video" width="75%" controls class="d-none">
+                  <source id="completion_modal_preview_video_source" src="" type="video/mp4">
+                  Votre navigateur ne supporte pas la vidéo.
+                </video>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="admin-users" role="tabpanel" aria-labelledby="admin-users-tab">
+      <div class="row g-3">
+        <div class="col-12">
+          <div class="card p-3">
+            <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
+              <div>
+                <h4 class="mb-1">Liste des utilisateurs</h4>
+                <div class="text-muted">
+                  <span id="admin-users-count">—</span> utilisateur(s)
+                </div>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="button" id="open-add-user-modal" class="btn btn-warning btn-sm">Ajouter un utilisateur</button>
+                <button type="button" id="refresh-users" class="btn btn-outline-primary btn-sm">Rafraîchir</button>
+              </div>
+            </div>
+
+            <div class="table-responsive">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Nom</th>
+                    <th>Email</th>
+                    <th style="width: 1%;">Statut</th>
+                    <th style="width: 1%;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-users-body">
+                  <tr><td colspan="4" class="text-muted">Charge la liste…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="admin-movies" role="tabpanel" aria-labelledby="admin-movies-tab">
+      <div class="row g-3">
+        <div class="col-12 col-xxl-4">
+          <div class="card p-3">
+            <h4 class="mb-1">Ajouter un film</h4>
+            <p class="text-muted mb-3">
+              Ajoute un film via l’API (<code>/api/movies/add</code>). Le serveur récupère automatiquement le titre/plot/affiche depuis OMDb avec l’<code>imdb_id</code>.
+            </p>
+
+            <form id="add-movie-form">
+              <div class="mb-3">
+                <label for="oscar_year" class="form-label">Oscar year</label>
+                <input type="number" class="form-control" id="oscar_year" placeholder="2026" min="1900" max="3000" required>
+                <div class="form-text">Permet de séparer les films et les stats par année.</div>
+              </div>
+              <div class="mb-3">
+                <label for="imdb_id" class="form-label">IMDB ID (ex: tt1234567)</label>
+                <input type="text" class="form-control" id="imdb_id" placeholder="tt..." required>
+              </div>
+              <div class="mb-3">
+                <label for="category" class="form-label">Catégorie</label>
+                <input type="text" class="form-control" id="category" placeholder="Best Picture, etc." required>
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Lecteur (source)</label>
+                <div class="row g-2">
+                  <div class="col-12 col-lg-4">
+                    <label for="player_mode" class="form-label">Mode</label>
+                    <select id="player_mode" class="form-select">
+                      <option value="auto" selected>Auto</option>
+                      <option value="video">Video</option>
+                      <option value="embed">Embed</option>
+                    </select>
+                    <div class="form-text">Auto = video_src → embed_src → vod_link.</div>
+                  </div>
+                  <div class="col-12 col-lg-8">
+                    <label for="video_src" class="form-label">Video URL (mp4/webm/m3u8)</label>
+                    <input type="text" class="form-control" id="video_src" placeholder="https://.../movie.mp4 or .../playlist.m3u8">
+                    <div class="form-text">If you use a server file (below) and leave this empty, it will auto-use <code>/api/video/&lt;movieId&gt;</code>.</div>
+                  </div>
+                  <div class="col-12">
+                    <label for="video_file" class="form-label">Server video file (optional)</label>
+                    <input type="text" class="form-control font-monospace" id="video_file" placeholder="my_movie.mp4 or 2026/my_movie.mp4">
+                    <div class="form-text">
+                      Relative path under <code>VIDEO_FILES_DIR</code> (default: <code>public/video</code>). Supports seeking (Range).
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <label for="embed_src" class="form-label">Embed URL or iframe code</label>
+                    <textarea class="form-control font-monospace" id="embed_src" rows="3" placeholder="https://www.youtube.com/watch?v=... OR <iframe src='...'></iframe>"></textarea>
+                  </div>
+                  <div class="col-12">
+                    <label for="vod_link" class="form-label">Legacy VOD link (optional)</label>
+                    <input type="text" class="form-control" id="vod_link" placeholder="https://...">
+                    <div class="form-text">Backward-compat. Prefer video_src / embed_src above.</div>
+                  </div>
+                </div>
+              </div>
+              <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">Ajouter</button>
+                <button type="button" id="reset-form" class="btn btn-outline-secondary">Reset</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <div class="col-12 col-xxl-8">
+          <div class="card p-3">
+            <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
+              <div>
+                <h4 class="mb-1">Gérer les films</h4>
+                <div class="text-muted">Sélectionne une année, puis coche les films à supprimer.</div>
+              </div>
+            </div>
+
+            <div class="row g-2 align-items-end">
+              <div class="col-md-6 col-xl-4">
+                <label for="manage_year" class="form-label">Oscar year</label>
+                <select id="manage_year" class="form-select">
+                  <option value="">Toutes</option>
+                </select>
+              </div>
+              <div class="col-md-6 col-xl-4 d-flex gap-2">
+                <button type="button" id="refresh-movies" class="btn btn-outline-primary w-100">Rafraîchir</button>
+                <button type="button" id="delete-selected" class="btn btn-danger w-100" disabled>Supprimer</button>
+              </div>
+              <div class="col-12 col-xl-4">
+                <div class="d-flex justify-content-between align-items-center">
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="select-all-movies">
+                    <label class="form-check-label" for="select-all-movies">Tout sélectionner</label>
+                  </div>
+                  <small class="text-muted"><span id="selected-count">0</span> sélectionné(s)</small>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-responsive mt-2">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th style="width: 1%;">Sel.</th>
+                    <th style="width: 1%;">ID</th>
+                    <th>Titre</th>
+                    <th style="width: 12%;">Player</th>
+                    <th style="width: 20%;">Catégorie</th>
+                    <th style="width: 12%;">Année</th>
+                    <th style="width: 1%;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="admin-movies-body">
+                  <tr><td colspan="7" class="text-muted">Charge la liste…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="admin-backup" role="tabpanel" aria-labelledby="admin-backup-tab">
+      <div class="row g-3">
+        <div class="col-12 col-xxl-6">
+          <div class="card p-3">
+            <h4 class="mb-1">Backup</h4>
+            <p class="text-muted mb-3">
+              Crée une sauvegarde de la base MongoDB (format <code>.ndjson.gz</code>) et conserve-la sur le serveur.
+            </p>
+
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" id="db-backup-create" class="btn btn-warning">Créer une sauvegarde</button>
+              <button type="button" id="db-backup-refresh" class="btn btn-outline-primary">Rafraîchir la liste</button>
+            </div>
+
+            <div class="table-responsive mt-3">
+              <table class="table table-sm align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Fichier</th>
+                    <th class="text-nowrap" style="width: 1%;">Taille</th>
+                    <th class="text-nowrap" style="width: 1%;">Modifié</th>
+                    <th class="text-nowrap text-end" style="width: 1%;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="db-backup-list">
+                  <tr><td colspan="4" class="text-muted">Ouvre l’onglet pour charger la liste…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12 col-xxl-6">
+          <div class="card p-3">
+            <h4 class="mb-1 text-danger">Restore</h4>
+            <p class="text-muted mb-3">
+              Restaure une sauvegarde (fichier <code>.ndjson.gz</code>). Option recommandée: <strong>drop</strong> pour supprimer les collections avant import.
+            </p>
+
+            <div class="alert alert-warning">
+              La restauration peut <strong>écraser</strong> les données. Fais un backup juste avant si besoin.
+            </div>
+
+            <div class="mb-3">
+              <label for="db-restore-file" class="form-label">Fichier de backup</label>
+              <input class="form-control" type="file" id="db-restore-file" accept=".gz,.ndjson.gz,application/gzip">
+            </div>
+
+            <div class="form-check mb-3">
+              <input class="form-check-input" type="checkbox" id="db-restore-drop" checked>
+              <label class="form-check-label" for="db-restore-drop">
+                Drop les collections avant restore (recommandé)
+              </label>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2">
+              <button type="button" id="db-restore-run" class="btn btn-danger">Restaurer</button>
+            </div>
+
+            <div id="db-restore-result" class="small text-muted mt-3"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="admin-winners" role="tabpanel" aria-labelledby="admin-winners-tab">
+      <div class="row g-3">
+        <div class="col-12 col-xxl-8">
+          <div class="card p-3">
+            <h4 class="mb-1">Définir les gagnants par année (égalité)</h4>
+            <div class="text-muted mb-3">
+              Tu peux ajouter plusieurs gagnants pour la même année (ex: égalité au même nombre de points).
+              Choisis un utilisateur + des points (optionnel), puis clique <strong>Ajouter</strong>.
+            </div>
+
+            <div class="row g-3">
+              <div class="col-md-4">
+                <label for="winner_year" class="form-label">Année</label>
+                <select id="winner_year" class="form-select"></select>
+                <div class="form-text">Basé sur les années présentes dans les films.</div>
+              </div>
+              <div class="col-md-5">
+                <label for="winner_user" class="form-label">Utilisateur</label>
+                <select id="winner_user" class="form-select">
+                  <option value="">—</option>
+                </select>
+                <div class="form-text">Pour retirer un gagnant, utilise la liste “Gagnants actuels” ci-dessous.</div>
+              </div>
+              <div class="col-md-3">
+                <label for="winner_points" class="form-label">Points (optionnel)</label>
+                <input id="winner_points" type="number" class="form-control" placeholder="ex: 42" min="0" step="1">
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
+              <button type="button" id="winner_reload" class="btn btn-outline-primary">Recharger</button>
+              <button type="button" id="winner_clear" class="btn btn-outline-danger">Tout supprimer</button>
+              <button type="button" id="winner_save" class="btn btn-warning">Ajouter</button>
+            </div>
+
+            <div class="mt-3">
+              <div class="text-muted small mb-1">Gagnants actuels</div>
+              <div id="winner_current" class="border rounded p-2 bg-light">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Reset user password modal -->
+<div class="modal fade" id="resetUserPasswordModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Reset mot de passe</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-muted mb-2">
+          Génère un mot de passe temporaire. L'utilisateur devra le changer à sa prochaine connexion.
+        </div>
+
+        <div class="mb-3">
+          <div class="fw-semibold" id="reset_user_label">—</div>
+          <div class="text-muted small" id="reset_user_email_label">—</div>
+        </div>
+
+        <div id="reset-user-modal-response" class="alert d-none" role="alert"></div>
+
+        <div id="reset-user-modal-result" class="border rounded p-2 bg-light d-none">
+          <div class="small text-muted mb-1">Mot de passe temporaire (affiché une seule fois)</div>
+          <div class="d-flex gap-2 align-items-center">
+            <code class="flex-grow-1" id="reset-user-temp-password">—</code>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="copy-temp-password">Copier</button>
+          </div>
+          <div class="small text-muted mt-2" id="reset-user-expires-at"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+        <button type="button" class="btn btn-danger" id="confirm-reset-user-password">Générer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete user confirmation modal -->
+<div class="modal fade" id="deleteUserModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title text-danger">Supprimer un utilisateur</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="mb-2">
+          Tu es sur le point de supprimer:
+          <div class="fw-semibold" id="delete_user_label">—</div>
+          <div class="text-muted small" id="delete_user_email_label">—</div>
+        </div>
+
+        <div class="alert alert-warning">
+          Cette action est <strong>irréversible</strong>.
+        </div>
+
+        <div class="mb-2">
+          Pour confirmer, tape l'email exact:
+        </div>
+        <input type="text" class="form-control" id="delete_user_verify_input" placeholder="email@exemple.com">
+        <div class="form-text">
+          Le bouton “Supprimer” s'activera seulement si l'email correspond.
+        </div>
+
+        <div id="delete-user-modal-response" class="alert d-none mt-3" role="alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-danger" id="confirm-delete-user" disabled>Supprimer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add user modal -->
+<div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Ajouter un utilisateur</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="text-muted mb-2">
+          Crée un compte avec un <strong>mot de passe temporaire</strong> (affiché une seule fois). L’utilisateur devra le changer à sa prochaine connexion.
+        </div>
+
+        <div id="add-user-response" class="alert d-none" role="alert"></div>
+
+        <form id="add-user-form">
+          <div class="mb-3">
+            <label for="add_user_name" class="form-label">Nom</label>
+            <input type="text" class="form-control" id="add_user_name" placeholder="Prénom / pseudo" required>
+          </div>
+          <div class="mb-3">
+            <label for="add_user_email" class="form-label">Email</label>
+            <input type="email" class="form-control" id="add_user_email" placeholder="email@exemple.com" required>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="add_user_admin">
+            <label class="form-check-label" for="add_user_admin">Admin</label>
+          </div>
+
+          <div id="add-user-result" class="border rounded p-2 bg-light d-none">
+            <div class="small text-muted mb-1">Mot de passe temporaire (affiché une seule fois)</div>
+            <div class="d-flex gap-2 align-items-center">
+              <code class="flex-grow-1" id="add-user-temp-password">—</code>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="copy-add-user-temp-password">Copier</button>
+            </div>
+            <div class="small text-muted mt-2" id="add-user-expires-at"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+        <button type="button" id="add-user-reset" class="btn btn-outline-secondary">Reset</button>
+        <button type="submit" form="add-user-form" class="btn btn-warning" id="add-user-submit">Créer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit movie modal -->
+<div class="modal fade" id="editMovieModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="editMovieModalTitle">Modifier le film</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit_movie_id">
+
+        <div class="mb-3">
+          <div class="text-muted small mb-1">Movie ID</div>
+          <div class="d-flex gap-2 align-items-center">
+            <code class="flex-grow-1" id="edit_movie_id_label">—</code>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="copy-movie-id">Copier</button>
+          </div>
+        </div>
+
+        <ul class="nav nav-tabs" id="editMovieTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button
+              class="nav-link active"
+              id="edit-movie-tab-info"
+              data-bs-toggle="tab"
+              data-bs-target="#edit-movie-pane-info"
+              type="button"
+              role="tab"
+              aria-controls="edit-movie-pane-info"
+              aria-selected="true"
+            >
+              Info
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button
+              class="nav-link"
+              id="edit-movie-tab-video"
+              data-bs-toggle="tab"
+              data-bs-target="#edit-movie-pane-video"
+              type="button"
+              role="tab"
+              aria-controls="edit-movie-pane-video"
+              aria-selected="false"
+            >
+              Player / Vidéo
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content pt-3" id="editMovieTabsContent">
+          <!-- Info tab -->
+          <div
+            class="tab-pane fade show active"
+            id="edit-movie-pane-info"
+            role="tabpanel"
+            aria-labelledby="edit-movie-tab-info"
+            tabindex="0"
+          >
+            <div class="row g-3">
+              <div class="col-md-6">
+                <label for="edit_imdb_id" class="form-label">IMDB ID (ex: tt1234567)</label>
+                <input type="text" class="form-control" id="edit_imdb_id" placeholder="tt..." required>
+              </div>
+              <div class="col-md-6">
+                <label for="edit_year" class="form-label">Oscar year</label>
+                <input type="number" class="form-control" id="edit_year" placeholder="2026" min="1900" max="3000">
+              </div>
+
+              <div class="col-md-6">
+                <label for="edit_category" class="form-label">Catégorie</label>
+                <input type="text" class="form-control" id="edit_category" placeholder="Best Picture, etc." required>
+              </div>
+
+              <div class="col-md-6">
+                <label for="edit_rating" class="form-label">Rating (imdbRating)</label>
+                <input type="text" class="form-control" id="edit_rating" placeholder="7.9">
+              </div>
+
+              <div class="col-12">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="edit_refresh_omdb">
+                  <label class="form-check-label" for="edit_refresh_omdb">
+                    Recharger depuis OMDb (écrase titre / plot / rating / poster)
+                  </label>
+                </div>
+                <div class="form-text">Si coché, le serveur refait un appel OMDb via l’IMDB ID au moment de l’enregistrement.</div>
+              </div>
+
+              <div class="col-12">
+                <label for="edit_title" class="form-label">Titre</label>
+                <input type="text" class="form-control" id="edit_title" placeholder="Title">
+              </div>
+
+              <div class="col-12">
+                <label for="edit_poster" class="form-label">Poster URL</label>
+                <input type="url" class="form-control" id="edit_poster" placeholder="https://...">
+              </div>
+
+              <div class="col-12">
+                <label for="edit_description" class="form-label">Description (Plot)</label>
+                <textarea class="form-control" id="edit_description" rows="4" placeholder="Plot..."></textarea>
+              </div>
+            </div>
+          </div>
+
+          <!-- Video tab -->
+          <div
+            class="tab-pane fade"
+            id="edit-movie-pane-video"
+            role="tabpanel"
+            aria-labelledby="edit-movie-tab-video"
+            tabindex="0"
+          >
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label">Lecteur (source)</label>
+                <div class="row g-2">
+                  <div class="col-12 col-lg-4">
+                    <label for="edit_player_mode" class="form-label">Mode</label>
+                    <select id="edit_player_mode" class="form-select">
+                      <option value="auto">Auto</option>
+                      <option value="video">Video</option>
+                      <option value="embed">Embed</option>
+                    </select>
+                    <div class="form-text">Auto = video_src → embed_src → vod_link.</div>
+                  </div>
+                  <div class="col-12 col-lg-8">
+                    <label for="edit_video_src" class="form-label">Video URL (mp4/webm/m3u8)</label>
+                    <input type="text" class="form-control" id="edit_video_src" placeholder="https://.../movie.mp4 or .../playlist.m3u8">
+                    <div class="form-text">If you use a server file (below) and leave this empty, it will auto-use <code>/api/video/&lt;movieId&gt;</code>.</div>
+                  </div>
+                  <div class="col-12">
+                    <label for="edit_video_file" class="form-label">Server video file (optional)</label>
+                    <input type="text" class="form-control font-monospace" id="edit_video_file" placeholder="my_movie.mp4 or 2026/my_movie.mp4">
+                    <div class="form-text">Relative path under <code>VIDEO_FILES_DIR</code> (default: <code>public/video</code>).</div>
+                  </div>
+                  <div class="col-12">
+                    <label for="edit_embed_src" class="form-label">Embed URL or iframe code</label>
+                    <textarea class="form-control font-monospace" id="edit_embed_src" rows="3" placeholder="https://... OR <iframe ...>"></textarea>
+                  </div>
+                  <div class="col-12">
+                    <label for="edit_vod_link" class="form-label">Legacy VOD link (optional)</label>
+                    <input type="text" class="form-control" id="edit_vod_link" placeholder="https://...">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="save-movie-changes">Enregistrer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="./js/app_control.js"></script>
+
+</body>
+</html>
+

@@ -1,62 +1,115 @@
-const axios = require("axios");
 const express = require("express");
 const moment = require("moment-timezone");
+const Setting = require("../models/Setting");
 
 const router = express.Router();
 
-let latestCommitCache = null;
-let lastFetchedTime = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes in milliseconds
+const TIMEZONE = "America/New_York";
 
-async function fetchLatestCommitFromGitHub() {
-  const githubOwner = process.env.GITHUB_OWNER;
-  const githubRepo = process.env.GITHUB_REPO;
+// Stored in Mongo via Setting model (admin-controlled).
+// Shape:
+//   {
+//     activeId: string|null,
+//     versions: [{ id, version, message, dateISO }]
+//   }
+const APP_VERSION_KEY = "app_version_control";
 
+function nowFormatted() {
+  return moment(Date.now()).tz(TIMEZONE).format("YYYY-MM-DD HH:mm:ss");
+}
+
+function getPackageVersion() {
   try {
-    const url = `https://api.github.com/repos/${githubOwner}/${githubRepo}/commits`;
-    const response = await axios.get(url, {
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
-
-    if (response.data && response.data.length > 0) {
-      const latestCommit = response.data[0];
-      latestCommitCache = {
-        sha: latestCommit.sha,
-        message: latestCommit.commit.message,
-        author: latestCommit.commit.author.name,
-        date: latestCommit.commit.author.date,
-      };
-      lastFetchedTime = Date.now();
-    } else {
-      throw new Error("No commits found.");
-    }
-  } catch (error) {
-    console.error("Error fetching commit:", error.message);
+    // routes/version.js -> ../package.json
+    const pkg = require("../package.json");
+    return typeof pkg?.version === "string" && pkg.version.trim() ? pkg.version.trim() : "dev";
+  } catch (_) {
+    return "dev";
   }
 }
 
-// Initial fetch to populate cache
-fetchLatestCommitFromGitHub();
+function normalizeAppVersionControl(rawValue) {
+  const v = rawValue && typeof rawValue === "object" && !Array.isArray(rawValue) ? rawValue : {};
+  const versions = Array.isArray(v.versions) ? v.versions : [];
 
-// Refresh cache every 5 minutes
-setInterval(fetchLatestCommitFromGitHub, CACHE_DURATION);
+  const cleaned = versions
+    .map((e) => (e && typeof e === "object" && !Array.isArray(e) ? e : {}))
+    .map((e) => {
+      const id = typeof e.id === "string" ? e.id.trim() : "";
+      const version = typeof e.version === "string" ? e.version.trim() : "";
+      const message = typeof e.message === "string" ? e.message.slice(0, 500) : "";
+      const dateISO = typeof e.dateISO === "string" ? e.dateISO.trim() : "";
+      const d = new Date(dateISO);
+      const safeDateISO = dateISO && !Number.isNaN(d.getTime()) ? d.toISOString() : null;
+      return {
+        id: id || null,
+        version: version || null,
+        message: String(message || ""),
+        dateISO: safeDateISO,
+      };
+    })
+    .filter((e) => e.id && e.version)
+    .sort((a, b) => {
+      const ad = a.dateISO ? new Date(a.dateISO).getTime() : 0;
+      const bd = b.dateISO ? new Date(b.dateISO).getTime() : 0;
+      return bd - ad;
+    });
+
+  const activeId = typeof v.activeId === "string" ? v.activeId.trim() : "";
+  const active = cleaned.find((e) => String(e.id) === String(activeId)) || null;
+
+  // If activeId is invalid, fall back to newest entry.
+  return {
+    activeId: active ? String(active.id) : cleaned[0]?.id ? String(cleaned[0].id) : null,
+    versions: cleaned,
+  };
+}
 
 // Route to get the latest commit (cached)
 router.get("/", async (req, res) => {
-  if (!latestCommitCache) {
-    return res.status(500).json({ message: "Commit data is not available yet." });
-  }
+  // Always return 200 and never rely on GitHub.
+  try {
+    const setting = await Setting.findOne({ key: APP_VERSION_KEY }).select("value").lean();
+    const control = normalizeAppVersionControl(setting?.value);
 
-  res.json({
-    version: latestCommitCache.sha.substring(0, 5),
-    message: latestCommitCache.message,
-    author: latestCommitCache.author,
-    date: moment(latestCommitCache.date)
-      .tz("America/New_York")
-      .format("YYYY-MM-DD HH:mm:ss"),
-  });
+    const active = control.activeId
+      ? control.versions.find((v) => String(v.id) === String(control.activeId)) || null
+      : null;
+
+    if (!active) {
+      return res.status(200).json({
+        version: getPackageVersion(),
+        message: "Version non configurée (définis-la dans Admin → Version).",
+        author: "",
+        date: nowFormatted(),
+        configured: false,
+        source: "fallback",
+      });
+    }
+
+    const date = active.dateISO
+      ? moment(active.dateISO).tz(TIMEZONE).format("YYYY-MM-DD HH:mm:ss")
+      : nowFormatted();
+
+    return res.status(200).json({
+      version: active.version,
+      message: active.message || "",
+      author: "",
+      date,
+      configured: true,
+      source: "admin",
+    });
+  } catch (_) {
+    // If DB is down, still return something useful.
+    return res.status(200).json({
+      version: getPackageVersion(),
+      message: "Version indisponible (DB).",
+      author: "",
+      date: nowFormatted(),
+      configured: false,
+      source: "fallback",
+    });
+  }
 });
 
 module.exports = router;
