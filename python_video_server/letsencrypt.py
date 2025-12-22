@@ -89,32 +89,60 @@ import os
 import sys
 import time
 
+def _open_tty():
+    # Certbot may capture stdout/stderr of hooks; /dev/tty forces user-visible IO
+    # when an interactive terminal exists.
+    try:
+        return open("/dev/tty", "r+", encoding="utf-8", buffering=1)
+    except Exception:
+        return None
+
 def main() -> int:
     domain = os.environ.get("CERTBOT_DOMAIN", "").strip()
     validation = os.environ.get("CERTBOT_VALIDATION", "").strip()
     if not domain or not validation:
-        print("Missing CERTBOT_DOMAIN/CERTBOT_VALIDATION in environment.", file=sys.stderr)
+        print("Missing CERTBOT_DOMAIN/CERTBOT_VALIDATION in environment.", file=sys.stderr, flush=True)
         return 2
 
     record_name = f"_acme-challenge.{domain}"
-    print("\\n=== DNS-01 challenge required ===")
-    print(f"Create/Update this TXT record:")
-    print(f"  Name:  {record_name}")
-    print(f"  Type:  TXT")
-    print(f"  Value: {validation}")
-    print("\\nAfter the record is published and has propagated, press Enter to continue.")
+    msg = (
+        "\\n=== DNS-01 challenge required ===\\n"
+        "Create/Update this TXT record:\\n"
+        f"  Name:  {record_name}\\n"
+        "  Type:  TXT\\n"
+        f"  Value: {validation}\\n"
+        "\\nAfter the record is published and has propagated, press Enter to continue.\\n"
+        "> "
+    )
 
-    # If we're in a non-interactive environment, wait a bit and then continue.
-    if not sys.stdin.isatty():
-        wait_s = int(os.environ.get("LE_DNS_WAIT_SECONDS", "60"))
-        print(f"(non-interactive stdin detected; waiting {wait_s}s then continuing...)")
-        time.sleep(max(0, wait_s))
+    tty = _open_tty()
+    if tty is not None:
+        tty.write(msg)
+        tty.flush()
+        try:
+            tty.readline()
+        except KeyboardInterrupt:
+            tty.write("\\nAborted.\\n")
+            tty.flush()
+            return 130
+        finally:
+            try:
+                tty.close()
+            except Exception:
+                pass
         return 0
 
+    # Fallback: best-effort stdout + either wait or read stdin if interactive.
+    print(msg, end="", flush=True)
+    if not sys.stdin.isatty():
+        wait_s = int(os.environ.get("LE_DNS_WAIT_SECONDS", "300"))
+        print(f"\\n(non-interactive stdin detected; waiting {wait_s}s then continuing...)", flush=True)
+        time.sleep(max(0, wait_s))
+        return 0
     try:
-        input("> ")
+        input("")
     except KeyboardInterrupt:
-        print("\\nAborted.", file=sys.stderr)
+        print("\\nAborted.", file=sys.stderr, flush=True)
         return 130
     return 0
 
@@ -125,11 +153,27 @@ if __name__ == "__main__":
     cleanup_contents = """#!/usr/bin/env python3
 import os
 
+def _open_tty():
+    try:
+        return open("/dev/tty", "w", encoding="utf-8", buffering=1)
+    except Exception:
+        return None
+
 def main() -> int:
     domain = os.environ.get("CERTBOT_DOMAIN", "").strip()
-    if domain:
-        print("\\nDNS-01 cleanup:")
-        print(f"You may now remove the TXT record: _acme-challenge.{domain}")
+    if not domain:
+        return 0
+    msg = "\\nDNS-01 cleanup:\\nYou may now remove the TXT record: _acme-challenge.%s\\n" % domain
+    tty = _open_tty()
+    if tty is not None:
+        tty.write(msg)
+        tty.flush()
+        try:
+            tty.close()
+        except Exception:
+            pass
+        return 0
+    print(msg, end="", flush=True)
     return 0
 
 if __name__ == "__main__":
