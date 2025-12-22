@@ -8,7 +8,7 @@ function isTokenExpired(decoded) {
 }
 
 async function applyActiveOscarYearToTitle() {
-  const base = 'Oscar Pool';
+  const base = 'Pool Oscars';
   const current = String(document.title || base);
   const sep = ' - ';
   const idx = current.indexOf(sep);

@@ -359,7 +359,7 @@ function setHeader(movie, { activeYear } = {}) {
   const ratingEl = document.getElementById('movie-rating');
 
   const year = Number.isInteger(activeYear) ? activeYear : null;
-  const titlePrefix = year ? `Oscar Pool (${year})` : 'Oscar Pool';
+  const titlePrefix = year ? `Pool Oscars (${year})` : 'Pool Oscars';
 
   if (titleEl) titleEl.textContent = movie?.title || titlePrefix;
 
