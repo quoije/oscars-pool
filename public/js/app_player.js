@@ -63,6 +63,7 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
   let intervalId = null;
   let lastSavedAt = 0;
   let lastSavedTime = -1;
+  let lastSaveStatus = '—';
 
   function getSnapshot() {
     const t = Number(videoEl.currentTime);
@@ -96,13 +97,18 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
     const clamped = Math.min(Math.max(targetTime, 0), Math.max(0, dur - 3));
     if (clamped > 1) {
       try { videoEl.currentTime = clamped; } catch (_) {}
+      lastSaveStatus = `Reprise à ${formatClock(clamped)}.`;
+      setProgressStatus(lastSaveStatus);
+    } else {
+      lastSaveStatus = 'Lecture depuis le début.';
+      setProgressStatus(lastSaveStatus);
     }
   }
 
-  async function persist({ keepalive } = {}) {
+  async function persist({ keepalive, force } = {}) {
     // Throttle to avoid spamming the API
     const now = Date.now();
-    if (!keepalive && now - lastSavedAt < 2000) return;
+    if (!force && !keepalive && now - lastSavedAt < 3000) return;
 
     const snap = getSnapshot();
     if (!Number.isFinite(snap.time)) return;
@@ -117,18 +123,28 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
       localStorage.setItem(key, JSON.stringify({ time: snap.time, duration: snap.duration, at: now }));
     } catch (_) {}
 
+    setProgressStatus('Sauvegarde…');
     const ok = await savePlaybackProgress(movieId, token, { ...snap, keepalive: !!keepalive });
     if (ok === false) {
       // Token expired mid-playback; stop spamming requests and prompt user.
       stopInterval();
       try { localStorage.removeItem('auth_token'); } catch (_) {}
+      lastSaveStatus = 'Connexion requise pour sauvegarder.';
+      setProgressStatus(lastSaveStatus);
       showAlertVariant('Session expirée. Reconnecte-toi pour continuer à sauvegarder la progression.', 'warning');
+      return;
     }
+    lastSaveStatus = `Sauvegardé à ${formatClock(snap.time)}.`;
+    setProgressStatus(lastSaveStatus);
   }
 
   function startInterval() {
     if (intervalId) return;
-    intervalId = window.setInterval(() => { void persist(); }, 10000);
+    // Safety-net; primary saving happens via timeupdate throttling.
+    intervalId = window.setInterval(() => {
+      if (videoEl.paused || videoEl.seeking) return;
+      void persist();
+    }, 15000);
   }
 
   function stopInterval() {
@@ -138,13 +154,17 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
   }
 
   const onPlay = () => startInterval();
-  const onPause = () => { stopInterval(); void persist(); };
-  const onSeeked = () => { void persist(); };
+  const onPause = () => { stopInterval(); void persist({ force: true }); };
+  const onSeeked = () => { void persist({ force: true }); };
   const onEnded = () => { stopInterval(); void persist(); };
   const onError = () => { stopInterval(); };
-  const onPageHide = () => { void persist({ keepalive: true }); };
+  const onTimeUpdate = () => {
+    if (videoEl.paused || videoEl.seeking) return;
+    void persist();
+  };
+  const onPageHide = () => { void persist({ keepalive: true, force: true }); };
   const onVisibility = () => {
-    if (document.visibilityState === 'hidden') void persist({ keepalive: true });
+    if (document.visibilityState === 'hidden') void persist({ keepalive: true, force: true });
   };
 
   videoEl.addEventListener('loadedmetadata', restoreProgressOnce, { once: true });
@@ -153,6 +173,7 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
   videoEl.addEventListener('seeked', onSeeked);
   videoEl.addEventListener('ended', onEnded);
   videoEl.addEventListener('error', onError);
+  videoEl.addEventListener('timeupdate', onTimeUpdate);
 
   window.addEventListener('pagehide', onPageHide);
   document.addEventListener('visibilitychange', onVisibility);
@@ -167,8 +188,10 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
     videoEl.removeEventListener('seeked', onSeeked);
     videoEl.removeEventListener('ended', onEnded);
     videoEl.removeEventListener('error', onError);
+    videoEl.removeEventListener('timeupdate', onTimeUpdate);
     window.removeEventListener('pagehide', onPageHide);
     document.removeEventListener('visibilitychange', onVisibility);
+    if (lastSaveStatus) setProgressStatus(lastSaveStatus);
   };
 }
 
@@ -204,6 +227,21 @@ function setSourceLabel(text) {
   if (!el) return;
   el.textContent = text || '—';
   el.title = text || '';
+}
+
+function setProgressStatus(text) {
+  const el = document.getElementById('progress-status');
+  if (!el) return;
+  el.textContent = text || '—';
+}
+
+function formatClock(seconds) {
+  const s = Math.max(0, Math.floor(Number(seconds) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
 function setHeader(movie) {
@@ -614,7 +652,10 @@ window.onload = async function () {
     // Only the <video> player supports reliable progress tracking (mp4/hls).
     const videoEl = document.getElementById('video');
     if (videoEl && !videoEl.classList.contains('d-none')) {
+      setProgressStatus('Prépare la reprise…');
       setupVideoProgress({ videoEl, movieId: id, token, userId: decoded?.id });
+    } else {
+      setProgressStatus('—');
     }
   } catch (err) {
     showAlert(err.message || 'Network error.');
