@@ -453,12 +453,9 @@ window.addEventListener('DOMContentLoaded', async function () {
         <td id="watched-date-${movie.imdb_id}">${watchedDate}</td>
       `;
 
-      // Set initial row color based on watched state
-      if (watchedMovie) {
-        movieRow.style.backgroundColor = 'rgba(144, 238, 144, 0.6)'; // Lighter light green with transparency
-      } else {
-        movieRow.style.backgroundColor = 'rgba(255, 99, 71, 0.6)'; // Lighter light red with transparency
-      }
+      // Use Bootstrap table state classes (matches Stats page styling better than custom backgrounds)
+      movieRow.classList.toggle('table-success', Boolean(watchedMovie));
+      movieRow.classList.toggle('table-danger', !watchedMovie);
 
       movieTableBody.appendChild(movieRow);
 
@@ -478,10 +475,16 @@ window.addEventListener('DOMContentLoaded', async function () {
 
         if (isChecked) {
           watchedDateCell.textContent = new Date().toLocaleString();
-          row.style.backgroundColor = 'rgba(144, 238, 144, 0.6)'; // Apply light green with transparency
+          if (row) {
+            row.classList.add('table-success');
+            row.classList.remove('table-danger');
+          }
         } else {
           watchedDateCell.textContent = '';
-          row.style.backgroundColor = 'rgba(255, 99, 71, 0.6)'; // Apply light red with transparency
+          if (row) {
+            row.classList.add('table-danger');
+            row.classList.remove('table-success');
+          }
         }
 
         await fetch('/api/movies/users/updateWatchedMovies', {
