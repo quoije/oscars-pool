@@ -139,6 +139,20 @@ async function fetchActiveOscarYear() {
   }
 }
 
+async function fetchPlayerAdminStatusUi() {
+  try {
+    const res = await fetch('/api/settings/player-admin-status-ui', { method: 'GET' });
+    if (!res.ok) return { showSource: true, showProgress: true };
+    const data = await res.json().catch(() => ({}));
+    return {
+      showSource: data?.showSource === undefined ? true : !!data.showSource,
+      showProgress: data?.showProgress === undefined ? true : !!data.showProgress,
+    };
+  } catch (_) {
+    return { showSource: true, showProgress: true };
+  }
+}
+
 async function fetchPlaybackProgress(movieId, token) {
   try {
     const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/progress`, {
@@ -868,8 +882,9 @@ window.onload = async function () {
   }
   pageLoader.setProgress(14);
 
-  // Load the active Oscar year in parallel with the movie fetch.
+  // Load the active Oscar year (and player UI flags) in parallel with the movie fetch.
   const activeYearPromise = fetchActiveOscarYear();
+  const playerUiPromise = fetchPlayerAdminStatusUi();
 
   let decoded = null;
   try {
@@ -889,8 +904,6 @@ window.onload = async function () {
     if (decoded.admin) {
       const adminLink = document.getElementById('admin-control-link');
       if (adminLink) adminLink.classList.remove('d-none');
-      const adminStatus = document.getElementById('player-admin-status');
-      if (adminStatus) adminStatus.classList.remove('d-none');
     }
 
     const logoffBtn = document.getElementById('log-off');
@@ -927,9 +940,19 @@ window.onload = async function () {
       return;
     }
 
-    const activeYear = await activeYearPromise;
+    const [activeYear, playerUi] = await Promise.all([activeYearPromise, playerUiPromise]);
     setHeader(movie, { activeYear });
     pageLoader.setProgress(58);
+
+    // Admin-only status block (Source + Progress) can be globally disabled via settings.
+    if (decoded?.admin) {
+      const enabled = !!playerUi?.showSource && !!playerUi?.showProgress;
+      const adminStatus = document.getElementById('player-admin-status');
+      if (adminStatus) {
+        if (enabled) adminStatus.classList.remove('d-none');
+        else adminStatus.classList.add('d-none');
+      }
+    }
 
     const resolved = resolveMovieSource(movie);
     if (!resolved?.src) {

@@ -102,51 +102,96 @@
   <div class="tab-content pt-3">
     <div class="tab-pane fade show active" id="admin-settings" role="tabpanel" aria-labelledby="admin-settings-tab">
       <div class="row g-3">
-        <div class="col-12 col-xl-8">
-          <div class="card p-3">
-            <h4 class="mb-1">Année active</h4>
-            <p class="text-muted mb-3">
-              Cette année pilote tout le site (films affichés, checklist et statistiques).
-            </p>
-            <div class="mb-3">
-              <label for="active_oscar_year" class="form-label">Année active</label>
-              <select class="form-select" id="active_oscar_year"></select>
-              <div class="form-text">La liste est basée sur les années présentes dans les films.</div>
-            </div>
-            <div class="d-flex justify-content-end">
-              <button type="button" id="save-active-year" class="btn btn-warning">Appliquer l’année</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="col-12 col-xl-8">
-          <div class="card p-3">
-            <h4 class="mb-1">Date des Oscars (par année)</h4>
-            <p class="text-muted mb-3">
-              Configure la date exacte de la cérémonie pour le <strong>compte à rebours</strong> sur Films &amp; Checklist.
-              Si non défini, la date par défaut reste <code>15 mars</code> (comportement actuel).
-            </p>
-
-            <div class="row g-3">
-              <div class="col-md-4">
-                <label for="oscar_date_year" class="form-label">Année</label>
-                <select class="form-select" id="oscar_date_year"></select>
-                <div class="form-text">Basé sur les années présentes dans les films.</div>
-              </div>
-              <div class="col-md-4">
-                <label for="oscar_date_value" class="form-label">Date</label>
-                <input type="date" class="form-control" id="oscar_date_value">
-                <div class="form-text">Format: YYYY-MM-DD.</div>
-              </div>
-              <div class="col-md-4 d-flex align-items-end justify-content-end gap-2">
-                <button type="button" id="clear-oscar-date" class="btn btn-outline-danger">Effacer</button>
-                <button type="button" id="save-oscar-date" class="btn btn-warning">Enregistrer</button>
+        <div class="col-12 col-xxl-8">
+          <div class="accordion" id="adminSettingsAccordion">
+            <!-- Active year -->
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="adminSettingsHeadingYear">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#adminSettingsCollapseYear" aria-expanded="true" aria-controls="adminSettingsCollapseYear">
+                  Année active
+                </button>
+              </h2>
+              <div id="adminSettingsCollapseYear" class="accordion-collapse collapse show" aria-labelledby="adminSettingsHeadingYear" data-bs-parent="#adminSettingsAccordion">
+                <div class="accordion-body">
+                  <div class="text-muted small mb-2">
+                    Pilote tout le site (films, checklist, statistiques).
+                  </div>
+                  <div class="d-flex flex-wrap gap-2 align-items-end justify-content-between">
+                    <div class="flex-grow-1" style="min-width: 220px;">
+                      <label for="active_oscar_year" class="form-label mb-1">Année active</label>
+                      <select class="form-select" id="active_oscar_year"></select>
+                      <div class="form-text">Basé sur les années présentes dans les films.</div>
+                    </div>
+                    <div class="d-flex justify-content-end">
+                      <button type="button" id="save-active-year" class="btn btn-warning">Appliquer</button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div class="mt-3">
-              <div class="text-muted small mb-1">Dates configurées</div>
-              <div id="oscar-date-current" class="border rounded p-2 bg-light">—</div>
+            <!-- Player -->
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="adminSettingsHeadingPlayer">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#adminSettingsCollapsePlayer" aria-expanded="false" aria-controls="adminSettingsCollapsePlayer">
+                  Lecteur (player)
+                </button>
+              </h2>
+              <div id="adminSettingsCollapsePlayer" class="accordion-collapse collapse" aria-labelledby="adminSettingsHeadingPlayer" data-bs-parent="#adminSettingsAccordion">
+                <div class="accordion-body">
+                  <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="player_ui_show_status">
+                      <label class="form-check-label" for="player_ui_show_status">Afficher “Source” + “Progress” (admins)</label>
+                    </div>
+                    <div class="d-flex gap-2">
+                      <button type="button" id="player_ui_reload" class="btn btn-outline-secondary btn-sm">Recharger</button>
+                      <button type="button" id="player_ui_save" class="btn btn-warning btn-sm">Enregistrer</button>
+                    </div>
+                  </div>
+                  <div class="form-text mt-2">
+                    Contrôle l’affichage du bloc debug dans <code>player.html</code> (admins uniquement).
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Oscar date -->
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="adminSettingsHeadingOscarDate">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#adminSettingsCollapseOscarDate" aria-expanded="false" aria-controls="adminSettingsCollapseOscarDate">
+                  Date des Oscars (par année)
+                </button>
+              </h2>
+              <div id="adminSettingsCollapseOscarDate" class="accordion-collapse collapse" aria-labelledby="adminSettingsHeadingOscarDate" data-bs-parent="#adminSettingsAccordion">
+                <div class="accordion-body">
+                  <div class="text-muted small mb-2">
+                    Configure la date de cérémonie pour le compte à rebours (Films &amp; Checklist). Défaut: <code>15 mars</code>.
+                  </div>
+
+                  <div class="row g-2">
+                    <div class="col-12 col-md-4">
+                      <label for="oscar_date_year" class="form-label mb-1">Année</label>
+                      <select class="form-select" id="oscar_date_year"></select>
+                      <div class="form-text">Basé sur les années présentes dans les films.</div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                      <label for="oscar_date_value" class="form-label mb-1">Date</label>
+                      <input type="date" class="form-control" id="oscar_date_value">
+                      <div class="form-text">Format: YYYY-MM-DD.</div>
+                    </div>
+                    <div class="col-12 col-md-4 d-flex align-items-end justify-content-end gap-2">
+                      <button type="button" id="clear-oscar-date" class="btn btn-outline-danger btn-sm">Effacer</button>
+                      <button type="button" id="save-oscar-date" class="btn btn-warning btn-sm">Enregistrer</button>
+                    </div>
+                  </div>
+
+                  <div class="mt-3">
+                    <div class="text-muted small mb-1">Dates configurées</div>
+                    <div id="oscar-date-current" class="border rounded p-2 bg-light">—</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
