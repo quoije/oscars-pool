@@ -64,6 +64,7 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
   let lastSavedAt = 0;
   let lastSavedTime = -1;
   let lastSaveStatus = '—';
+  let seekSaveTimer = null;
 
   function getSnapshot() {
     const t = Number(videoEl.currentTime);
@@ -108,13 +109,13 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
   async function persist({ keepalive, force } = {}) {
     // Throttle to avoid spamming the API
     const now = Date.now();
-    if (!force && !keepalive && now - lastSavedAt < 3000) return;
+    if (!force && !keepalive && now - lastSavedAt < 1500) return;
 
     const snap = getSnapshot();
     if (!Number.isFinite(snap.time)) return;
 
     // Only save if it meaningfully changed (>= 1s)
-    if (lastSavedTime >= 0 && Math.abs(snap.time - lastSavedTime) < 1) return;
+    if (!force && lastSavedTime >= 0 && Math.abs(snap.time - lastSavedTime) < 1) return;
 
     lastSavedAt = now;
     lastSavedTime = snap.time;
@@ -144,7 +145,7 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
     intervalId = window.setInterval(() => {
       if (videoEl.paused || videoEl.seeking) return;
       void persist();
-    }, 15000);
+    }, 8000);
   }
 
   function stopInterval() {
@@ -155,6 +156,11 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
 
   const onPlay = () => startInterval();
   const onPause = () => { stopInterval(); void persist({ force: true }); };
+  const onSeeking = () => {
+    // While scrubbing, browsers fire many events; debounce a forced save so it lands quickly.
+    if (seekSaveTimer) window.clearTimeout(seekSaveTimer);
+    seekSaveTimer = window.setTimeout(() => { void persist({ force: true }); }, 400);
+  };
   const onSeeked = () => { void persist({ force: true }); };
   const onEnded = () => { stopInterval(); void persist(); };
   const onError = () => { stopInterval(); };
@@ -170,6 +176,7 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
   videoEl.addEventListener('loadedmetadata', restoreProgressOnce, { once: true });
   videoEl.addEventListener('play', onPlay);
   videoEl.addEventListener('pause', onPause);
+  videoEl.addEventListener('seeking', onSeeking);
   videoEl.addEventListener('seeked', onSeeked);
   videoEl.addEventListener('ended', onEnded);
   videoEl.addEventListener('error', onError);
@@ -183,8 +190,10 @@ function setupVideoProgress({ videoEl, movieId, token, userId }) {
 
   return () => {
     stopInterval();
+    if (seekSaveTimer) window.clearTimeout(seekSaveTimer);
     videoEl.removeEventListener('play', onPlay);
     videoEl.removeEventListener('pause', onPause);
+    videoEl.removeEventListener('seeking', onSeeking);
     videoEl.removeEventListener('seeked', onSeeked);
     videoEl.removeEventListener('ended', onEnded);
     videoEl.removeEventListener('error', onError);
