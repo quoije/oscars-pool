@@ -359,7 +359,6 @@ window.addEventListener('DOMContentLoaded', async function () {
       // Modal UI (Films regardés)
       const moviesModalEl = document.getElementById('moviesModal');
       const movieGridEl = document.getElementById('movie-grid');
-      const movieSearchEl = document.getElementById('movie-search');
       const movieSortEl = document.getElementById('movie-sort');
       const moviesSummaryEl = document.getElementById('movies-summary');
       const moviesEmptyEl = document.getElementById('movies-empty');
@@ -394,12 +393,6 @@ window.addEventListener('DOMContentLoaded', async function () {
         return s;
       }
 
-      function movieMatchesQuery(movie, q) {
-        if (!q) return true;
-        const hay = `${safeStr(movie?.title)} ${safeStr(movie?.category)} ${safeStr(movie?.imdb_id)}`.toLowerCase();
-        return hay.includes(q.toLowerCase());
-      }
-
       function sortMovies(list, mode) {
         const arr = Array.isArray(list) ? list.slice() : [];
         if (mode === 'title') {
@@ -425,18 +418,14 @@ window.addEventListener('DOMContentLoaded', async function () {
       }
 
       function renderMoviesModal() {
-        if (!movieGridEl || !movieSearchEl || !movieSortEl || !moviesSummaryEl || !moviesEmptyEl) return;
+        if (!movieGridEl || !movieSortEl || !moviesSummaryEl || !moviesEmptyEl) return;
 
-        const q = safeStr(movieSearchEl.value).trim();
         const sortMode = safeStr(movieSortEl.value).trim() || 'recent';
 
-        const filtered = (Array.isArray(currentModalMovies) ? currentModalMovies : []).filter((m) => movieMatchesQuery(m, q));
-        const sorted = sortMovies(filtered, sortMode);
+        const sorted = sortMovies((Array.isArray(currentModalMovies) ? currentModalMovies : []), sortMode);
 
         const total = Array.isArray(currentModalMovies) ? currentModalMovies.length : 0;
-        moviesSummaryEl.textContent = total
-          ? `${sorted.length} / ${total}`
-          : '0';
+        moviesSummaryEl.textContent = total ? `${total} film${total > 1 ? 's' : ''}` : '0 film';
 
         movieGridEl.innerHTML = '';
         if (!sorted.length) {
@@ -514,10 +503,11 @@ window.addEventListener('DOMContentLoaded', async function () {
           meta.className = 'stats-movie-meta';
 
           if (category) {
-            const badge = document.createElement('span');
-            badge.className = 'badge bg-light text-dark border';
-            badge.textContent = category;
-            meta.appendChild(badge);
+            const cat = document.createElement('div');
+            cat.className = 'stats-movie-category text-muted small';
+            cat.title = category;
+            cat.textContent = category;
+            meta.appendChild(cat);
           }
 
           if (rating !== null && rating > 0) {
@@ -559,7 +549,6 @@ window.addEventListener('DOMContentLoaded', async function () {
             : `Films regardés (${count})`;
         }
 
-        if (movieSearchEl) movieSearchEl.value = '';
         if (movieSortEl) movieSortEl.value = 'recent';
         renderMoviesModal();
 
@@ -569,15 +558,12 @@ window.addEventListener('DOMContentLoaded', async function () {
         }
       }
 
-      if (movieSearchEl) {
-        movieSearchEl.addEventListener('input', () => renderMoviesModal());
-      }
       if (movieSortEl) {
         movieSortEl.addEventListener('change', () => renderMoviesModal());
       }
       if (moviesModalEl) {
         moviesModalEl.addEventListener('shown.bs.modal', () => {
-          try { movieSearchEl?.focus(); } catch (_) {}
+          try { movieSortEl?.focus(); } catch (_) {}
         });
       }
 

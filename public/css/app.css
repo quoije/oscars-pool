@@ -264,6 +264,13 @@ footer {
     font-size: 0.875rem;
   }
 
+  .stats-movie-category {
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+
   .stats-movie-imdb {
     display: inline-flex;
     align-items: center;
