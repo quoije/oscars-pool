@@ -3,7 +3,7 @@ Little nodejs + mongodb app that I hack together with ChatGPT to keep track of w
 
 Would probably need to revamp everything, but didn't want to spend more time on it. 
 
-![Oscars Pool 2025](https://github.com/quoije/oscar-pool/blob/prod/img/preview.png)
+![Oscars Pool 2025](https://github.com/quoije/oscar-pool/blob/2025/img/preview.png)
 
 ## Setup
 Config those in your .env file:
