@@ -102,7 +102,17 @@
     }
   </style>
 </head>
-<body class="bg-light">
+<body class="bg-light page-loading">
+  <!-- Preloaded loader overlay to avoid initial "clear" flash -->
+  <div id="page-loader-overlay" class="page-loader-overlay" data-preloaded="true" role="status" aria-live="polite" aria-busy="true">
+    <div class="page-loader-card page-loader-card--baronly">
+      <span class="visually-hidden">Chargement…</span>
+      <div class="page-loader-progress" aria-hidden="true">
+        <div class="page-loader-bar" id="page-loader-bar" style="width: 8%;"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Black banner with buttons and user info -->
   <nav class="navbar navbar-expand-lg navbar-custom">
     <div class="container">
@@ -128,39 +138,53 @@
   </nav>
 
   <div class="container mt-5 pb-4 player-wrap">
-    <div class="mb-3">
-      <h2 id="movie-title" class="mb-1">Loading…</h2>
-      <div class="meta-muted">
-        <span id="movie-category"></span>
-        <span id="movie-rating"></span>
+    <div id="alert" class="alert alert-danger d-none" role="alert"></div>
+
+    <!-- Header / metadata -->
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+          <div>
+            <h2 id="movie-title" class="mb-1">Chargement…</h2>
+            <div class="text-muted small">
+              <span id="movie-category"></span><span id="movie-rating"></span>
+            </div>
+          </div>
+
+          <!-- Admin-only debug/status (Source + Progress) -->
+          <div id="player-admin-status" class="d-none d-flex flex-column gap-2">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <span class="badge bg-secondary">Source</span>
+              <span id="source-label" class="badge bg-light text-dark badge-src">—</span>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <span class="badge bg-secondary">Progress</span>
+              <span id="progress-status" class="text-muted small progress-indicator">
+                <span id="progress-status-icon" class="progress-icon" aria-hidden="true"></span>
+                <span id="progress-status-text" class="progress-text">—</span>
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <div id="alert" class="alert alert-danger d-none" role="alert"></div>
-
-    <div class="player-surface">
-      <video id="video" class="d-none" controls playsinline></video>
-      <iframe
-        id="embed"
-        class="d-none"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowfullscreen
-        referrerpolicy="no-referrer-when-downgrade"
-        sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation"
-      ></iframe>
-    </div>
-
-    <div class="mt-3 d-flex flex-wrap gap-2 align-items-center">
-      <span class="badge bg-secondary">Source</span>
-      <span id="source-label" class="badge bg-light text-dark badge-src">—</span>
-    </div>
-
-    <div class="mt-2 d-flex flex-wrap gap-2 align-items-center">
-      <span class="badge bg-secondary">Progress</span>
-      <span id="progress-status" class="text-muted small progress-indicator">
-        <span id="progress-status-icon" class="progress-icon" aria-hidden="true"></span>
-        <span id="progress-status-text" class="progress-text">—</span>
-      </span>
+    <!-- Player surface -->
+    <div class="card shadow-sm mt-3">
+      <div class="card-body p-0">
+        <div class="player-surface">
+          <video id="video" class="d-none" controls playsinline></video>
+          <iframe
+            id="embed"
+            class="d-none"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowfullscreen
+            referrerpolicy="no-referrer-when-downgrade"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-presentation"
+          ></iframe>
+        </div>
+      </div>
     </div>
   </div>
 

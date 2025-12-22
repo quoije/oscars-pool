@@ -359,22 +359,31 @@ window.addEventListener('DOMContentLoaded', async function () {
           : (hasLegacy ? movie.vod_link : (movie && movie._id ? `/player.html?id=${encodeURIComponent(movie._id)}` : '#'));
 
         const movieDiv = document.createElement('div');
-        movieDiv.classList.add('col-md-4', 'mb-4', 'movie-card');
+        movieDiv.classList.add('col-12', 'col-sm-6', 'col-lg-4', 'movie-card');
         movieDiv.setAttribute('data-imdb-id', movie.imdb_id);
         movieDiv.innerHTML = `
-          <div class="card">
-            ${isChecked ? '<div class="watched-banner">VISIONNÉ</div>' : ''}
-            <a href="${playerUrl}" target="_self" rel="noopener noreferrer">
-              <img src="${movie.poster}" class="card-img-top" alt="${movie.title}" style="width: 75%; display: block; margin: 0 auto; padding: 10px;">
+          <div class="card h-100 shadow-sm">
+            ${isChecked ? '<span class="badge bg-success position-absolute top-0 start-0 m-2 watched-badge">VISIONNÉ</span>' : ''}
+            <a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none">
+              <div class="text-center pt-3 px-3">
+                <img src="${movie.poster}" class="img-fluid rounded movie-poster" alt="${movie.title}">
+              </div>
             </a>
-            <div class="card-body">
-              <h5 class="card-title d-flex justify-content-between align-items-center">
-                <a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none text-dark">${movie.title}</a>
-                <span>⭐ ${movie.rating} <a href="https://www.imdb.com/title/${movie.imdb_id}/"><img src="/img/imdb.png"></a></span>
-              </h5>
-              <p class="fw-bold fst-italic card-text" style="font-size: 0.75rem;">${movie.category}</p>
-              <p class="card-text">${movie.description}</p>
-              ${isChecked ? `<p class="card-text"><strong>Regardé le:</strong> ${watchedDate}</p>` : ''}
+            <div class="card-body d-flex flex-column">
+              <div class="d-flex justify-content-between align-items-start gap-2">
+                <h5 class="card-title mb-1 flex-grow-1">
+                  <a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none text-dark">${movie.title}</a>
+                </h5>
+                <div class="text-nowrap small text-muted">
+                  ⭐ ${movie.rating}
+                  <a href="https://www.imdb.com/title/${movie.imdb_id}/" target="_blank" rel="noopener noreferrer" aria-label="Voir sur IMDb">
+                    <img src="/img/imdb.png" class="imdb-icon" alt="IMDb">
+                  </a>
+                </div>
+              </div>
+              <div class="text-muted small fw-semibold fst-italic mb-2">${movie.category}</div>
+              <p class="card-text small flex-grow-1 mb-2">${movie.description}</p>
+              ${isChecked ? `<div class="text-muted small"><span class="fw-semibold text-dark">Regardé le:</span> ${watchedDate}</div>` : ''}
             </div>
           </div>`;
         moviesList.appendChild(movieDiv);

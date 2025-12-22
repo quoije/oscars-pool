@@ -7,6 +7,110 @@ function decodeJwt(token) {
   return JSON.parse(atob(padded));
 }
 
+function createPageLoader(options = {}) {
+  const title = String(options.title || 'Chargement…');
+  let progress = 0;
+  let removed = false;
+  let navResizeObserver = null;
+
+  // Reuse a preloaded overlay if present (prevents initial "clear" flash).
+  const preloadedOverlay = document.getElementById('page-loader-overlay');
+  const overlay = preloadedOverlay || document.createElement('div');
+  if (!preloadedOverlay) {
+    overlay.className = 'page-loader-overlay';
+    overlay.setAttribute('role', 'status');
+    overlay.setAttribute('aria-live', 'polite');
+    overlay.setAttribute('aria-busy', 'true');
+
+    overlay.innerHTML = `
+      <div class="page-loader-card page-loader-card--baronly">
+        <span class="visually-hidden">${title}</span>
+        <div class="page-loader-progress" aria-hidden="true">
+          <div class="page-loader-bar" id="page-loader-bar"></div>
+        </div>
+      </div>
+    `;
+  } else {
+    const label = overlay.querySelector('.visually-hidden');
+    if (label) label.textContent = title;
+  }
+
+  const barEl = () => overlay.querySelector('#page-loader-bar');
+
+  function clampPct(p) {
+    const n = Number(p);
+    if (!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(100, n));
+  }
+
+  function setProgress(p) {
+    progress = clampPct(p);
+    const bar = barEl();
+    if (bar) bar.style.width = `${progress}%`;
+  }
+
+  function getNavHeightPx() {
+    const nav = document.querySelector('nav.navbar');
+    if (!nav) return 0;
+    const rect = nav.getBoundingClientRect();
+    const h = Number(rect?.height) || 0;
+    return h > 0 ? Math.round(h) : 0;
+  }
+
+  function updateOverlayTopOffset() {
+    overlay.style.setProperty('--page-loader-top', `${getNavHeightPx()}px`);
+  }
+
+  function ensureMounted() {
+    if (removed) return;
+    updateOverlayTopOffset();
+    document.body.classList.add('page-loading');
+    if (!overlay.isConnected) document.body.appendChild(overlay);
+
+    if (!navResizeObserver) {
+      const nav = document.querySelector('nav.navbar');
+      if (nav && typeof ResizeObserver !== 'undefined') {
+        try {
+          navResizeObserver = new ResizeObserver(() => updateOverlayTopOffset());
+          navResizeObserver.observe(nav);
+        } catch (_) {
+          navResizeObserver = null;
+        }
+      }
+    }
+  }
+
+  function hideAndRemoveSoon() {
+    if (removed) return;
+    overlay.classList.add('page-loader-hide');
+    overlay.setAttribute('aria-busy', 'false');
+    document.body.classList.remove('page-loading');
+    window.setTimeout(() => {
+      removed = true;
+      if (navResizeObserver) {
+        try { navResizeObserver.disconnect(); } catch (_) {}
+        navResizeObserver = null;
+      }
+      try { overlay.remove(); } catch (_) {}
+    }, 220);
+  }
+
+  function done() {
+    setProgress(100);
+    hideAndRemoveSoon();
+  }
+
+  function fail() {
+    setProgress(Math.max(progress, 95));
+    window.setTimeout(() => hideAndRemoveSoon(), 200);
+  }
+
+  ensureMounted();
+  setProgress(8);
+
+  return { setProgress, done, fail };
+}
+
 function safeJsonParse(v) {
   try { return JSON.parse(v); } catch (_) { return null; }
 }
@@ -754,12 +858,15 @@ function resolveMovieSource(movie) {
 }
 
 window.onload = async function () {
+  const pageLoader = createPageLoader({ title: 'Chargement du lecteur' });
+
   // Basic auth UX: require a valid local token (like the rest of the app).
   const token = localStorage.getItem('auth_token');
   if (!token) {
     window.location.href = '/';
     return;
   }
+  pageLoader.setProgress(14);
 
   // Load the active Oscar year in parallel with the movie fetch.
   const activeYearPromise = fetchActiveOscarYear();
@@ -782,6 +889,8 @@ window.onload = async function () {
     if (decoded.admin) {
       const adminLink = document.getElementById('admin-control-link');
       if (adminLink) adminLink.classList.remove('d-none');
+      const adminStatus = document.getElementById('player-admin-status');
+      if (adminStatus) adminStatus.classList.remove('d-none');
     }
 
     const logoffBtn = document.getElementById('log-off');
@@ -796,14 +905,17 @@ window.onload = async function () {
     window.location.href = '/';
     return;
   }
+  pageLoader.setProgress(26);
 
   const id = getQueryParam('id');
   if (!id) {
     showAlert('Missing movie id.');
+    pageLoader.fail();
     return;
   }
 
   try {
+    pageLoader.setProgress(36);
     const res = await fetch(`/api/movies/${encodeURIComponent(id)}`, {
       method: 'GET',
       headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
@@ -811,17 +923,20 @@ window.onload = async function () {
     const movie = await res.json().catch(() => ({}));
     if (!res.ok) {
       showAlert(movie?.message || movie?.error || `Failed to load movie (${res.status}).`);
+      pageLoader.fail();
       return;
     }
 
     const activeYear = await activeYearPromise;
     setHeader(movie, { activeYear });
+    pageLoader.setProgress(58);
 
     const resolved = resolveMovieSource(movie);
     if (!resolved?.src) {
       setSourceLabel('—');
       hideAllPlayers();
       showAlert('No playable source configured for this movie.');
+      pageLoader.fail();
       return;
     }
 
@@ -832,10 +947,13 @@ window.onload = async function () {
       setSourceLabel('Legacy link');
       hideAllPlayers();
       showAlertVariant('Legacy source: this link is not playable in the in-app player.', 'warning');
+      pageLoader.done();
       return;
     }
 
+    pageLoader.setProgress(70);
     await playVodLink(resolved.src, { token });
+    pageLoader.setProgress(82);
 
     // Only the <video> player supports reliable progress tracking (mp4/hls).
     const videoEl = document.getElementById('video');
@@ -851,8 +969,11 @@ window.onload = async function () {
     } else {
       setProgressUi({ state: 'info', text: '—', showText: true });
     }
+    pageLoader.setProgress(92);
+    pageLoader.done();
   } catch (err) {
     showAlert(err.message || 'Network error.');
+    pageLoader.fail();
   }
 };
 
