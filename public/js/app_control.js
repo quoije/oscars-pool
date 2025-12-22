@@ -986,22 +986,10 @@ window.onload = async function () {
     return winnersByYear.get(String(y)) || null;
   }
 
-  function renderWinnerCurrent() {
-    if (!winnerCurrentEl || !winnerYearSelect) return;
-    const y = parseYear(winnerYearSelect.value);
-    if (!y) {
-      winnerCurrentEl.textContent = '—';
-      return;
-    }
-    const list = getWinnerForYear(y);
+  function sortWinnersForDisplay(list) {
     const winners = Array.isArray(list) ? list : [];
-    if (!winners.length) {
-      winnerCurrentEl.textContent = `${y}: (aucun gagnant)`;
-      return;
-    }
-
     // Sort for stable display: points desc (null last), then name
-    const sorted = winners.slice().sort((a, b) => {
+    return winners.slice().sort((a, b) => {
       const ap = a?.points === null || a?.points === undefined ? null : Number(a.points);
       const bp = b?.points === null || b?.points === undefined ? null : Number(b.points);
       if (ap === null && bp !== null) return 1;
@@ -1009,25 +997,57 @@ window.onload = async function () {
       if (ap !== null && bp !== null && ap !== bp) return bp - ap;
       return String(a?.name || '').localeCompare(String(b?.name || ''), 'fr', { sensitivity: 'base' });
     });
+  }
 
-    const rows = sorted.map((w) => {
-      const name = w?.name || '(utilisateur supprimé)';
-      const pts = w?.points === null || w?.points === undefined ? null : Number(w.points);
-      const ptsLabel = pts === null || Number.isNaN(pts) ? '' : ` <span class="text-muted">— ${pts} pts</span>`;
-      const uid = String(w?.userId || '');
+  function renderWinnerCurrent() {
+    if (!winnerCurrentEl) return;
+
+    const years = Array.from(winnersByYear.keys())
+      .map((k) => Number(k))
+      .filter((n) => Number.isInteger(n))
+      .sort((a, b) => b - a);
+
+    if (!years.length) {
+      winnerCurrentEl.textContent = '—';
+      return;
+    }
+
+    const blocks = years.map((y) => {
+      const list = winnersByYear.get(String(y)) || [];
+      const sorted = sortWinnersForDisplay(list);
+
+      if (!sorted.length) {
+        return `
+          <div class="border rounded p-2 bg-white mb-2">
+            <div class="fw-semibold">${escapeHtml(String(y))}</div>
+            <div class="text-muted small">(aucun gagnant)</div>
+          </div>
+        `;
+      }
+
+      const rows = sorted.map((w) => {
+        const name = escapeHtml(w?.name || '(utilisateur supprimé)');
+        const pts = w?.points === null || w?.points === undefined ? null : Number(w.points);
+        const ptsLabel = pts === null || Number.isNaN(pts) ? '' : ` <span class="text-muted">— ${escapeHtml(String(Math.round(pts)))} pts</span>`;
+        const uid = escapeHtml(String(w?.userId || '').trim());
+        return (
+          `<div class="d-flex justify-content-between align-items-center border rounded px-2 py-1 mb-2 bg-white">` +
+            `<div class="me-2 min-width-0"><strong class="text-break">${name}</strong>${ptsLabel}</div>` +
+            `<button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" data-winner-remove-year="${escapeHtml(String(y))}" data-winner-remove-user="${uid}">Retirer</button>` +
+          `</div>`
+        );
+      }).join('');
+
+      const tieLabel = sorted.length > 1 ? ' <span class="text-muted fw-normal">(égalité)</span>' : '';
       return `
-        <div class="d-flex justify-content-between align-items-center border rounded px-2 py-1 mb-2">
-          <div class="me-2"><strong>${name}</strong>${ptsLabel}</div>
-          <button type="button" class="btn btn-sm btn-outline-danger" data-winner-remove-year="${y}" data-winner-remove-user="${uid}">Retirer</button>
+        <div class="border rounded p-2 bg-light mb-2">
+          <div class="fw-semibold mb-2">${escapeHtml(String(y))}${tieLabel}</div>
+          ${rows}
         </div>
       `;
     }).join('');
 
-    const tieLabel = sorted.length > 1 ? ' <span class="text-muted fw-normal">(égalité)</span>' : '';
-    winnerCurrentEl.innerHTML = `
-      <div class="fw-semibold mb-2">${y}${tieLabel}</div>
-      ${rows}
-    `;
+    winnerCurrentEl.innerHTML = blocks;
 
     winnerCurrentEl.querySelectorAll('button[data-winner-remove-year][data-winner-remove-user]').forEach((btn) => {
       btn.addEventListener('click', async () => {
