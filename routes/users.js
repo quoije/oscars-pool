@@ -122,14 +122,16 @@ async function getOrInitActiveYear() {
 // Get user stats with watched movie titles and details from the movies collection
 router.get("/stats", verifyToken, async (req, res) => {
   try {
-    // Fetch all users
-    const users = await User.find();
+    // Fetch all users (only needed fields)
+    const users = await User.find().select("name watchedMovies").lean();
     
     // If a year is explicitly provided, use it; otherwise default to the global active year.
     const year = parseOscarYear(req.query.year) || await getOrInitActiveYear();
 
     // Fetch movies (optionally filtered by year)
-    const allMovies = await Movie.find({ year });
+    const allMovies = await Movie.find({ year })
+      .select("imdb_id title poster rating category year")
+      .lean();
     const totalMoviesCount = allMovies.length;
 
     if (totalMoviesCount === 0) {
@@ -140,18 +142,28 @@ router.get("/stats", verifyToken, async (req, res) => {
     const userStats = users.map((user) => {
       const movieByImdbId = new Map(allMovies.map((m) => [m.imdb_id, m]));
 
-      // Get watched movies with details from the database
-      const watchedMovies = user.watchedMovies
-        .map((wm) => movieByImdbId.get(wm.imdb_id)) // Match movie details
-        .filter(Boolean); // Remove any `undefined` values (if movie is not found)
+      // Join watched movies with movie details for the selected year (keep watchedDate)
+      const watchedRaw = Array.isArray(user?.watchedMovies) ? user.watchedMovies : [];
+      const watchedMoviesDetails = watchedRaw
+        .map((wm) => {
+          const imdbId = typeof wm?.imdb_id === "string" ? wm.imdb_id : "";
+          if (!imdbId) return null;
+          const movie = movieByImdbId.get(imdbId);
+          if (!movie) return null;
+          return {
+            imdb_id: movie.imdb_id,
+            title: movie.title || "",
+            poster: movie.poster || "",
+            rating: movie.rating || "",
+            category: movie.category || "",
+            year: Number.isInteger(movie.year) ? movie.year : year,
+            watchedDate: wm?.watchedDate ? new Date(wm.watchedDate).toISOString() : null,
+          };
+        })
+        .filter(Boolean);
 
-      const watchedCount = watchedMovies.length;
+      const watchedCount = watchedMoviesDetails.length;
       const watchedRatio = ((watchedCount / totalMoviesCount) * 100).toFixed(1);
-
-      const watchedMoviesDetails = watchedMovies.map((movie) => ({
-        imdb_id: movie.imdb_id,
-        title: movie.title
-      }));
 
       return {
         name: user.name,

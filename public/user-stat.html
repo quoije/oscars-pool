@@ -165,16 +165,31 @@
 
 <!-- Modal for displaying movies watched -->
 <div class="modal fade" id="moviesModal" tabindex="-1" aria-labelledby="moviesModalLabel" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title" id="moviesModalLabel">Films regardés</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <ul id="movie-list" class="list-group">
-          <!-- Movie titles will be inserted here -->
-        </ul>
+        <div class="d-flex flex-column gap-3">
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <div class="input-group input-group-sm flex-grow-1" style="min-width: 220px;">
+              <span class="input-group-text">Rechercher</span>
+              <input id="movie-search" type="search" class="form-control" placeholder="Titre, catégorie…" autocomplete="off">
+            </div>
+            <select id="movie-sort" class="form-select form-select-sm" style="max-width: 240px;">
+              <option value="recent">Plus récents</option>
+              <option value="title">Titre (A → Z)</option>
+              <option value="category">Catégorie</option>
+            </select>
+          </div>
+
+          <div id="movies-summary" class="text-muted small"></div>
+
+          <div id="movies-empty" class="text-muted d-none">Aucun film à afficher.</div>
+          <div id="movie-grid" class="stats-movies-grid" aria-live="polite"></div>
+        </div>
       </div>
     </div>
   </div>

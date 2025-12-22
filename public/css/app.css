@@ -219,3 +219,61 @@ footer {
   .watched-badge {
     z-index: 2;
   }
+
+  /* Stats → "Films regardés" modal */
+  .stats-movies-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+
+  .stats-movie-item {
+    display: flex;
+    gap: 12px;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 14px;
+  }
+
+  .stats-movie-poster {
+    width: 56px;
+    height: 84px;
+    border-radius: 10px;
+    object-fit: cover;
+    background: rgba(0, 0, 0, 0.06);
+    flex: 0 0 auto;
+  }
+
+  .stats-movie-poster.stats-movie-poster--empty {
+    background: linear-gradient(135deg, rgba(0,0,0,0.08), rgba(0,0,0,0.03));
+  }
+
+  .stats-movie-title {
+    font-weight: 700;
+    line-height: 1.2;
+    margin: 0;
+  }
+
+  .stats-movie-meta {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    align-items: center;
+    font-size: 0.875rem;
+  }
+
+  .stats-movie-imdb {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0.2rem 0.45rem;
+    line-height: 1.1;
+  }
+
+  .stats-movie-imdb .imdb-icon {
+    width: 18px;
+    height: 18px;
+    margin-left: 0;
+  }

@@ -356,6 +356,231 @@ window.addEventListener('DOMContentLoaded', async function () {
     try {
       pageLoader.setProgress(12);
 
+      // Modal UI (Films regardés)
+      const moviesModalEl = document.getElementById('moviesModal');
+      const movieGridEl = document.getElementById('movie-grid');
+      const movieSearchEl = document.getElementById('movie-search');
+      const movieSortEl = document.getElementById('movie-sort');
+      const moviesSummaryEl = document.getElementById('movies-summary');
+      const moviesEmptyEl = document.getElementById('movies-empty');
+      const moviesModalTitleEl = document.getElementById('moviesModalLabel');
+
+      let currentModalUserName = '';
+      let currentModalMovies = [];
+
+      function safeStr(v) {
+        return (v === null || v === undefined) ? '' : String(v);
+      }
+
+      function parseMaybeNumber(v) {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      function formatWatchedDate(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return '';
+        try {
+          return d.toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch (_) {
+          return d.toLocaleDateString();
+        }
+      }
+
+      function normalizePosterUrl(poster) {
+        const s = safeStr(poster).trim();
+        if (!s || s.toUpperCase() === 'N/A') return '';
+        return s;
+      }
+
+      function movieMatchesQuery(movie, q) {
+        if (!q) return true;
+        const hay = `${safeStr(movie?.title)} ${safeStr(movie?.category)} ${safeStr(movie?.imdb_id)}`.toLowerCase();
+        return hay.includes(q.toLowerCase());
+      }
+
+      function sortMovies(list, mode) {
+        const arr = Array.isArray(list) ? list.slice() : [];
+        if (mode === 'title') {
+          arr.sort((a, b) => safeStr(a?.title).localeCompare(safeStr(b?.title), 'fr', { sensitivity: 'base' }));
+          return arr;
+        }
+        if (mode === 'category') {
+          arr.sort((a, b) => {
+            const c = safeStr(a?.category).localeCompare(safeStr(b?.category), 'fr', { sensitivity: 'base' });
+            if (c !== 0) return c;
+            return safeStr(a?.title).localeCompare(safeStr(b?.title), 'fr', { sensitivity: 'base' });
+          });
+          return arr;
+        }
+        // recent (default): watchedDate desc, fallback title
+        arr.sort((a, b) => {
+          const at = a?.watchedDate ? new Date(a.watchedDate).getTime() : 0;
+          const bt = b?.watchedDate ? new Date(b.watchedDate).getTime() : 0;
+          if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return bt - at;
+          return safeStr(a?.title).localeCompare(safeStr(b?.title), 'fr', { sensitivity: 'base' });
+        });
+        return arr;
+      }
+
+      function renderMoviesModal() {
+        if (!movieGridEl || !movieSearchEl || !movieSortEl || !moviesSummaryEl || !moviesEmptyEl) return;
+
+        const q = safeStr(movieSearchEl.value).trim();
+        const sortMode = safeStr(movieSortEl.value).trim() || 'recent';
+
+        const filtered = (Array.isArray(currentModalMovies) ? currentModalMovies : []).filter((m) => movieMatchesQuery(m, q));
+        const sorted = sortMovies(filtered, sortMode);
+
+        const total = Array.isArray(currentModalMovies) ? currentModalMovies.length : 0;
+        moviesSummaryEl.textContent = total
+          ? `${sorted.length} / ${total}`
+          : '0';
+
+        movieGridEl.innerHTML = '';
+        if (!sorted.length) {
+          moviesEmptyEl.classList.remove('d-none');
+          return;
+        }
+        moviesEmptyEl.classList.add('d-none');
+
+        sorted.forEach((movie) => {
+          const imdbId = safeStr(movie?.imdb_id).trim();
+          const title = safeStr(movie?.title).trim() || '(sans titre)';
+          const category = safeStr(movie?.category).trim();
+          const ratingRaw = safeStr(movie?.rating).trim();
+          const rating = parseMaybeNumber(ratingRaw);
+          const watchedLabel = formatWatchedDate(movie?.watchedDate);
+          const posterUrl = normalizePosterUrl(movie?.poster);
+
+          const item = document.createElement('div');
+          item.className = 'stats-movie-item';
+
+          const poster = document.createElement('img');
+          poster.className = 'stats-movie-poster';
+          poster.alt = title;
+          if (posterUrl) {
+            poster.src = posterUrl;
+          } else {
+            poster.classList.add('stats-movie-poster--empty');
+            // Keep src empty; browser will not request anything.
+            poster.src = '';
+          }
+          poster.addEventListener('error', () => {
+            poster.classList.add('stats-movie-poster--empty');
+            try { poster.removeAttribute('src'); } catch (_) {}
+          });
+
+          const main = document.createElement('div');
+          main.className = 'flex-grow-1';
+
+          const topRow = document.createElement('div');
+          topRow.className = 'd-flex align-items-start justify-content-between gap-2';
+
+          const titleEl = document.createElement('div');
+          titleEl.className = 'stats-movie-title';
+          titleEl.textContent = title;
+
+          const right = document.createElement('div');
+          right.className = 'text-nowrap';
+
+          if (imdbId) {
+            const imdbLink = document.createElement('a');
+            imdbLink.className = 'btn btn-outline-dark btn-sm stats-movie-imdb';
+            imdbLink.href = `https://www.imdb.com/title/${encodeURIComponent(imdbId)}/`;
+            imdbLink.target = '_blank';
+            imdbLink.rel = 'noopener noreferrer';
+            imdbLink.setAttribute('aria-label', 'Voir sur IMDb');
+
+            const imdbText = document.createElement('span');
+            imdbText.className = 'small';
+            imdbText.textContent = 'IMDb';
+
+            const imdbIcon = document.createElement('img');
+            imdbIcon.src = '/img/imdb.png';
+            imdbIcon.className = 'imdb-icon';
+            imdbIcon.alt = 'IMDb';
+
+            imdbLink.appendChild(imdbText);
+            imdbLink.appendChild(imdbIcon);
+            right.appendChild(imdbLink);
+          }
+
+          topRow.appendChild(titleEl);
+          topRow.appendChild(right);
+
+          const meta = document.createElement('div');
+          meta.className = 'stats-movie-meta';
+
+          if (category) {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-light text-dark border';
+            badge.textContent = category;
+            meta.appendChild(badge);
+          }
+
+          if (rating !== null && rating > 0) {
+            const r = document.createElement('span');
+            r.className = 'text-muted';
+            r.textContent = `⭐ ${rating.toFixed(1)}`;
+            meta.appendChild(r);
+          } else if (ratingRaw) {
+            const r = document.createElement('span');
+            r.className = 'text-muted';
+            r.textContent = `⭐ ${ratingRaw}`;
+            meta.appendChild(r);
+          }
+
+          if (watchedLabel) {
+            const d = document.createElement('span');
+            d.className = 'text-muted';
+            d.textContent = `Vu le ${watchedLabel}`;
+            meta.appendChild(d);
+          }
+
+          main.appendChild(topRow);
+          if (meta.childNodes.length) main.appendChild(meta);
+
+          item.appendChild(poster);
+          item.appendChild(main);
+          movieGridEl.appendChild(item);
+        });
+      }
+
+      function openMoviesModalForUser(userStat) {
+        currentModalUserName = safeStr(userStat?.name).trim();
+        currentModalMovies = Array.isArray(userStat?.watchedMovies) ? userStat.watchedMovies : [];
+
+        if (moviesModalTitleEl) {
+          const count = currentModalMovies.length;
+          moviesModalTitleEl.textContent = currentModalUserName
+            ? `Films regardés — ${currentModalUserName} (${count})`
+            : `Films regardés (${count})`;
+        }
+
+        if (movieSearchEl) movieSearchEl.value = '';
+        if (movieSortEl) movieSortEl.value = 'recent';
+        renderMoviesModal();
+
+        if (moviesModalEl) {
+          const modal = new bootstrap.Modal(moviesModalEl);
+          modal.show();
+        }
+      }
+
+      if (movieSearchEl) {
+        movieSearchEl.addEventListener('input', () => renderMoviesModal());
+      }
+      if (movieSortEl) {
+        movieSortEl.addEventListener('change', () => renderMoviesModal());
+      }
+      if (moviesModalEl) {
+        moviesModalEl.addEventListener('shown.bs.modal', () => {
+          try { movieSearchEl?.focus(); } catch (_) {}
+        });
+      }
+
       // Show loading states immediately (avoid "blank" panels)
       const table = document.querySelector('.user-table');
       const statsError = document.getElementById('stats-error');
@@ -402,13 +627,26 @@ window.addEventListener('DOMContentLoaded', async function () {
 
       stats.forEach(userStat => {
         const userRow = document.createElement('tr');
-        userRow.innerHTML = `
-          <td>
-            <a href="#" class="user-link" data-movies='${JSON.stringify(userStat.watchedMovies)}'>${userStat.name}</a>
-          </td>
-          <td>${userStat.watchedCount}</td>
-          <td>${userStat.watchedRatio}</td>
-        `;
+        const nameTd = document.createElement('td');
+        const link = document.createElement('a');
+        link.href = '#';
+        link.className = 'user-link';
+        link.textContent = userStat.name;
+        link.addEventListener('click', function (event) {
+          event.preventDefault();
+          openMoviesModalForUser(userStat);
+        });
+        nameTd.appendChild(link);
+
+        const countTd = document.createElement('td');
+        countTd.textContent = String(userStat.watchedCount ?? '');
+
+        const ratioTd = document.createElement('td');
+        ratioTd.textContent = String(userStat.watchedRatio ?? '');
+
+        userRow.appendChild(nameTd);
+        userRow.appendChild(countTd);
+        userRow.appendChild(ratioTd);
         userTableBody.appendChild(userRow);
       });
 
@@ -416,32 +654,6 @@ window.addEventListener('DOMContentLoaded', async function () {
       if (table) table.classList.remove('d-none');
       if (statsError) statsError.classList.add('d-none');
       pageLoader.setProgress(92);
-
-      // Add event listener for user links
-      document.querySelectorAll('.user-link').forEach(link => {
-        link.addEventListener('click', function (event) {
-          event.preventDefault();
-          const datasetMovies = this.dataset.movies;
-          console.log(datasetMovies);
-          const movies = JSON.parse(datasetMovies);
-
-          // Clear the current movie list in the modal
-          const movieList = document.getElementById('movie-list');
-          movieList.innerHTML = '';
-
-          // Populate the modal with the movies the user has watched
-          movies.forEach(movie => {
-            const movieItem = document.createElement('li');
-            movieItem.classList.add('list-group-item');
-            movieItem.textContent = movie.title;
-            movieList.appendChild(movieItem);
-          });
-
-          // Show the modal
-          const modal = new bootstrap.Modal(document.getElementById('moviesModal'));
-          modal.show();
-        });
-      });
 
       pageLoader.done();
     } catch (error) {
