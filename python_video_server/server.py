@@ -1,6 +1,7 @@
 import mimetypes
 import os
 import posixpath
+from functools import lru_cache
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator, Optional, Tuple
@@ -13,6 +14,7 @@ from fastapi import FastAPI, Header, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pymongo import MongoClient
+from pymongo.errors import PyMongoError
 
 
 def _env_str(name: str, default: str = "") -> str:
@@ -48,6 +50,12 @@ def _mongo_db_name() -> str:
         return db
     except Exception:
         return ""
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(_env_str(name, str(default)))
+    except Exception:
+        return default
 
 
 def _video_files_dir() -> Path:
@@ -143,7 +151,38 @@ def _mongo_client() -> MongoClient:
     uri = _mongo_uri()
     if not uri:
         raise HTTPException(status_code=500, detail="MONGO_URI is not configured")
-    return MongoClient(uri)
+    kwargs = {
+        # Fail fast instead of hanging for ~30s on each request.
+        "serverSelectionTimeoutMS": _env_int("MONGO_SERVER_SELECTION_TIMEOUT_MS", 8000),
+        "connectTimeoutMS": _env_int("MONGO_CONNECT_TIMEOUT_MS", 8000),
+        "socketTimeoutMS": _env_int("MONGO_SOCKET_TIMEOUT_MS", 20000),
+    }
+
+    # On some hosts, the system CA store is missing/broken or overridden by env vars,
+    # causing TLS handshake failures to MongoDB Atlas. Prefer certifi's CA bundle.
+    ca_file = _env_str("MONGO_TLS_CA_FILE")
+    if ca_file:
+        kwargs["tlsCAFile"] = ca_file
+    else:
+        try:
+            import certifi  # type: ignore
+
+            kwargs["tlsCAFile"] = certifi.where()
+        except Exception:
+            # If certifi isn't available, fall back to system trust.
+            pass
+
+    # Optional escape hatch (NOT recommended): allow invalid certs for debugging only.
+    if _env_str("MONGO_TLS_INSECURE", "0") in ("1", "true", "yes", "on"):
+        kwargs["tlsAllowInvalidCertificates"] = True
+
+    return MongoClient(uri, **kwargs)
+
+
+@lru_cache(maxsize=1)
+def _mongo_client_cached() -> MongoClient:
+    # Reuse one client (connection pool) across requests.
+    return _mongo_client()
 
 
 app = FastAPI()
@@ -211,15 +250,26 @@ def stream_video(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid movie id")
 
-    with _mongo_client() as client:
-        db_name = _mongo_db_name()
-        if not db_name:
-            raise HTTPException(
-                status_code=500,
-                detail="Mongo DB name not configured. Add it to MONGO_URI (…/dbname) or set MONGO_DB_NAME.",
-            )
+    db_name = _mongo_db_name()
+    if not db_name:
+        raise HTTPException(
+            status_code=500,
+            detail="Mongo DB name not configured. Add it to MONGO_URI (…/dbname) or set MONGO_DB_NAME.",
+        )
+
+    try:
+        client = _mongo_client_cached()
         db = client[db_name]
         movie = db["movies"].find_one({"_id": oid}, {"video_file": 1})
+    except PyMongoError as e:
+        raise HTTPException(
+            status_code=502,
+            detail=(
+                "Failed to query MongoDB (TLS/connection issue). "
+                "On some hosts you may need a CA bundle; try installing certifi or set MONGO_TLS_CA_FILE. "
+                f"Original error: {type(e).__name__}: {e}"
+            ),
+        )
 
     video_file = (movie or {}).get("video_file") or ""
     if not isinstance(video_file, str) or not video_file.strip():
@@ -288,4 +338,14 @@ def healthz():
         "video_files_dir": str(_video_files_dir()),
         "mongo_db_name": _mongo_db_name() or None,
     }
+
+
+@app.on_event("shutdown")
+def _shutdown():
+    # Close the cached Mongo client cleanly.
+    try:
+        client = _mongo_client_cached()
+        client.close()
+    except Exception:
+        pass
 
