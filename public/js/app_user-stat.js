@@ -130,7 +130,7 @@ window.addEventListener('DOMContentLoaded', async function () {
 
     async function fetchActiveYear() {
       try {
-        const res = await fetch('/api/settings/year', { method: 'GET' });
+        const res = await fetch('/api/settings/year', { method: 'GET', cache: 'no-cache' });
         if (!res.ok) throw new Error('Failed to fetch active year');
         const data = await res.json();
         const year = Number(data?.year);
@@ -142,7 +142,7 @@ window.addEventListener('DOMContentLoaded', async function () {
 
     async function fetchWinners() {
       try {
-        const res = await fetch('/api/settings/winners', { method: 'GET' });
+        const res = await fetch('/api/settings/winners', { method: 'GET', cache: 'no-cache' });
         if (!res.ok) throw new Error('Failed to fetch winners');
         const data = await res.json().catch(() => ({}));
         return Array.isArray(data?.winners) ? data.winners : [];
@@ -155,7 +155,8 @@ window.addEventListener('DOMContentLoaded', async function () {
       try {
         const res = await fetch('/api/users/completions', {
           method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` },
+          cache: 'no-cache',
         });
         if (!res.ok) throw new Error('Failed to fetch completions');
         const data = await res.json().catch(() => ({}));
@@ -253,7 +254,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       if (!completions || typeof completions !== 'object') {
         tbody.innerHTML = `
           <tr>
-            <td colspan="4" class="text-muted">Impossible de charger les finisseurs 100%.</td>
+            <td colspan="3" class="text-muted">Impossible de charger les finisseurs 100%.</td>
           </tr>
         `;
         return;
@@ -266,7 +267,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       if (!years.length) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="4" class="text-muted">Aucune année trouvée.</td>
+            <td colspan="3" class="text-muted">Aucune année trouvée.</td>
           </tr>
         `;
         return;
@@ -282,7 +283,6 @@ window.addEventListener('DOMContentLoaded', async function () {
         const yearStr = String(y);
         const total = Number(totals?.[yearStr] ?? 0);
         const completers = Array.isArray(byYear?.[yearStr]) ? byYear[yearStr] : [];
-        const count = completers.length;
 
         const tr = document.createElement('tr');
 
@@ -290,17 +290,11 @@ window.addEventListener('DOMContentLoaded', async function () {
         tdYear.className = 'fw-semibold';
         tdYear.textContent = yearStr;
 
-        const tdCount = document.createElement('td');
-        const badge = document.createElement('span');
-        badge.className = 'badge bg-secondary';
-        badge.textContent = String(count);
-        tdCount.appendChild(badge);
-
         const tdTotal = document.createElement('td');
         tdTotal.textContent = String(Number.isFinite(total) ? total : 0);
 
         const tdNames = document.createElement('td');
-        if (!count) {
+        if (!completers.length) {
           tdNames.className = 'text-muted';
           tdNames.textContent = '—';
         } else {
@@ -316,7 +310,6 @@ window.addEventListener('DOMContentLoaded', async function () {
         }
 
         tr.appendChild(tdYear);
-        tr.appendChild(tdCount);
         tr.appendChild(tdTotal);
         tr.appendChild(tdNames);
         tbody.appendChild(tr);
@@ -356,6 +349,262 @@ window.addEventListener('DOMContentLoaded', async function () {
     try {
       pageLoader.setProgress(12);
 
+      // Modal UI (Films regardés)
+      const moviesModalEl = document.getElementById('moviesModal');
+      const movieGridEl = document.getElementById('movie-grid');
+      const moviesSummaryEl = document.getElementById('movies-summary');
+      const moviesEmptyEl = document.getElementById('movies-empty');
+      const moviesModalTitleEl = document.getElementById('moviesModalLabel');
+
+      let currentModalUserName = '';
+      let currentModalMovies = [];
+
+      function safeStr(v) {
+        return (v === null || v === undefined) ? '' : String(v);
+      }
+
+      function parseMaybeNumber(v) {
+        const n = Number(v);
+        return Number.isFinite(n) ? n : null;
+      }
+
+      function formatWatchedDate(iso) {
+        if (!iso) return '';
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return '';
+        try {
+          return d.toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' });
+        } catch (_) {
+          return d.toLocaleDateString();
+        }
+      }
+
+      function normalizePosterUrl(poster) {
+        const s = safeStr(poster).trim();
+        if (!s || s.toUpperCase() === 'N/A') return '';
+        return s;
+      }
+
+      function sortMoviesRecent(list) {
+        const arr = Array.isArray(list) ? list.slice() : [];
+        // watchedDate desc, fallback title
+        arr.sort((a, b) => {
+          const at = a?.watchedDate ? new Date(a.watchedDate).getTime() : 0;
+          const bt = b?.watchedDate ? new Date(b.watchedDate).getTime() : 0;
+          if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return bt - at;
+          return safeStr(a?.title).localeCompare(safeStr(b?.title), 'fr', { sensitivity: 'base' });
+        });
+        return arr;
+      }
+
+      function renderMoviesModal() {
+        if (!movieGridEl || !moviesSummaryEl || !moviesEmptyEl) return;
+
+        const sorted = sortMoviesRecent((Array.isArray(currentModalMovies) ? currentModalMovies : []));
+
+        const total = Array.isArray(currentModalMovies) ? currentModalMovies.length : 0;
+        moviesSummaryEl.textContent = total ? `${total} film${total > 1 ? 's' : ''}` : '0 film';
+
+        movieGridEl.innerHTML = '';
+        if (!sorted.length) {
+          moviesEmptyEl.classList.remove('d-none');
+          return;
+        }
+        moviesEmptyEl.classList.add('d-none');
+
+        sorted.forEach((movie) => {
+          const movieId = safeStr(movie?.movieId).trim();
+          const imdbId = safeStr(movie?.imdb_id).trim();
+          const title = safeStr(movie?.title).trim() || '(sans titre)';
+          const category = safeStr(movie?.category).trim();
+          const ratingRaw = safeStr(movie?.rating).trim();
+          const rating = parseMaybeNumber(ratingRaw);
+          const watchedLabel = formatWatchedDate(movie?.watchedDate);
+          const posterUrl = normalizePosterUrl(movie?.poster);
+
+          const cleanUrl = (v) => {
+            const s = (typeof v === 'string' ? v.trim() : '');
+            if (!s || s === '#' || s.toLowerCase() === 'about:blank') return '';
+            return s;
+          };
+
+          // Click behavior (requested):
+          // - If vod_link is set => go to it
+          // - Else if any playable source exists => go to player
+          // - Else => not clickable
+          const vodLink = cleanUrl(movie?.vod_link);
+          const hasPlayableSource = !!cleanUrl(movie?.video_src) || !!cleanUrl(movie?.embed_src) || !!cleanUrl(movie?.video_file);
+          const isClickable = !!vodLink || (!!movieId && hasPlayableSource);
+
+          const item = document.createElement('div');
+          item.className = 'stats-movie-item';
+          if (isClickable) {
+            item.classList.add('stats-movie-item--clickable');
+            item.setAttribute('role', 'link');
+            item.setAttribute('tabindex', '0');
+            item.setAttribute('aria-label', vodLink ? `Ouvrir le lien: ${title}` : `Ouvrir le lecteur: ${title}`);
+          }
+
+          const poster = document.createElement('img');
+          poster.className = 'stats-movie-poster';
+          poster.alt = title;
+          if (posterUrl) {
+            poster.src = posterUrl;
+          } else {
+            poster.classList.add('stats-movie-poster--empty');
+            // Keep src empty; browser will not request anything.
+            poster.src = '';
+          }
+          poster.addEventListener('error', () => {
+            poster.classList.add('stats-movie-poster--empty');
+            try { poster.removeAttribute('src'); } catch (_) {}
+          });
+
+          function openIfPossible(evt) {
+            if (!isClickable) return;
+            // Don't hijack clicks inside controls (IMDb button, details summary, etc.)
+            const target = evt?.target;
+            if (target && typeof target.closest === 'function') {
+              if (target.closest('a, button, summary, details')) return;
+            }
+
+            if (vodLink) {
+              // Use a new tab (keeps the app state intact)
+              try {
+                const w = window.open(vodLink, '_blank', 'noopener,noreferrer');
+                if (!w) window.location.href = vodLink;
+              } catch (_) {
+                window.location.href = vodLink;
+              }
+              return;
+            }
+
+            if (movieId && hasPlayableSource) {
+              window.location.href = `/player.html?id=${encodeURIComponent(movieId)}`;
+            }
+          }
+
+          if (isClickable) {
+            item.addEventListener('click', openIfPossible);
+            item.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openIfPossible(e);
+              }
+            });
+          }
+
+          const main = document.createElement('div');
+          main.className = 'flex-grow-1';
+
+          const topRow = document.createElement('div');
+          topRow.className = 'd-flex align-items-start justify-content-between gap-2';
+
+          const titleEl = document.createElement('div');
+          titleEl.className = 'stats-movie-title';
+          titleEl.textContent = title;
+
+          const right = document.createElement('div');
+          right.className = 'text-nowrap';
+
+          if (imdbId) {
+            const imdbLink = document.createElement('a');
+            imdbLink.className = 'btn btn-outline-dark btn-sm stats-movie-imdb';
+            imdbLink.href = `https://www.imdb.com/title/${encodeURIComponent(imdbId)}/`;
+            imdbLink.target = '_blank';
+            imdbLink.rel = 'noopener noreferrer';
+            imdbLink.setAttribute('aria-label', 'Voir sur IMDb');
+
+            const imdbText = document.createElement('span');
+            imdbText.className = 'small';
+            imdbText.textContent = 'IMDb';
+
+            const imdbIcon = document.createElement('img');
+            imdbIcon.src = '/img/imdb.png';
+            imdbIcon.className = 'imdb-icon';
+            imdbIcon.alt = 'IMDb';
+
+            imdbLink.appendChild(imdbText);
+            imdbLink.appendChild(imdbIcon);
+            right.appendChild(imdbLink);
+          }
+
+          topRow.appendChild(titleEl);
+          topRow.appendChild(right);
+
+          const meta = document.createElement('div');
+          meta.className = 'stats-movie-meta';
+
+          if (rating !== null && rating > 0) {
+            const r = document.createElement('span');
+            r.className = 'text-muted';
+            r.textContent = `⭐ ${rating.toFixed(1)}`;
+            meta.appendChild(r);
+          } else if (ratingRaw) {
+            const r = document.createElement('span');
+            r.className = 'text-muted';
+            r.textContent = `⭐ ${ratingRaw}`;
+            meta.appendChild(r);
+          }
+
+          if (watchedLabel) {
+            const d = document.createElement('span');
+            d.className = 'text-muted';
+            d.textContent = `Vu le ${watchedLabel}`;
+            meta.appendChild(d);
+          }
+
+          main.appendChild(topRow);
+          if (meta.childNodes.length) main.appendChild(meta);
+
+          // Optional: keep long strings (like category) out of the main layout.
+          if (category) {
+            const details = document.createElement('details');
+            details.className = 'stats-movie-details';
+
+            const summary = document.createElement('summary');
+            summary.textContent = 'Détails';
+            details.appendChild(summary);
+
+            const body = document.createElement('div');
+            body.className = 'stats-movie-details-body text-muted small';
+            body.textContent = category;
+            details.appendChild(body);
+
+            main.appendChild(details);
+          }
+
+          item.appendChild(poster);
+          item.appendChild(main);
+          movieGridEl.appendChild(item);
+        });
+      }
+
+      function openMoviesModalForUser(userStat) {
+        currentModalUserName = safeStr(userStat?.name).trim();
+        currentModalMovies = Array.isArray(userStat?.watchedMovies) ? userStat.watchedMovies : [];
+
+        if (moviesModalTitleEl) {
+          const count = currentModalMovies.length;
+          moviesModalTitleEl.textContent = currentModalUserName
+            ? `Films regardés — ${currentModalUserName} (${count})`
+            : `Films regardés (${count})`;
+        }
+
+        renderMoviesModal();
+
+        if (moviesModalEl) {
+          const modal = new bootstrap.Modal(moviesModalEl);
+          modal.show();
+        }
+      }
+
+      if (moviesModalEl) {
+        moviesModalEl.addEventListener('shown.bs.modal', () => {
+          // no controls to focus
+        });
+      }
+
       // Show loading states immediately (avoid "blank" panels)
       const table = document.querySelector('.user-table');
       const statsError = document.getElementById('stats-error');
@@ -366,8 +615,14 @@ window.addEventListener('DOMContentLoaded', async function () {
       const activeYear = await fetchActiveYear();
       if (activeYear) {
         document.title = `Pool Oscars (${activeYear}) - Statistiques des utilisateurs`;
+        // Keep the main heading clean; show the year in the "Classement" tab instead.
         const h2 = document.querySelector('h2');
-        if (h2) h2.textContent = `Statistiques des utilisateurs (${activeYear})`;
+        if (h2) h2.textContent = 'Statistiques des utilisateurs';
+        const badge = document.getElementById('stats-active-year-badge');
+        if (badge) {
+          badge.textContent = String(activeYear);
+          badge.classList.remove('d-none');
+        }
       }
 
       const statsUrl = activeYear ? `/api/users/stats?year=${encodeURIComponent(String(activeYear))}` : '/api/users/stats';
@@ -375,7 +630,8 @@ window.addEventListener('DOMContentLoaded', async function () {
       const [statsRes, winners, completions] = await Promise.all([
         fetch(statsUrl, {
           method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` },
+          cache: 'no-cache',
         }),
         fetchWinners(),
         fetchCompletions(),
@@ -402,13 +658,26 @@ window.addEventListener('DOMContentLoaded', async function () {
 
       stats.forEach(userStat => {
         const userRow = document.createElement('tr');
-        userRow.innerHTML = `
-          <td>
-            <a href="#" class="user-link" data-movies='${JSON.stringify(userStat.watchedMovies)}'>${userStat.name}</a>
-          </td>
-          <td>${userStat.watchedCount}</td>
-          <td>${userStat.watchedRatio}</td>
-        `;
+        const nameTd = document.createElement('td');
+        const link = document.createElement('a');
+        link.href = '#';
+        link.className = 'user-link';
+        link.textContent = userStat.name;
+        link.addEventListener('click', function (event) {
+          event.preventDefault();
+          openMoviesModalForUser(userStat);
+        });
+        nameTd.appendChild(link);
+
+        const countTd = document.createElement('td');
+        countTd.textContent = String(userStat.watchedCount ?? '');
+
+        const ratioTd = document.createElement('td');
+        ratioTd.textContent = String(userStat.watchedRatio ?? '');
+
+        userRow.appendChild(nameTd);
+        userRow.appendChild(countTd);
+        userRow.appendChild(ratioTd);
         userTableBody.appendChild(userRow);
       });
 
@@ -416,32 +685,6 @@ window.addEventListener('DOMContentLoaded', async function () {
       if (table) table.classList.remove('d-none');
       if (statsError) statsError.classList.add('d-none');
       pageLoader.setProgress(92);
-
-      // Add event listener for user links
-      document.querySelectorAll('.user-link').forEach(link => {
-        link.addEventListener('click', function (event) {
-          event.preventDefault();
-          const datasetMovies = this.dataset.movies;
-          console.log(datasetMovies);
-          const movies = JSON.parse(datasetMovies);
-
-          // Clear the current movie list in the modal
-          const movieList = document.getElementById('movie-list');
-          movieList.innerHTML = '';
-
-          // Populate the modal with the movies the user has watched
-          movies.forEach(movie => {
-            const movieItem = document.createElement('li');
-            movieItem.classList.add('list-group-item');
-            movieItem.textContent = movie.title;
-            movieList.appendChild(movieItem);
-          });
-
-          // Show the modal
-          const modal = new bootstrap.Modal(document.getElementById('moviesModal'));
-          modal.show();
-        });
-      });
 
       pageLoader.done();
     } catch (error) {

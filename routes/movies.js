@@ -291,6 +291,9 @@ router.get("/watchedMovies", async (req, res) => {
     const user = await User.findById(decoded.id).select("watchedMovies").lean(); // Get user by ID
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // User-specific: never allow shared/proxy caching.
+    res.set("Cache-Control", "private, no-store, must-revalidate");
+    res.set("Vary", "Authorization");
     res.status(200).json(user.watchedMovies); // Return the list of watched movies
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -360,16 +363,6 @@ router.post("/add", async (req, res) => {
     const normalizedMode = normalizePlayerMode(player_mode);
     if (normalizedMode === null) {
       return res.status(400).json({ message: "player_mode invalide (auto|video|embed)" });
-    }
-    if (
-      !hasAnySourceIncludingFile({
-        vod_link: normalizedVod || "",
-        video_src: normalizedVideo || "",
-        embed_src: normalizedEmbed || "",
-        video_file: normalizedFile || "",
-      })
-    ) {
-      return res.status(400).json({ message: "Ajoute au moins une source (VOD / video_src / embed_src)." });
     }
 
     // Fetch movie details from OMDb API
@@ -582,17 +575,6 @@ router.put("/:id", async (req, res) => {
       if (description !== undefined) movie.description = description;
       if (rating !== undefined) movie.rating = rating;
       if (poster !== undefined) movie.poster = poster;
-    }
-
-    if (
-      !hasAnySourceIncludingFile({
-        vod_link: movie.vod_link || "",
-        video_src: movie.video_src || "",
-        embed_src: movie.embed_src || "",
-        video_file: movie.video_file || "",
-      })
-    ) {
-      return res.status(400).json({ message: "Ajoute au moins une source (VOD / video_src / embed_src / video_file)." });
     }
 
     await movie.save();

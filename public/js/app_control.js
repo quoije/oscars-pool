@@ -165,7 +165,7 @@ window.onload = async function () {
   }
 
   async function fetchPlayerUi() {
-    const res = await fetch('/api/settings/player-admin-status-ui', { method: 'GET' });
+    const res = await fetch('/api/settings/player-admin-status-ui', { method: 'GET', cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = data.message || data.error || `Erreur (${res.status})`;
@@ -254,7 +254,7 @@ window.onload = async function () {
   }
 
   async function fetchAppVersionState() {
-    const res = await fetch('/api/settings/app-version', { method: 'GET' });
+    const res = await fetch('/api/settings/app-version', { method: 'GET', cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = data.message || data.error || `Erreur (${res.status})`;
@@ -338,7 +338,7 @@ window.onload = async function () {
   async function refreshAppVersionPreview() {
     if (!appVersionPreviewEl) return;
     try {
-      const res = await fetch('/api/version', { method: 'GET' });
+      const res = await fetch('/api/version', { method: 'GET', cache: 'no-store' });
       if (!res.ok) throw new Error(`Erreur (${res.status})`);
       const data = await res.json().catch(() => ({}));
       const line = `${data?.date || ''} - ${data?.version || ''} - ${data?.message || ''}`.trim();
@@ -462,7 +462,7 @@ window.onload = async function () {
   }
 
   async function fetchCompletionModal() {
-    const res = await fetch('/api/settings/completion-modal', { method: 'GET' });
+    const res = await fetch('/api/settings/completion-modal', { method: 'GET', cache: 'no-store' });
     if (!res.ok) throw new Error(`Erreur (${res.status})`);
     const data = await res.json().catch(() => ({}));
     return normalizeCompletionModal(data);
@@ -763,7 +763,8 @@ window.onload = async function () {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
-      }
+      },
+      cache: 'no-store',
     });
 
     const data = await res.json().catch(() => ([]));
@@ -805,7 +806,7 @@ window.onload = async function () {
   }
 
   async function fetchOscarDates() {
-    const res = await fetch('/api/settings/oscar-dates', { method: 'GET' });
+    const res = await fetch('/api/settings/oscar-dates', { method: 'GET', cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = data.message || data.error || `Erreur (${res.status})`;
@@ -876,7 +877,7 @@ window.onload = async function () {
   }
 
   async function fetchWinners() {
-    const res = await fetch('/api/settings/winners', { method: 'GET' });
+    const res = await fetch('/api/settings/winners', { method: 'GET', cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
       const msg = data.message || data.error || `Erreur (${res.status})`;
@@ -986,22 +987,10 @@ window.onload = async function () {
     return winnersByYear.get(String(y)) || null;
   }
 
-  function renderWinnerCurrent() {
-    if (!winnerCurrentEl || !winnerYearSelect) return;
-    const y = parseYear(winnerYearSelect.value);
-    if (!y) {
-      winnerCurrentEl.textContent = '—';
-      return;
-    }
-    const list = getWinnerForYear(y);
+  function sortWinnersForDisplay(list) {
     const winners = Array.isArray(list) ? list : [];
-    if (!winners.length) {
-      winnerCurrentEl.textContent = `${y}: (aucun gagnant)`;
-      return;
-    }
-
     // Sort for stable display: points desc (null last), then name
-    const sorted = winners.slice().sort((a, b) => {
+    return winners.slice().sort((a, b) => {
       const ap = a?.points === null || a?.points === undefined ? null : Number(a.points);
       const bp = b?.points === null || b?.points === undefined ? null : Number(b.points);
       if (ap === null && bp !== null) return 1;
@@ -1009,25 +998,57 @@ window.onload = async function () {
       if (ap !== null && bp !== null && ap !== bp) return bp - ap;
       return String(a?.name || '').localeCompare(String(b?.name || ''), 'fr', { sensitivity: 'base' });
     });
+  }
 
-    const rows = sorted.map((w) => {
-      const name = w?.name || '(utilisateur supprimé)';
-      const pts = w?.points === null || w?.points === undefined ? null : Number(w.points);
-      const ptsLabel = pts === null || Number.isNaN(pts) ? '' : ` <span class="text-muted">— ${pts} pts</span>`;
-      const uid = String(w?.userId || '');
+  function renderWinnerCurrent() {
+    if (!winnerCurrentEl) return;
+
+    const years = Array.from(winnersByYear.keys())
+      .map((k) => Number(k))
+      .filter((n) => Number.isInteger(n))
+      .sort((a, b) => b - a);
+
+    if (!years.length) {
+      winnerCurrentEl.textContent = '—';
+      return;
+    }
+
+    const blocks = years.map((y) => {
+      const list = winnersByYear.get(String(y)) || [];
+      const sorted = sortWinnersForDisplay(list);
+
+      if (!sorted.length) {
+        return `
+          <div class="border rounded p-2 bg-white mb-2">
+            <div class="fw-semibold">${escapeHtml(String(y))}</div>
+            <div class="text-muted small">(aucun gagnant)</div>
+          </div>
+        `;
+      }
+
+      const rows = sorted.map((w) => {
+        const name = escapeHtml(w?.name || '(utilisateur supprimé)');
+        const pts = w?.points === null || w?.points === undefined ? null : Number(w.points);
+        const ptsLabel = pts === null || Number.isNaN(pts) ? '' : ` <span class="text-muted">— ${escapeHtml(String(Math.round(pts)))} pts</span>`;
+        const uid = escapeHtml(String(w?.userId || '').trim());
+        return (
+          `<div class="d-flex justify-content-between align-items-center border rounded px-2 py-1 mb-2 bg-white">` +
+            `<div class="me-2 min-width-0"><strong class="text-break">${name}</strong>${ptsLabel}</div>` +
+            `<button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" data-winner-remove-year="${escapeHtml(String(y))}" data-winner-remove-user="${uid}">Retirer</button>` +
+          `</div>`
+        );
+      }).join('');
+
+      const tieLabel = sorted.length > 1 ? ' <span class="text-muted fw-normal">(égalité)</span>' : '';
       return `
-        <div class="d-flex justify-content-between align-items-center border rounded px-2 py-1 mb-2">
-          <div class="me-2"><strong>${name}</strong>${ptsLabel}</div>
-          <button type="button" class="btn btn-sm btn-outline-danger" data-winner-remove-year="${y}" data-winner-remove-user="${uid}">Retirer</button>
+        <div class="border rounded p-2 bg-light mb-2">
+          <div class="fw-semibold mb-2">${escapeHtml(String(y))}${tieLabel}</div>
+          ${rows}
         </div>
       `;
     }).join('');
 
-    const tieLabel = sorted.length > 1 ? ' <span class="text-muted fw-normal">(égalité)</span>' : '';
-    winnerCurrentEl.innerHTML = `
-      <div class="fw-semibold mb-2">${y}${tieLabel}</div>
-      ${rows}
-    `;
+    winnerCurrentEl.innerHTML = blocks;
 
     winnerCurrentEl.querySelectorAll('button[data-winner-remove-year][data-winner-remove-user]').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -1109,7 +1130,7 @@ window.onload = async function () {
 
   async function fetchActiveYear() {
     try {
-      const res = await fetch('/api/settings/year', { method: 'GET' });
+      const res = await fetch('/api/settings/year', { method: 'GET', cache: 'no-store' });
       if (!res.ok) throw new Error('Failed to fetch active year');
       const data = await res.json();
       const year = Number(data?.year);
@@ -1516,6 +1537,7 @@ window.onload = async function () {
     const res = await fetch('/api/admin/db/backups', {
       method: 'GET',
       headers: { 'Authorization': `Bearer ${token}` },
+      cache: 'no-store',
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
@@ -1915,11 +1937,6 @@ window.onload = async function () {
       return;
     }
 
-    if (!vod_link && !video_src && !video_file && !embed_src) {
-      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / video_file / embed_src).');
-      return;
-    }
-
     try {
       const res = await fetch('/api/movies/add', {
         method: 'POST',
@@ -1953,7 +1970,7 @@ window.onload = async function () {
 
   async function refreshYears() {
     try {
-      const yearsRes = await fetch('/api/movies/years');
+      const yearsRes = await fetch('/api/movies/years', { cache: 'no-store' });
       const years = yearsRes.ok ? await yearsRes.json() : [];
       const cleanedYears = (Array.isArray(years) ? years : [])
         .map((y) => Number(y))
@@ -2167,11 +2184,6 @@ window.onload = async function () {
       return;
     }
 
-    if (!vod_link && !video_src && !video_file && !embed_src) {
-      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / video_file / embed_src).');
-      return;
-    }
-
     const body = {
       imdb_id,
       year: yearRaw === '' ? null : year,
@@ -2235,7 +2247,7 @@ window.onload = async function () {
     adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-muted">Chargement…</td></tr>`;
 
     try {
-      const res = await fetch(url, { method: 'GET' });
+      const res = await fetch(url, { method: 'GET', cache: 'no-store' });
       if (!res.ok) {
         adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-danger">Erreur lors du chargement (${res.status})</td></tr>`;
         return;
