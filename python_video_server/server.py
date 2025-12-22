@@ -1,6 +1,7 @@
 import mimetypes
 import os
 import posixpath
+import ssl
 from functools import lru_cache
 from datetime import datetime, timezone
 from pathlib import Path
@@ -172,6 +173,19 @@ def _mongo_client() -> MongoClient:
             # If certifi isn't available, fall back to system trust.
             pass
 
+    # Some hosts / middleboxes break TLS 1.3 handshakes to Atlas and produce
+    # `TLSV1_ALERT_INTERNAL_ERROR`. Forcing TLS 1.2 can fix it.
+    if _env_str("MONGO_TLS_FORCE_TLS12", "0") in ("1", "true", "yes", "on"):
+        cafile = kwargs.pop("tlsCAFile", None)
+        ctx = ssl.create_default_context(cafile=cafile)
+        try:
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+            ctx.maximum_version = ssl.TLSVersion.TLSv1_2
+        except Exception:
+            # Older Python/OpenSSL may not support TLSVersion fields.
+            pass
+        kwargs["ssl_context"] = ctx
+
     # Optional escape hatch (NOT recommended): allow invalid certs for debugging only.
     if _env_str("MONGO_TLS_INSECURE", "0") in ("1", "true", "yes", "on"):
         kwargs["tlsAllowInvalidCertificates"] = True
@@ -337,6 +351,7 @@ def healthz():
         "time": datetime.now(timezone.utc).isoformat(),
         "video_files_dir": str(_video_files_dir()),
         "mongo_db_name": _mongo_db_name() or None,
+        "openssl": ssl.OPENSSL_VERSION,
     }
 
 
