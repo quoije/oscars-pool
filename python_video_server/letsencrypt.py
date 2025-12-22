@@ -14,6 +14,14 @@ Typical usage (standalone HTTP-01, binds to port 80):
     --domains example.com,www.example.com \
     --production
 
+If you *cannot* bind port 80 (shared hosting, no root, port already in use),
+use DNS-01 instead (manual TXT record):
+  python3 -m python_video_server.letsencrypt certonly \
+    --challenge dns \
+    --email you@example.com \
+    --domains example.com,www.example.com \
+    --production
+
 Then run uvicorn with:
   sudo -E uvicorn python_video_server.server:app --host 0.0.0.0 --port 443 \
     --ssl-certfile python_video_server/certs/config/live/example.com/fullchain.pem \
@@ -65,6 +73,77 @@ def _ensure_dirs(base_dir: Path) -> tuple[Path, Path, Path]:
     return config_dir, work_dir, logs_dir
 
 
+def _ensure_dns_hook_scripts(work_dir: Path) -> tuple[Path, Path]:
+    """
+    Create small executable hook scripts used by certbot's --manual DNS flow.
+
+    Certbot runs these hooks as external executables; we generate them under the
+    certbot work dir so no special permissions are needed.
+    """
+
+    auth_hook = (work_dir / "certbot_dns_auth_hook.py").resolve()
+    cleanup_hook = (work_dir / "certbot_dns_cleanup_hook.py").resolve()
+
+    auth_contents = """#!/usr/bin/env python3
+import os
+import sys
+import time
+
+def main() -> int:
+    domain = os.environ.get("CERTBOT_DOMAIN", "").strip()
+    validation = os.environ.get("CERTBOT_VALIDATION", "").strip()
+    if not domain or not validation:
+        print("Missing CERTBOT_DOMAIN/CERTBOT_VALIDATION in environment.", file=sys.stderr)
+        return 2
+
+    record_name = f"_acme-challenge.{domain}"
+    print("\\n=== DNS-01 challenge required ===")
+    print(f"Create/Update this TXT record:")
+    print(f"  Name:  {record_name}")
+    print(f"  Type:  TXT")
+    print(f"  Value: {validation}")
+    print("\\nAfter the record is published and has propagated, press Enter to continue.")
+
+    # If we're in a non-interactive environment, wait a bit and then continue.
+    if not sys.stdin.isatty():
+        wait_s = int(os.environ.get("LE_DNS_WAIT_SECONDS", "60"))
+        print(f"(non-interactive stdin detected; waiting {wait_s}s then continuing...)")
+        time.sleep(max(0, wait_s))
+        return 0
+
+    try:
+        input("> ")
+    except KeyboardInterrupt:
+        print("\\nAborted.", file=sys.stderr)
+        return 130
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+"""
+
+    cleanup_contents = """#!/usr/bin/env python3
+import os
+
+def main() -> int:
+    domain = os.environ.get("CERTBOT_DOMAIN", "").strip()
+    if domain:
+        print("\\nDNS-01 cleanup:")
+        print(f"You may now remove the TXT record: _acme-challenge.{domain}")
+    return 0
+
+if __name__ == "__main__":
+    raise SystemExit(main())
+"""
+
+    auth_hook.write_text(auth_contents, encoding="utf-8")
+    cleanup_hook.write_text(cleanup_contents, encoding="utf-8")
+    os.chmod(auth_hook, 0o755)
+    os.chmod(cleanup_hook, 0o755)
+
+    return auth_hook, cleanup_hook
+
+
 def _run_certbot(argv: Iterable[str]) -> int:
     try:
         # certbot is a Python package dependency (installed via pip).
@@ -86,6 +165,7 @@ def _common_certbot_flags(
     domains: List[str],
     base_dir: Path,
     production: bool,
+    non_interactive: bool = True,
 ) -> List[str]:
     if not email.strip():
         raise SystemExit("--email is required")
@@ -95,7 +175,6 @@ def _common_certbot_flags(
     config_dir, work_dir, logs_dir = _ensure_dirs(base_dir)
 
     args: List[str] = [
-        "--non-interactive",
         "--agree-tos",
         "--email",
         email.strip(),
@@ -109,6 +188,8 @@ def _common_certbot_flags(
         "--key-type",
         "ecdsa",
     ]
+    if non_interactive:
+        args.insert(0, "--non-interactive")
 
     if production:
         args += ["--server", LE_PRODUCTION_DIRECTORY_URL]
@@ -126,23 +207,51 @@ def cmd_certonly(args: argparse.Namespace) -> int:
     domains = _split_domains(args.domains)
     production = bool(args.production)
 
-    certbot_args = [
-        "certonly",
-        "--standalone",
-        # HTTP-01 is the simplest/most compatible for typical VPS setups.
-        "--preferred-challenges",
-        "http",
-        # If port 80 is already in use, certbot can still succeed behind a reverse proxy
-        # using `--webroot`, but this wrapper defaults to standalone by design.
-        "--http-01-port",
-        str(int(args.http_01_port)),
-        *_common_certbot_flags(
-            email=args.email,
-            domains=domains,
-            base_dir=base_dir,
-            production=production,
-        ),
-    ]
+    challenge = (args.challenge or "http").strip().lower()
+    if challenge not in {"http", "dns"}:
+        raise SystemExit("--challenge must be one of: http, dns")
+
+    if challenge == "dns":
+        # DNS-01 works without binding any local ports; suitable for shared hosting / no root.
+        _, work_dir, _ = _ensure_dirs(base_dir)
+        auth_hook, cleanup_hook = _ensure_dns_hook_scripts(work_dir)
+        certbot_args = [
+            "certonly",
+            "--manual",
+            "--preferred-challenges",
+            "dns",
+            "--manual-public-ip-logging-ok",
+            "--manual-auth-hook",
+            str(auth_hook),
+            "--manual-cleanup-hook",
+            str(cleanup_hook),
+            *_common_certbot_flags(
+                email=args.email,
+                domains=domains,
+                base_dir=base_dir,
+                production=production,
+                non_interactive=True,
+            ),
+        ]
+    else:
+        certbot_args = [
+            "certonly",
+            "--standalone",
+            # HTTP-01 is the simplest/most compatible for typical VPS setups.
+            "--preferred-challenges",
+            "http",
+            # If port 80 is already in use, certbot can still succeed behind a reverse proxy
+            # using `--webroot`, but this wrapper defaults to standalone by design.
+            "--http-01-port",
+            str(int(args.http_01_port)),
+            *_common_certbot_flags(
+                email=args.email,
+                domains=domains,
+                base_dir=base_dir,
+                production=production,
+                non_interactive=True,
+            ),
+        ]
 
     if args.force_renewal:
         certbot_args.append("--force-renewal")
@@ -211,6 +320,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=int(os.environ.get("LE_HTTP01_PORT", "80")),
         type=int,
         help="Port to bind for HTTP-01 challenge (default: 80).",
+    )
+    c.add_argument(
+        "--challenge",
+        default=os.environ.get("LE_CHALLENGE", "http"),
+        choices=["http", "dns"],
+        help="ACME challenge type: http (standalone) or dns (manual TXT record). Default: http.",
     )
     c.add_argument("--force-renewal", action="store_true", help="Force issuance even if not close to expiry.")
     c.add_argument(

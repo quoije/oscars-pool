@@ -37,6 +37,28 @@ sudo -E python3 -m python_video_server.letsencrypt certonly \
   --domains example.com,www.example.com
 ```
 
+### 1b) Issue a certificate (DNS-01 manual TXT record — no port 80, no root)
+
+If your host already uses port **80** (or you don't have permission to bind it), use DNS-01.
+This does **not** require any inbound ports on the machine, but you must be able to edit DNS for the domain.
+
+```bash
+python3 -m pip install -r python_video_server/requirements.txt
+
+# Add --production when staging works.
+python3 -m python_video_server.letsencrypt certonly \
+  --challenge dns \
+  --email you@example.com \
+  --domains example.com,www.example.com
+```
+
+During issuance, you'll be prompted to create a TXT record like:
+- Name: `_acme-challenge.example.com`
+- Type: `TXT`
+- Value: (a token certbot prints)
+
+After it propagates, press Enter and certbot will continue.
+
 Certificates will be written under:
 - `python_video_server/certs/config/live/<primary-domain>/fullchain.pem`
 - `python_video_server/certs/config/live/<primary-domain>/privkey.pem`
