@@ -42,8 +42,7 @@ window.onload = async function () {
   const saveActiveYearBtn = document.getElementById('save-active-year');
 
   // Player UI (settings tab): show/hide admin status blocks in player.html
-  const playerUiShowSourceEl = document.getElementById('player_ui_show_source');
-  const playerUiShowProgressEl = document.getElementById('player_ui_show_progress');
+  const playerUiShowStatusEl = document.getElementById('player_ui_show_status');
   const playerUiReloadBtn = document.getElementById('player_ui_reload');
   const playerUiSaveBtn = document.getElementById('player_ui_save');
 
@@ -193,21 +192,22 @@ window.onload = async function () {
   }
 
   function setPlayerUiForm(value) {
-    if (!playerUiShowSourceEl || !playerUiShowProgressEl) return;
-    playerUiShowSourceEl.checked = !!value.showSource;
-    playerUiShowProgressEl.checked = !!value.showProgress;
+    if (!playerUiShowStatusEl) return;
+    // Single checkbox controls both flags.
+    playerUiShowStatusEl.checked = !!value.showSource && !!value.showProgress;
   }
 
   function getPlayerUiFormValue() {
+    const enabled = !!playerUiShowStatusEl?.checked;
     return normalizePlayerUi({
-      showSource: !!playerUiShowSourceEl?.checked,
-      showProgress: !!playerUiShowProgressEl?.checked,
+      showSource: enabled,
+      showProgress: enabled,
     });
   }
 
   async function loadPlayerUiIntoUi() {
     // If the section isn't present (older HTML), skip gracefully.
-    if (!playerUiShowSourceEl) return;
+    if (!playerUiShowStatusEl) return;
     try {
       const value = await fetchPlayerUi();
       setPlayerUiForm(value);
