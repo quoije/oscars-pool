@@ -362,92 +362,67 @@
     </div>
 
     <div class="tab-pane fade" id="admin-movies" role="tabpanel" aria-labelledby="admin-movies-tab">
-      <div class="row g-3">
-        <div class="col-12 col-xxl-4">
-          <div class="card p-3">
-            <h4 class="mb-1">Ajouter un film</h4>
-            <p class="text-muted mb-3">
-              Ajoute un film via l’API (<code>/api/movies/add</code>). Le serveur récupère automatiquement le titre/plot/affiche depuis OMDb avec l’<code>imdb_id</code>.
-            </p>
-
-            <form id="add-movie-form">
-              <div class="mb-3">
-                <label for="oscar_year" class="form-label">Oscar year</label>
-                <input type="number" class="form-control" id="oscar_year" placeholder="2026" min="1900" max="3000" required>
-                <div class="form-text">Permet de séparer les films et les stats par année.</div>
-              </div>
-              <div class="mb-3">
-                <label for="imdb_id" class="form-label">IMDB ID (ex: tt1234567)</label>
-                <input type="text" class="form-control" id="imdb_id" placeholder="tt..." required>
-              </div>
-              <div class="mb-3">
-                <label for="category" class="form-label">Catégorie</label>
-                <input type="text" class="form-control" id="category" placeholder="Best Picture, etc." required>
-              </div>
-              <div class="mb-3">
-                <label class="form-label">Lecteur (source)</label>
-                <div class="row g-2">
-                  <div class="col-12 col-lg-4">
-                    <label for="player_mode" class="form-label">Mode</label>
-                    <select id="player_mode" class="form-select">
-                      <option value="auto" selected>Auto</option>
-                      <option value="video">Video</option>
-                      <option value="embed">Embed</option>
-                    </select>
-                    <div class="form-text">Auto = video_src → embed_src → vod_link.</div>
-                  </div>
-                  <div class="col-12 col-lg-8">
-                    <label for="video_src" class="form-label">Video URL (mp4/webm/m3u8)</label>
-                    <input type="text" class="form-control" id="video_src" placeholder="https://.../movie.mp4 or .../playlist.m3u8">
-                    <div class="form-text">If you use a server file (below) and leave this empty, it will auto-use <code>/api/video/&lt;movieId&gt;</code>.</div>
-                  </div>
-                  <div class="col-12">
-                    <label for="video_file" class="form-label">Server video file (optional)</label>
-                    <input type="text" class="form-control font-monospace" id="video_file" placeholder="my_movie.mp4 or 2026/my_movie.mp4">
-                    <div class="form-text">
-                      Relative path under <code>VIDEO_FILES_DIR</code> (default: <code>public/video</code>). Supports seeking (Range).
-                    </div>
-                  </div>
-                  <div class="col-12">
-                    <label for="embed_src" class="form-label">Embed URL or iframe code</label>
-                    <textarea class="form-control font-monospace" id="embed_src" rows="3" placeholder="https://www.youtube.com/watch?v=... OR <iframe src='...'></iframe>"></textarea>
-                  </div>
-                  <div class="col-12">
-                    <label for="vod_link" class="form-label">Legacy VOD link (optional)</label>
-                    <input type="text" class="form-control" id="vod_link" placeholder="https://...">
-                    <div class="form-text">Backward-compat. Prefer video_src / embed_src above.</div>
-                  </div>
-                </div>
-              </div>
-              <div class="d-flex gap-2">
-                <button type="submit" class="btn btn-primary">Ajouter</button>
-                <button type="button" id="reset-form" class="btn btn-outline-secondary">Reset</button>
-              </div>
-            </form>
+      <div class="card p-3">
+        <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
+          <div>
+            <h4 class="mb-1">Films</h4>
+            <div class="text-muted">Gestion et ajout des films (par année).</div>
           </div>
         </div>
 
-        <div class="col-12 col-xxl-8">
-          <div class="card p-3">
+        <ul class="nav nav-pills admin-subtabs mt-3" id="adminMoviesSubTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="admin-movies-subtab-manage" data-bs-toggle="tab" data-bs-target="#admin-movies-pane-manage" type="button" role="tab" aria-controls="admin-movies-pane-manage" aria-selected="true">
+              Gérer
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="admin-movies-subtab-add" data-bs-toggle="tab" data-bs-target="#admin-movies-pane-add" type="button" role="tab" aria-controls="admin-movies-pane-add" aria-selected="false">
+              Ajouter
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="admin-movies-subtab-help" data-bs-toggle="tab" data-bs-target="#admin-movies-pane-help" type="button" role="tab" aria-controls="admin-movies-pane-help" aria-selected="false">
+              Aide
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content pt-3">
+          <!-- Manage -->
+          <div class="tab-pane fade show active" id="admin-movies-pane-manage" role="tabpanel" aria-labelledby="admin-movies-subtab-manage" tabindex="0">
             <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
               <div>
-                <h4 class="mb-1">Gérer les films</h4>
-                <div class="text-muted">Sélectionne une année, puis coche les films à supprimer.</div>
+                <h5 class="mb-1">Gérer les films</h5>
+                <div class="text-muted">Filtre, sélection et suppression en lot.</div>
+              </div>
+              <div class="text-muted small">
+                <span id="admin-movies-table-count">—</span>
               </div>
             </div>
 
             <div class="row g-2 align-items-end">
-              <div class="col-md-6 col-xl-4">
+              <div class="col-12 col-md-4 col-xl-3">
                 <label for="manage_year" class="form-label">Oscar year</label>
                 <select id="manage_year" class="form-select">
                   <option value="">Toutes</option>
                 </select>
               </div>
-              <div class="col-md-6 col-xl-4 d-flex gap-2">
+
+              <div class="col-12 col-md-8 col-xl-5">
+                <label for="admin_movies_search" class="form-label">Recherche</label>
+                <div class="input-group">
+                  <input type="text" class="form-control" id="admin_movies_search" placeholder="Titre, IMDB ID, catégorie…" autocomplete="off">
+                  <button type="button" class="btn btn-outline-secondary" id="admin_movies_clear_search">Effacer</button>
+                </div>
+              </div>
+
+              <div class="col-12 col-xl-4 d-flex gap-2">
                 <button type="button" id="refresh-movies" class="btn btn-outline-primary w-100">Rafraîchir</button>
                 <button type="button" id="delete-selected" class="btn btn-danger w-100" disabled>Supprimer</button>
               </div>
-              <div class="col-12 col-xl-4">
+
+              <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center">
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="select-all-movies">
@@ -459,7 +434,7 @@
             </div>
 
             <div class="table-responsive mt-2">
-              <table class="table table-sm align-middle mb-0">
+              <table class="table table-sm align-middle mb-0 admin-movies-table">
                 <thead>
                   <tr>
                     <th style="width: 1%;">Sel.</th>
@@ -475,6 +450,107 @@
                   <tr><td colspan="7" class="text-muted">Charge la liste…</td></tr>
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          <!-- Add -->
+          <div class="tab-pane fade" id="admin-movies-pane-add" role="tabpanel" aria-labelledby="admin-movies-subtab-add" tabindex="0">
+            <h5 class="mb-2">Ajouter un film</h5>
+            <div class="text-muted mb-3">
+              Le serveur récupère automatiquement titre/plot/poster via OMDb avec l’<code>imdb_id</code>.
+            </div>
+
+            <form id="add-movie-form">
+              <div class="row g-3">
+                <div class="col-12 col-md-4">
+                  <label for="oscar_year" class="form-label">Oscar year</label>
+                  <input type="number" class="form-control" id="oscar_year" placeholder="2026" min="1900" max="3000" required>
+                  <div class="form-text">Sépare films &amp; stats par année.</div>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label for="imdb_id" class="form-label">IMDB ID</label>
+                  <input type="text" class="form-control" id="imdb_id" placeholder="tt1234567" required>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label for="category" class="form-label">Catégorie</label>
+                  <input type="text" class="form-control" id="category" placeholder="Best Picture, etc." required>
+                </div>
+
+                <div class="col-12">
+                  <div class="accordion" id="adminAddMovieAccordion">
+                    <div class="accordion-item">
+                      <h2 class="accordion-header" id="adminAddMovieHeadingPlayer">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#adminAddMovieCollapsePlayer" aria-expanded="true" aria-controls="adminAddMovieCollapsePlayer">
+                          Source vidéo / Player
+                        </button>
+                      </h2>
+                      <div id="adminAddMovieCollapsePlayer" class="accordion-collapse collapse show" aria-labelledby="adminAddMovieHeadingPlayer" data-bs-parent="#adminAddMovieAccordion">
+                        <div class="accordion-body">
+                          <div class="row g-2">
+                            <div class="col-12 col-lg-4">
+                              <label for="player_mode" class="form-label">Mode</label>
+                              <select id="player_mode" class="form-select">
+                                <option value="auto" selected>Auto</option>
+                                <option value="video">Video</option>
+                                <option value="embed">Embed</option>
+                              </select>
+                              <div class="form-text">Auto = video_src → embed_src → vod_link.</div>
+                            </div>
+                            <div class="col-12 col-lg-8">
+                              <label for="video_src" class="form-label">Video URL (mp4/webm/m3u8)</label>
+                              <input type="text" class="form-control" id="video_src" placeholder="https://.../movie.mp4 or .../playlist.m3u8">
+                              <div class="form-text">Si <code>video_file</code> est fourni et que ce champ est vide, la lecture utilisera <code>/api/video/&lt;movieId&gt;</code>.</div>
+                            </div>
+                            <div class="col-12">
+                              <label for="video_file" class="form-label">Server video file (optionnel)</label>
+                              <input type="text" class="form-control font-monospace" id="video_file" placeholder="my_movie.mp4 or 2026/my_movie.mp4">
+                              <div class="form-text">Chemin relatif sous <code>VIDEO_FILES_DIR</code> (défaut: <code>public/video</code>).</div>
+                            </div>
+                            <div class="col-12">
+                              <label for="embed_src" class="form-label">Embed URL ou iframe</label>
+                              <textarea class="form-control font-monospace" id="embed_src" rows="3" placeholder="https://... OR <iframe src='...'></iframe>"></textarea>
+                            </div>
+                            <div class="col-12">
+                              <label for="vod_link" class="form-label">Legacy VOD link (optionnel)</label>
+                              <input type="text" class="form-control" id="vod_link" placeholder="https://...">
+                              <div class="form-text">Compat. Préfère <code>video_src</code> / <code>embed_src</code>.</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12 d-flex flex-wrap justify-content-end gap-2">
+                  <button type="button" id="reset-form" class="btn btn-outline-secondary">Reset</button>
+                  <button type="submit" class="btn btn-primary">Ajouter</button>
+                </div>
+              </div>
+            </form>
+          </div>
+
+          <!-- Help -->
+          <div class="tab-pane fade" id="admin-movies-pane-help" role="tabpanel" aria-labelledby="admin-movies-subtab-help" tabindex="0">
+            <div class="row g-3">
+              <div class="col-12 col-xxl-8">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-2">Notes rapides</div>
+                  <ul class="mb-0">
+                    <li><strong>Auto</strong>: utilise <code>video_src</code> → <code>embed_src</code> → <code>vod_link</code>.</li>
+                    <li><strong>Server file</strong>: mets <code>video_file</code> (chemin relatif sous <code>public/video</code>).</li>
+                    <li><strong>Édition</strong>: le bouton “Éditer” ouvre une modale avec des onglets Info / Player.</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="col-12 col-xxl-4">
+                <div class="border rounded p-3 bg-white">
+                  <div class="fw-semibold mb-2">Astuce</div>
+                  <div class="text-muted">
+                    Dans “Gérer”, la recherche filtre la table localement (sans requête API). Le “Tout sélectionner” ne coche que les lignes visibles.
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
