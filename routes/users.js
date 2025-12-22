@@ -130,7 +130,7 @@ router.get("/stats", verifyToken, async (req, res) => {
 
     // Fetch movies (optionally filtered by year)
     const allMovies = await Movie.find({ year })
-      .select("imdb_id title poster rating category year")
+      .select("imdb_id title poster rating category year vod_link player_mode video_src embed_src video_file")
       .lean();
     const totalMoviesCount = allMovies.length;
 
@@ -158,6 +158,11 @@ router.get("/stats", verifyToken, async (req, res) => {
             rating: movie.rating || "",
             category: movie.category || "",
             year: Number.isInteger(movie.year) ? movie.year : year,
+            vod_link: movie.vod_link || "",
+            player_mode: movie.player_mode || "auto",
+            video_src: movie.video_src || "",
+            embed_src: movie.embed_src || "",
+            video_file: movie.video_file || "",
             watchedDate: wm?.watchedDate ? new Date(wm.watchedDate).toISOString() : null,
           };
         })

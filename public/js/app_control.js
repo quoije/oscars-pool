@@ -1935,11 +1935,6 @@ window.onload = async function () {
       return;
     }
 
-    if (!vod_link && !video_src && !video_file && !embed_src) {
-      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / video_file / embed_src).');
-      return;
-    }
-
     try {
       const res = await fetch('/api/movies/add', {
         method: 'POST',
@@ -2184,11 +2179,6 @@ window.onload = async function () {
 
     if (!category) {
       showResponse('warning', 'Catégorie invalide.');
-      return;
-    }
-
-    if (!vod_link && !video_src && !video_file && !embed_src) {
-      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / video_file / embed_src).');
       return;
     }
 

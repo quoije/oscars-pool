@@ -444,13 +444,27 @@ window.addEventListener('DOMContentLoaded', async function () {
           const watchedLabel = formatWatchedDate(movie?.watchedDate);
           const posterUrl = normalizePosterUrl(movie?.poster);
 
+          const cleanUrl = (v) => {
+            const s = (typeof v === 'string' ? v.trim() : '');
+            if (!s || s === '#' || s.toLowerCase() === 'about:blank') return '';
+            return s;
+          };
+
+          // Click behavior (requested):
+          // - If vod_link is set => go to it
+          // - Else if any playable source exists => go to player
+          // - Else => not clickable
+          const vodLink = cleanUrl(movie?.vod_link);
+          const hasPlayableSource = !!cleanUrl(movie?.video_src) || !!cleanUrl(movie?.embed_src) || !!cleanUrl(movie?.video_file);
+          const isClickable = !!vodLink || (!!movieId && hasPlayableSource);
+
           const item = document.createElement('div');
           item.className = 'stats-movie-item';
-          if (movieId) {
+          if (isClickable) {
             item.classList.add('stats-movie-item--clickable');
             item.setAttribute('role', 'link');
             item.setAttribute('tabindex', '0');
-            item.setAttribute('aria-label', `Ouvrir le lecteur: ${title}`);
+            item.setAttribute('aria-label', vodLink ? `Ouvrir le lien: ${title}` : `Ouvrir le lecteur: ${title}`);
           }
 
           const poster = document.createElement('img');
@@ -468,22 +482,36 @@ window.addEventListener('DOMContentLoaded', async function () {
             try { poster.removeAttribute('src'); } catch (_) {}
           });
 
-          function openPlayerIfPossible(evt) {
-            if (!movieId) return;
+          function openIfPossible(evt) {
+            if (!isClickable) return;
             // Don't hijack clicks inside controls (IMDb button, details summary, etc.)
             const target = evt?.target;
             if (target && typeof target.closest === 'function') {
               if (target.closest('a, button, summary, details')) return;
             }
-            window.location.href = `/player.html?id=${encodeURIComponent(movieId)}`;
+
+            if (vodLink) {
+              // Use a new tab (keeps the app state intact)
+              try {
+                const w = window.open(vodLink, '_blank', 'noopener,noreferrer');
+                if (!w) window.location.href = vodLink;
+              } catch (_) {
+                window.location.href = vodLink;
+              }
+              return;
+            }
+
+            if (movieId && hasPlayableSource) {
+              window.location.href = `/player.html?id=${encodeURIComponent(movieId)}`;
+            }
           }
 
-          if (movieId) {
-            item.addEventListener('click', openPlayerIfPossible);
+          if (isClickable) {
+            item.addEventListener('click', openIfPossible);
             item.addEventListener('keydown', (e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                openPlayerIfPossible(e);
+                openIfPossible(e);
               }
             });
           }
