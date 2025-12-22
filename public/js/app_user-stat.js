@@ -360,7 +360,6 @@ window.addEventListener('DOMContentLoaded', async function () {
       // Modal UI (Films regardés)
       const moviesModalEl = document.getElementById('moviesModal');
       const movieGridEl = document.getElementById('movie-grid');
-      const movieSortEl = document.getElementById('movie-sort');
       const moviesSummaryEl = document.getElementById('movies-summary');
       const moviesEmptyEl = document.getElementById('movies-empty');
       const moviesModalTitleEl = document.getElementById('moviesModalLabel');
@@ -394,21 +393,9 @@ window.addEventListener('DOMContentLoaded', async function () {
         return s;
       }
 
-      function sortMovies(list, mode) {
+      function sortMoviesRecent(list) {
         const arr = Array.isArray(list) ? list.slice() : [];
-        if (mode === 'title') {
-          arr.sort((a, b) => safeStr(a?.title).localeCompare(safeStr(b?.title), 'fr', { sensitivity: 'base' }));
-          return arr;
-        }
-        if (mode === 'category') {
-          arr.sort((a, b) => {
-            const c = safeStr(a?.category).localeCompare(safeStr(b?.category), 'fr', { sensitivity: 'base' });
-            if (c !== 0) return c;
-            return safeStr(a?.title).localeCompare(safeStr(b?.title), 'fr', { sensitivity: 'base' });
-          });
-          return arr;
-        }
-        // recent (default): watchedDate desc, fallback title
+        // watchedDate desc, fallback title
         arr.sort((a, b) => {
           const at = a?.watchedDate ? new Date(a.watchedDate).getTime() : 0;
           const bt = b?.watchedDate ? new Date(b.watchedDate).getTime() : 0;
@@ -419,11 +406,9 @@ window.addEventListener('DOMContentLoaded', async function () {
       }
 
       function renderMoviesModal() {
-        if (!movieGridEl || !movieSortEl || !moviesSummaryEl || !moviesEmptyEl) return;
+        if (!movieGridEl || !moviesSummaryEl || !moviesEmptyEl) return;
 
-        const sortMode = safeStr(movieSortEl.value).trim() || 'recent';
-
-        const sorted = sortMovies((Array.isArray(currentModalMovies) ? currentModalMovies : []), sortMode);
+        const sorted = sortMoviesRecent((Array.isArray(currentModalMovies) ? currentModalMovies : []));
 
         const total = Array.isArray(currentModalMovies) ? currentModalMovies.length : 0;
         moviesSummaryEl.textContent = total ? `${total} film${total > 1 ? 's' : ''}` : '0 film';
@@ -614,7 +599,6 @@ window.addEventListener('DOMContentLoaded', async function () {
             : `Films regardés (${count})`;
         }
 
-        if (movieSortEl) movieSortEl.value = 'recent';
         renderMoviesModal();
 
         if (moviesModalEl) {
@@ -623,12 +607,9 @@ window.addEventListener('DOMContentLoaded', async function () {
         }
       }
 
-      if (movieSortEl) {
-        movieSortEl.addEventListener('change', () => renderMoviesModal());
-      }
       if (moviesModalEl) {
         moviesModalEl.addEventListener('shown.bs.modal', () => {
-          try { movieSortEl?.focus(); } catch (_) {}
+          // no controls to focus
         });
       }
 
