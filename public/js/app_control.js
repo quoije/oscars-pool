@@ -2332,7 +2332,7 @@ window.onload = async function () {
   // Initial load
   activeYear = await fetchActiveYear();
   if (activeYear) {
-    document.title = `Pool Oscars ${activeYear} - Admin`;
+    document.title = `Oscar Pool (${activeYear}) - Admin`;
   }
 
   hookModal100Inputs();
@@ -2352,7 +2352,7 @@ window.onload = async function () {
         activeYear = await setActiveYear(y);
         activeYearInput.value = String(activeYear);
         yearInput.value = String(activeYear);
-        document.title = `Pool Oscars ${activeYear} - Admin`;
+        document.title = `Oscar Pool (${activeYear}) - Admin`;
         showResponse('success', `Année active appliquée: ${activeYear}`);
         await refreshYears();
         await loadMoviesForManagement();

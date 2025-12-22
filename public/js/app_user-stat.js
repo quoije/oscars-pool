@@ -365,7 +365,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       pageLoader.setProgress(20);
       const activeYear = await fetchActiveYear();
       if (activeYear) {
-        document.title = `Pool Oscars ${activeYear} - Statistiques des utilisateurs`;
+        document.title = `Oscar Pool (${activeYear}) - Statistiques des utilisateurs`;
         const h2 = document.querySelector('h2');
         if (h2) h2.textContent = `Statistiques des utilisateurs (${activeYear})`;
       }

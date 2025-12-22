@@ -23,6 +23,18 @@ function normalizeUserId(raw) {
   return /^[a-f0-9]{24}$/i.test(s) ? s : null;
 }
 
+async function fetchActiveOscarYear() {
+  try {
+    const res = await fetch('/api/settings/year', { method: 'GET' });
+    if (!res.ok) return null;
+    const data = await res.json().catch(() => null);
+    const year = Number(data?.year);
+    return Number.isInteger(year) ? year : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 async function fetchPlaybackProgress(movieId, token) {
   try {
     const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/progress`, {
@@ -341,12 +353,15 @@ function formatClock(seconds) {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
-function setHeader(movie) {
+function setHeader(movie, { activeYear } = {}) {
   const titleEl = document.getElementById('movie-title');
   const categoryEl = document.getElementById('movie-category');
   const ratingEl = document.getElementById('movie-rating');
 
-  if (titleEl) titleEl.textContent = movie?.title || 'Player';
+  const year = Number.isInteger(activeYear) ? activeYear : null;
+  const titlePrefix = year ? `Oscar Pool (${year})` : 'Oscar Pool';
+
+  if (titleEl) titleEl.textContent = movie?.title || titlePrefix;
 
   if (categoryEl) {
     const cat = movie?.category ? String(movie.category) : '';
@@ -358,7 +373,7 @@ function setHeader(movie) {
     ratingEl.textContent = r ? `⭐ ${r}` : '';
   }
 
-  document.title = movie?.title ? `Player - ${movie.title}` : 'Player';
+  document.title = movie?.title ? `${titlePrefix} - ${movie.title}` : titlePrefix;
 }
 
 function normalizeVodLink(raw) {
@@ -475,18 +490,6 @@ function hideAllPlayers() {
   }
 }
 
-function setOpenOriginal(raw) {
-  const openOriginal = document.getElementById('open-original');
-  if (!openOriginal) return;
-  if (raw) {
-    openOriginal.href = raw;
-    openOriginal.classList.remove('d-none');
-  } else {
-    openOriginal.removeAttribute('href');
-    openOriginal.classList.add('d-none');
-  }
-}
-
 function isApiVideoUrl(raw) {
   const s = String(raw || '').trim();
   if (!s) return false;
@@ -596,9 +599,6 @@ async function playVodLink(vodLink, { token } = {}) {
     setSourceLabel('—');
     return;
   }
-
-  // "Open original" button
-  setOpenOriginal(raw);
 
   // Prefer known embed providers
   const yt = toYoutubeEmbed(raw);
@@ -721,6 +721,9 @@ window.onload = async function () {
     return;
   }
 
+  // Load the active Oscar year in parallel with the movie fetch.
+  const activeYearPromise = fetchActiveOscarYear();
+
   let decoded = null;
   try {
     decoded = decodeJwt(token);
@@ -771,11 +774,11 @@ window.onload = async function () {
       return;
     }
 
-    setHeader(movie);
+    const activeYear = await activeYearPromise;
+    setHeader(movie, { activeYear });
 
     const resolved = resolveMovieSource(movie);
     if (!resolved?.src) {
-      setOpenOriginal(null);
       setSourceLabel('—');
       hideAllPlayers();
       showAlert('No playable source configured for this movie.');
@@ -786,10 +789,9 @@ window.onload = async function () {
 
     if (resolved.isLegacy) {
       // Legacy source: never embed it in the player.
-      setOpenOriginal(resolved.src);
-      setSourceLabel('Legacy link (opens in new tab)');
+      setSourceLabel('Legacy link');
       hideAllPlayers();
-      showAlertVariant('Legacy source: use “Open original” to watch in a new tab.', 'warning');
+      showAlertVariant('Legacy source: this link is not playable in the in-app player.', 'warning');
       return;
     }
 

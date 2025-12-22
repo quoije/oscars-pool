@@ -254,7 +254,7 @@ window.addEventListener('DOMContentLoaded', async function () {
     }
 
     const activeYear = await fetchActiveYear();
-    document.title = `Pool Oscars ${activeYear} - Checklist`;
+    document.title = `Oscar Pool (${activeYear}) - Checklist`;
     const oscarYearEl = document.getElementById('oscar-year');
     if (oscarYearEl) oscarYearEl.textContent = String(activeYear);
 

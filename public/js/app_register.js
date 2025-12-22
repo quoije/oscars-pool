@@ -2,6 +2,26 @@ function decodeJwt(token) {
   return JSON.parse(atob(token.split('.')[1]));
 }
 
+async function applyActiveOscarYearToTitle() {
+  const base = 'Oscar Pool';
+  const current = String(document.title || base);
+  const sep = ' - ';
+  const idx = current.indexOf(sep);
+  const suffix = idx >= 0 ? current.slice(idx) : '';
+
+  try {
+    const res = await fetch('/api/settings/year', { method: 'GET' });
+    const data = res.ok ? await res.json().catch(() => null) : null;
+    const year = Number(data?.year);
+    document.title = Number.isInteger(year) ? `${base} (${year})${suffix}` : `${base}${suffix}`;
+  } catch (_) {
+    document.title = `${base}${suffix}`;
+  }
+}
+
+// Fire and forget.
+applyActiveOscarYearToTitle();
+
 // Check if the user is already logged in by looking for auth_token in localStorage
 const existingToken = localStorage.getItem('auth_token');
 if (existingToken) {

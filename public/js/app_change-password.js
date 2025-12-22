@@ -7,7 +7,27 @@ function isTokenExpired(decoded) {
   return !!decoded.exp && decoded.exp < currentTime;
 }
 
+async function applyActiveOscarYearToTitle() {
+  const base = 'Oscar Pool';
+  const current = String(document.title || base);
+  const sep = ' - ';
+  const idx = current.indexOf(sep);
+  const suffix = idx >= 0 ? current.slice(idx) : '';
+
+  try {
+    const res = await fetch('/api/settings/year', { method: 'GET' });
+    const data = res.ok ? await res.json().catch(() => null) : null;
+    const year = Number(data?.year);
+    document.title = Number.isInteger(year) ? `${base} (${year})${suffix}` : `${base}${suffix}`;
+  } catch (_) {
+    document.title = `${base}${suffix}`;
+  }
+}
+
 window.onload = function () {
+  // Best-effort: update page title with active year.
+  applyActiveOscarYearToTitle();
+
   const token = localStorage.getItem('auth_token');
   if (!token) {
     window.location.href = '/';
