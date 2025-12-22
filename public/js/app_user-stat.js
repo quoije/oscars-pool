@@ -254,7 +254,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       if (!completions || typeof completions !== 'object') {
         tbody.innerHTML = `
           <tr>
-            <td colspan="4" class="text-muted">Impossible de charger les finisseurs 100%.</td>
+            <td colspan="3" class="text-muted">Impossible de charger les finisseurs 100%.</td>
           </tr>
         `;
         return;
@@ -267,7 +267,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       if (!years.length) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="4" class="text-muted">Aucune année trouvée.</td>
+            <td colspan="3" class="text-muted">Aucune année trouvée.</td>
           </tr>
         `;
         return;
@@ -283,7 +283,6 @@ window.addEventListener('DOMContentLoaded', async function () {
         const yearStr = String(y);
         const total = Number(totals?.[yearStr] ?? 0);
         const completers = Array.isArray(byYear?.[yearStr]) ? byYear[yearStr] : [];
-        const count = completers.length;
 
         const tr = document.createElement('tr');
 
@@ -291,17 +290,11 @@ window.addEventListener('DOMContentLoaded', async function () {
         tdYear.className = 'fw-semibold';
         tdYear.textContent = yearStr;
 
-        const tdCount = document.createElement('td');
-        const badge = document.createElement('span');
-        badge.className = 'badge bg-secondary';
-        badge.textContent = String(count);
-        tdCount.appendChild(badge);
-
         const tdTotal = document.createElement('td');
         tdTotal.textContent = String(Number.isFinite(total) ? total : 0);
 
         const tdNames = document.createElement('td');
-        if (!count) {
+        if (!completers.length) {
           tdNames.className = 'text-muted';
           tdNames.textContent = '—';
         } else {
@@ -317,7 +310,6 @@ window.addEventListener('DOMContentLoaded', async function () {
         }
 
         tr.appendChild(tdYear);
-        tr.appendChild(tdCount);
         tr.appendChild(tdTotal);
         tr.appendChild(tdNames);
         tbody.appendChild(tr);
