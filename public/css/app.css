@@ -172,8 +172,8 @@ footer {
     background: #fff;
     color: #111;
     font-weight: 600;
-    padding: 0.45rem 0.75rem;
-    border-radius: 999px;
+    padding: 0.45rem 0.8rem;
+    border-radius: 10px;
   }
 
   .admin-subtabs.nav-pills .nav-link:hover {
