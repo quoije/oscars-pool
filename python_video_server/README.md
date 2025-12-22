@@ -36,6 +36,58 @@ export MONGO_CONNECT_TIMEOUT_MS="8000"
 export MONGO_SOCKET_TIMEOUT_MS="20000"
 ```
 
+## Video auth / usage
+
+`GET /api/video/{movieId}` accepts auth in three ways (in priority order):
+
+1) `video_auth` cookie (best for browser `<video>` tags)
+2) `Authorization: Bearer <token>` header
+3) `?token=<token>` query param (debug only; tokens in URLs leak via logs/referrers)
+
+### Browser `<video>` (cookie flow)
+
+Because HTML `<video>` cannot send an `Authorization` header, the pattern is:
+
+1. Your JS calls `POST /api/video/session` with `Authorization: Bearer <token>`
+2. The server responds `204` and sets a `video_auth` cookie (scoped to `/api/video`)
+3. Your `<video>` loads `/api/video/{movieId}` and the cookie is used automatically
+
+Example (curl):
+
+```bash
+# 1) exchange header token -> cookie
+curl -i -X POST "https://video.example.com/api/video/session" \
+  -H "Authorization: Bearer $JWT"
+
+# 2) then the <video> element can simply use:
+# https://video.example.com/api/video/<movieId>
+```
+
+Cross-site note (frontend on a different origin):
+- Set `CORS_ALLOW_ORIGINS` to your exact app origin (not `*`) and ensure your frontend uses `credentials: "include"` on the `/api/video/session` request.
+- If the video host is cross-site, you’ll usually need `VIDEO_COOKIE_SAMESITE=None` **and** HTTPS, otherwise browsers may block the cookie.
+
+### Non-browser clients (header flow)
+
+```bash
+curl -I "https://video.example.com/api/video/<movieId>" \
+  -H "Authorization: Bearer $JWT"
+```
+
+### Token in URL (debug flow)
+
+```bash
+curl -I "https://video.example.com/api/video/<movieId>?token=$JWT"
+```
+
+### Seeking / Range requests (example)
+
+```bash
+curl -i "https://video.example.com/api/video/<movieId>" \
+  -H "Authorization: Bearer $JWT" \
+  -H "Range: bytes=0-1023"
+```
+
 ## HTTPS (optional)
 
 You can run behind a reverse proxy/ingress, or run `uvicorn` with TLS directly:
@@ -48,7 +100,70 @@ uvicorn python_video_server.server:app --host 0.0.0.0 --port 443 \
 
 Notes:
 - If you’re behind a proxy, forward `X-Forwarded-Proto: https` so `/api/video/session` can set `Secure` cookies correctly.
-- This repo includes `python_video_server/letsencrypt.py` as an optional helper for cert issuance/renewal (kept intentionally lightweight here).
+
+## Let’s Encrypt certs (python-only helper)
+
+This repo includes `python_video_server/letsencrypt.py`, a wrapper around the **certbot Python package** (no system `certbot` needed).
+
+Certificates (and certbot state) are stored under:
+- `python_video_server/certs/config/live/<primary-domain>/fullchain.pem`
+- `python_video_server/certs/config/live/<primary-domain>/privkey.pem`
+
+You can override the storage directory with `LETSENCRYPT_BASE_DIR` (optional).
+
+### Issue a cert (HTTP-01 standalone, easiest)
+
+Requirements:
+- DNS `A/AAAA` records point to this host
+- Port **80** reachable from the internet
+- You can bind port 80 (often requires `sudo`)
+
+```bash
+python -m pip install -r python_video_server/requirements.txt
+
+# staging by default (recommended first)
+sudo -E python -m python_video_server.letsencrypt certonly \
+  --email you@example.com \
+  --domains example.com,www.example.com
+
+# production (real cert)
+sudo -E python -m python_video_server.letsencrypt certonly \
+  --email you@example.com \
+  --domains example.com,www.example.com \
+  --production
+```
+
+Then run uvicorn with those certs:
+
+```bash
+sudo -E uvicorn python_video_server.server:app --host 0.0.0.0 --port 443 \
+  --ssl-certfile python_video_server/certs/config/live/example.com/fullchain.pem \
+  --ssl-keyfile  python_video_server/certs/config/live/example.com/privkey.pem
+```
+
+### Issue a cert (DNS-01 manual TXT, no port 80)
+
+Use this if you cannot expose/bind port 80. Certbot will prompt you to create a TXT record.
+
+```bash
+python -m pip install -r python_video_server/requirements.txt
+
+python -m python_video_server.letsencrypt certonly \
+  --challenge dns \
+  --email you@example.com \
+  --domains example.com,www.example.com \
+  --production
+```
+
+### Renew certs
+
+```bash
+# dry-run (safe)
+sudo -E python -m python_video_server.letsencrypt renew --dry-run
+
+# real renewal
+sudo -E python -m python_video_server.letsencrypt renew --production
+```
 
 ## Endpoints
 
