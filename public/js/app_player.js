@@ -428,13 +428,16 @@ function resolveMovieSource(movie) {
   const legacy = cleanUrlValue(movie?.vod_link);
   const video = cleanUrlValue(movie?.video_src);
   const embed = cleanUrlValue(movie?.embed_src);
+  const serverFile = cleanUrlValue(movie?.video_file);
 
   // Legacy should never embed in the player (open in new tab only).
   // So we only pick legacy if there is no other option, and mark it.
   let picked = null;
-  if (mode === 'video') picked = video || null;
+  const serverVideoUrl = serverFile ? `/api/video/${encodeURIComponent(String(movie?._id || ''))}` : null;
+
+  if (mode === 'video') picked = video || serverVideoUrl || null;
   else if (mode === 'embed') picked = embed || null;
-  else picked = video || embed || null; // auto
+  else picked = video || serverVideoUrl || embed || null; // auto
 
   if (picked) return { src: picked, isLegacy: false };
   if (legacy) return { src: legacy, isLegacy: true };
@@ -500,6 +503,16 @@ window.onload = async function () {
     }
 
     setHeader(movie);
+
+    // Allow <video> to call /api/video/* without Authorization headers by using a cookie.
+    // Best-effort: if it fails, external video_src URLs can still work.
+    try {
+      await fetch('/api/video/session', {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+      });
+    } catch (_) {}
+
     const resolved = resolveMovieSource(movie);
     if (!resolved?.src) {
       setOpenOriginal(null);
