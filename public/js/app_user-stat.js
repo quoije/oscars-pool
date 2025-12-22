@@ -435,6 +435,7 @@ window.addEventListener('DOMContentLoaded', async function () {
         moviesEmptyEl.classList.add('d-none');
 
         sorted.forEach((movie) => {
+          const movieId = safeStr(movie?.movieId).trim();
           const imdbId = safeStr(movie?.imdb_id).trim();
           const title = safeStr(movie?.title).trim() || '(sans titre)';
           const category = safeStr(movie?.category).trim();
@@ -445,6 +446,12 @@ window.addEventListener('DOMContentLoaded', async function () {
 
           const item = document.createElement('div');
           item.className = 'stats-movie-item';
+          if (movieId) {
+            item.classList.add('stats-movie-item--clickable');
+            item.setAttribute('role', 'link');
+            item.setAttribute('tabindex', '0');
+            item.setAttribute('aria-label', `Ouvrir le lecteur: ${title}`);
+          }
 
           const poster = document.createElement('img');
           poster.className = 'stats-movie-poster';
@@ -460,6 +467,26 @@ window.addEventListener('DOMContentLoaded', async function () {
             poster.classList.add('stats-movie-poster--empty');
             try { poster.removeAttribute('src'); } catch (_) {}
           });
+
+          function openPlayerIfPossible(evt) {
+            if (!movieId) return;
+            // Don't hijack clicks inside controls (IMDb button, details summary, etc.)
+            const target = evt?.target;
+            if (target && typeof target.closest === 'function') {
+              if (target.closest('a, button, summary, details')) return;
+            }
+            window.location.href = `/player.html?id=${encodeURIComponent(movieId)}`;
+          }
+
+          if (movieId) {
+            item.addEventListener('click', openPlayerIfPossible);
+            item.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                openPlayerIfPossible(e);
+              }
+            });
+          }
 
           const main = document.createElement('div');
           main.className = 'flex-grow-1';

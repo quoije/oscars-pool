@@ -236,6 +236,15 @@ footer {
     border-radius: 14px;
   }
 
+  .stats-movie-item--clickable {
+    cursor: pointer;
+  }
+
+  .stats-movie-item--clickable:hover {
+    background: rgba(0, 0, 0, 0.02);
+    border-color: rgba(0, 0, 0, 0.14);
+  }
+
   .stats-movie-poster {
     width: 56px;
     height: 84px;

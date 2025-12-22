@@ -151,6 +151,7 @@ router.get("/stats", verifyToken, async (req, res) => {
           const movie = movieByImdbId.get(imdbId);
           if (!movie) return null;
           return {
+            movieId: movie?._id ? String(movie._id) : null,
             imdb_id: movie.imdb_id,
             title: movie.title || "",
             poster: movie.poster || "",

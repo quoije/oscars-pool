@@ -348,15 +348,26 @@ window.addEventListener('DOMContentLoaded', async function () {
         const isChecked = watchedMoviesInYear.some(watchedMovie => watchedMovie.imdb_id === movie.imdb_id);
         const watchedMovie = watchedMoviesInYear.find(wm => wm.imdb_id === movie.imdb_id);
         const watchedDate = watchedMovie ? new Date(watchedMovie.watchedDate).toLocaleString() : '';
-        const hasVideoSrc = !!(movie && typeof movie.video_src === 'string' && movie.video_src.trim());
-        const hasEmbedSrc = !!(movie && typeof movie.embed_src === 'string' && movie.embed_src.trim());
+        const cleanUrl = (v) => {
+          const s = (typeof v === 'string' ? v.trim() : '');
+          // Treat placeholders as "no link" so you never need to store '#'
+          if (!s || s === '#' || s.toLowerCase() === 'about:blank') return '';
+          return s;
+        };
+        const hasVideoSrc = !!cleanUrl(movie?.video_src);
+        const hasEmbedSrc = !!cleanUrl(movie?.embed_src);
         const hasNewPlayerSource = hasVideoSrc || hasEmbedSrc;
-        const hasLegacy = !!(movie && typeof movie.vod_link === 'string' && movie.vod_link.trim());
+        const legacyUrl = cleanUrl(movie?.vod_link);
+        const hasLegacy = !!legacyUrl;
 
-        // If the movie only has legacy `vod_link`, skip the player entirely and open the original URL in a new tab.
+        // Navigation:
+        // - Prefer in-app player when we have a non-legacy source
+        // - If only legacy exists, open the legacy URL
+        // - If there is no source at all, render as non-clickable (no "#")
         const playerUrl = (movie && movie._id && hasNewPlayerSource)
           ? `/player.html?id=${encodeURIComponent(movie._id)}`
-          : (hasLegacy ? movie.vod_link : (movie && movie._id ? `/player.html?id=${encodeURIComponent(movie._id)}` : '#'));
+          : (hasLegacy ? legacyUrl : '');
+        const isClickable = !!playerUrl;
 
         const movieDiv = document.createElement('div');
         movieDiv.classList.add('col-12', 'col-sm-6', 'col-lg-4', 'movie-card');
@@ -364,15 +375,25 @@ window.addEventListener('DOMContentLoaded', async function () {
         movieDiv.innerHTML = `
           <div class="card h-100 shadow-sm">
             ${isChecked ? '<span class="badge bg-success position-absolute top-0 start-0 m-2 watched-badge">VISIONNÉ</span>' : ''}
-            <a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none">
-              <div class="text-center pt-3 px-3">
-                <img src="${movie.poster}" class="img-fluid rounded movie-poster" alt="${movie.title}">
-              </div>
-            </a>
+            ${
+              isClickable
+                ? `<a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none">
+                    <div class="text-center pt-3 px-3">
+                      <img src="${movie.poster}" class="img-fluid rounded movie-poster" alt="${movie.title}">
+                    </div>
+                  </a>`
+                : `<div class="text-center pt-3 px-3">
+                    <img src="${movie.poster}" class="img-fluid rounded movie-poster" alt="${movie.title}">
+                  </div>`
+            }
             <div class="card-body d-flex flex-column">
               <div class="d-flex justify-content-between align-items-start gap-2">
                 <h5 class="card-title mb-1 flex-grow-1">
-                  <a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none text-dark">${movie.title}</a>
+                  ${
+                    isClickable
+                      ? `<a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none text-dark">${movie.title}</a>`
+                      : `<span class="text-dark">${movie.title}</span>`
+                  }
                 </h5>
                 <div class="text-nowrap small text-muted">
                   ⭐ ${movie.rating}
@@ -381,6 +402,7 @@ window.addEventListener('DOMContentLoaded', async function () {
                   </a>
                 </div>
               </div>
+              ${!isClickable ? '<div class="text-muted small mb-1">Aucune source</div>' : ''}
               <div class="text-muted small fw-semibold fst-italic mb-2">${movie.category}</div>
               <p class="card-text small flex-grow-1 mb-2">${movie.description}</p>
               ${isChecked ? `<div class="text-muted small"><span class="fw-semibold text-dark">Regardé le:</span> ${watchedDate}</div>` : ''}

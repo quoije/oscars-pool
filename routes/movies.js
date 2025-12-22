@@ -361,16 +361,6 @@ router.post("/add", async (req, res) => {
     if (normalizedMode === null) {
       return res.status(400).json({ message: "player_mode invalide (auto|video|embed)" });
     }
-    if (
-      !hasAnySourceIncludingFile({
-        vod_link: normalizedVod || "",
-        video_src: normalizedVideo || "",
-        embed_src: normalizedEmbed || "",
-        video_file: normalizedFile || "",
-      })
-    ) {
-      return res.status(400).json({ message: "Ajoute au moins une source (VOD / video_src / embed_src)." });
-    }
 
     // Fetch movie details from OMDb API
     let movieDetails;
@@ -582,17 +572,6 @@ router.put("/:id", async (req, res) => {
       if (description !== undefined) movie.description = description;
       if (rating !== undefined) movie.rating = rating;
       if (poster !== undefined) movie.poster = poster;
-    }
-
-    if (
-      !hasAnySourceIncludingFile({
-        vod_link: movie.vod_link || "",
-        video_src: movie.video_src || "",
-        embed_src: movie.embed_src || "",
-        video_file: movie.video_file || "",
-      })
-    ) {
-      return res.status(400).json({ message: "Ajoute au moins une source (VOD / video_src / embed_src / video_file)." });
     }
 
     await movie.save();
