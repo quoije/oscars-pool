@@ -174,9 +174,11 @@ footer {
   }
 
   .imdb-icon {
-    width: 18px;
-    height: 18px;
-    vertical-align: text-bottom;
+    width: 26px;
+    height: 26px;
+    vertical-align: middle;
+    margin-left: 6px;
+    display: inline-block;
   }
 
   .watched-badge {
