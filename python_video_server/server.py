@@ -9,6 +9,7 @@ from urllib.parse import quote
 import jwt
 from bson import ObjectId
 from fastapi import FastAPI, Header, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from pymongo import MongoClient
 
@@ -22,6 +23,7 @@ JWT_SECRET = _env_str("JWT_SECRET")
 MONGO_URI = _env_str("MONGO_URI")
 VIDEO_FILES_DIR = Path(_env_str("VIDEO_FILES_DIR", str(Path.cwd() / "public" / "video"))).resolve()
 COOKIE_MAX_AGE_SECONDS = int(_env_str("VIDEO_SESSION_MAX_AGE_SECONDS", "28800"))  # 8h
+COOKIE_SAMESITE = _env_str("VIDEO_COOKIE_SAMESITE", "Lax")  # Lax|Strict|None
 
 
 def _parse_bearer(authorization: Optional[str]) -> str:
@@ -115,6 +117,25 @@ def _mongo_client() -> MongoClient:
 
 app = FastAPI()
 
+# CORS: needed so the app can call the Python host's /api/video/session
+_cors_origins_raw = _env_str("CORS_ALLOW_ORIGINS", "*")
+_cors_origins = [o.strip() for o in _cors_origins_raw.split(",") if o.strip()]
+_cors_allow_origin_regex = None
+if len(_cors_origins) == 0 or (len(_cors_origins) == 1 and _cors_origins[0] == "*"):
+    # With credentials, browsers can't accept Access-Control-Allow-Origin: *
+    # Using a regex makes Starlette reflect the requesting Origin instead.
+    _cors_origins = []
+    _cors_allow_origin_regex = ".*"
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_origin_regex=_cors_allow_origin_regex,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 @app.post("/api/video/session")
 def create_video_session(request: Request, response: Response, authorization: Optional[str] = Header(default=None)):
@@ -123,14 +144,19 @@ def create_video_session(request: Request, response: Response, authorization: Op
 
     secure = request.url.scheme == "https" or (request.headers.get("x-forwarded-proto") == "https")
     encoded = quote(token, safe="")
+    samesite = (COOKIE_SAMESITE or "Lax").strip().lower()
+    if samesite not in ("lax", "strict", "none"):
+        samesite = "lax"
+    samesite_attr = "None" if samesite == "none" else ("Strict" if samesite == "strict" else "Lax")
     cookie_parts = [
         f"video_auth={encoded}",
         "Path=/api/video",
         f"Max-Age={COOKIE_MAX_AGE_SECONDS}",
-        "SameSite=Lax",
+        f"SameSite={samesite_attr}",
         "HttpOnly",
     ]
-    if secure:
+    # Modern browsers require Secure when SameSite=None
+    if secure or samesite == "none":
         cookie_parts.append("Secure")
     response.headers["Set-Cookie"] = "; ".join(cookie_parts)
     response.status_code = 204

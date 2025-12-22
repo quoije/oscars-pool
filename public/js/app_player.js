@@ -352,6 +352,58 @@ function setOpenOriginal(raw) {
   }
 }
 
+function isApiVideoUrl(raw) {
+  const s = String(raw || '').trim();
+  if (!s) return false;
+  if (s.startsWith('/api/video/')) return true;
+  try {
+    const u = new URL(s);
+    return u.pathname.startsWith('/api/video/');
+  } catch (_) {
+    return false;
+  }
+}
+
+function toVideoSessionUrl(videoSrc) {
+  const s = String(videoSrc || '').trim();
+  if (!s) return null;
+  if (s.startsWith('/')) return '/api/video/session';
+  try {
+    const u = new URL(s);
+    return new URL('/api/video/session', u.origin).toString();
+  } catch (_) {
+    return null;
+  }
+}
+
+async function ensureVideoSessionForSource(videoSrc, token) {
+  // Only needed for our protected /api/video/* streams.
+  if (!token) return;
+  if (!isApiVideoUrl(videoSrc)) return;
+  const sessionUrl = toVideoSessionUrl(videoSrc);
+  if (!sessionUrl) return;
+
+  // If sessionUrl is cross-origin, we need credentials so the cookie is stored for that domain.
+  const isCrossOrigin = (() => {
+    try {
+      const u = new URL(sessionUrl, window.location.origin);
+      return u.origin !== window.location.origin;
+    } catch (_) {
+      return false;
+    }
+  })();
+
+  try {
+    await fetch(sessionUrl, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+      ...(isCrossOrigin ? { credentials: 'include' } : {}),
+    });
+  } catch (_) {
+    // best-effort
+  }
+}
+
 async function playVodLink(vodLink) {
   const raw = normalizeVodLink(vodLink);
   if (!raw) {
@@ -520,15 +572,6 @@ window.onload = async function () {
 
     setHeader(movie);
 
-    // Allow <video> to call /api/video/* without Authorization headers by using a cookie.
-    // Best-effort: if it fails, external video_src URLs can still work.
-    try {
-      await fetch('/api/video/session', {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
-      });
-    } catch (_) {}
-
     const resolved = resolveMovieSource(movie);
     if (!resolved?.src) {
       setOpenOriginal(null);
@@ -537,6 +580,10 @@ window.onload = async function () {
       showAlert('No playable source configured for this movie.');
       return;
     }
+
+    // Allow <video> to call protected /api/video/* sources without Authorization headers by using a cookie.
+    // If the source is on a different origin (Python video host), we call THAT host’s /api/video/session.
+    await ensureVideoSessionForSource(resolved.src, token);
 
     if (resolved.isLegacy) {
       // Legacy source: never embed it in the player.
