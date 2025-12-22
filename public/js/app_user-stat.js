@@ -623,8 +623,14 @@ window.addEventListener('DOMContentLoaded', async function () {
       const activeYear = await fetchActiveYear();
       if (activeYear) {
         document.title = `Pool Oscars (${activeYear}) - Statistiques des utilisateurs`;
+        // Keep the main heading clean; show the year in the "Classement" tab instead.
         const h2 = document.querySelector('h2');
-        if (h2) h2.textContent = `Statistiques des utilisateurs (${activeYear})`;
+        if (h2) h2.textContent = 'Statistiques des utilisateurs';
+        const badge = document.getElementById('stats-active-year-badge');
+        if (badge) {
+          badge.textContent = String(activeYear);
+          badge.classList.remove('d-none');
+        }
       }
 
       const statsUrl = activeYear ? `/api/users/stats?year=${encodeURIComponent(String(activeYear))}` : '/api/users/stats';
