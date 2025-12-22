@@ -17,6 +17,9 @@ const movieSchema = new mongoose.Schema({
   player_mode: { type: String, required: false, enum: ["auto", "video", "embed"], default: "auto" },
   video_src: { type: String, required: false }, // direct video file URL or HLS (.m3u8)
   embed_src: { type: String, required: false }, // URL or iframe code
+  // Server-hosted file (relative path under VIDEO_FILES_DIR, default public/video)
+  // If set, the backend can stream it via /api/video/:movieId (Range/seek supported).
+  video_file: { type: String, required: false },
   watchedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }, { timestamps: true });
 

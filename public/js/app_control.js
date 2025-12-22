@@ -104,6 +104,7 @@ window.onload = async function () {
   const editVodLinkEl = document.getElementById('edit_vod_link');
   const editPlayerModeEl = document.getElementById('edit_player_mode');
   const editVideoSrcEl = document.getElementById('edit_video_src');
+  const editVideoFileEl = document.getElementById('edit_video_file');
   const editEmbedSrcEl = document.getElementById('edit_embed_src');
   const editRefreshOmdbEl = document.getElementById('edit_refresh_omdb');
   const editTitleEl = document.getElementById('edit_title');
@@ -1817,6 +1818,7 @@ window.onload = async function () {
     const vod_link = document.getElementById('vod_link').value.trim();
     const player_mode = (document.getElementById('player_mode')?.value || 'auto').trim();
     const video_src = document.getElementById('video_src')?.value?.trim() || '';
+    const video_file = document.getElementById('video_file')?.value?.trim() || '';
     const embed_src = document.getElementById('embed_src')?.value?.trim() || '';
 
     if (!year) {
@@ -1829,8 +1831,8 @@ window.onload = async function () {
       return;
     }
 
-    if (!vod_link && !video_src && !embed_src) {
-      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / embed_src).');
+    if (!vod_link && !video_src && !video_file && !embed_src) {
+      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / video_file / embed_src).');
       return;
     }
 
@@ -1841,7 +1843,7 @@ window.onload = async function () {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ year, imdb_id, category, vod_link, player_mode, video_src, embed_src })
+        body: JSON.stringify({ year, imdb_id, category, vod_link, player_mode, video_src, video_file, embed_src })
       });
 
       if (res.ok) {
@@ -2025,6 +2027,7 @@ window.onload = async function () {
     editVodLinkEl.value = movie.vod_link || '';
     if (editPlayerModeEl) editPlayerModeEl.value = movie.player_mode || 'auto';
     if (editVideoSrcEl) editVideoSrcEl.value = movie.video_src || '';
+    if (editVideoFileEl) editVideoFileEl.value = movie.video_file || '';
     if (editEmbedSrcEl) editEmbedSrcEl.value = movie.embed_src || '';
     editRefreshOmdbEl.checked = false;
 
@@ -2051,6 +2054,7 @@ window.onload = async function () {
     const vod_link = (editVodLinkEl.value || '').trim();
     const player_mode = (editPlayerModeEl?.value || 'auto').trim();
     const video_src = (editVideoSrcEl?.value || '').trim();
+    const video_file = (editVideoFileEl?.value || '').trim();
     const embed_src = (editEmbedSrcEl?.value || '').trim();
     const refreshOmdb = !!editRefreshOmdbEl.checked;
 
@@ -2078,8 +2082,8 @@ window.onload = async function () {
       return;
     }
 
-    if (!vod_link && !video_src && !embed_src) {
-      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / embed_src).');
+    if (!vod_link && !video_src && !video_file && !embed_src) {
+      showResponse('warning', 'Ajoute au moins une source (VOD / video_src / video_file / embed_src).');
       return;
     }
 
@@ -2090,6 +2094,7 @@ window.onload = async function () {
       vod_link,
       player_mode,
       video_src,
+      video_file,
       embed_src,
       refreshOmdb
     };
@@ -2163,10 +2168,12 @@ window.onload = async function () {
       function buildPlayerBadges(m) {
         const badges = [];
         const hasVideo = !!(m && m.video_src);
+        const hasFile = !!(m && m.video_file);
         const hasEmbed = !!(m && m.embed_src);
         const hasLegacy = !!(m && m.vod_link);
 
         if (hasVideo) badges.push({ text: 'Video', cls: 'bg-primary' });
+        if (hasFile) badges.push({ text: 'Server file', cls: 'bg-dark' });
         if (hasEmbed) badges.push({ text: 'Embed', cls: 'bg-info text-dark' });
         if (hasLegacy) badges.push({ text: 'Legacy', cls: 'bg-secondary' });
 

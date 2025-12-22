@@ -354,6 +354,14 @@
                   <div class="col-12 col-lg-8">
                     <label for="video_src" class="form-label">Video URL (mp4/webm/m3u8)</label>
                     <input type="text" class="form-control" id="video_src" placeholder="https://.../movie.mp4 or .../playlist.m3u8">
+                    <div class="form-text">If you use a server file (below) and leave this empty, it will auto-use <code>/api/video/&lt;movieId&gt;</code>.</div>
+                  </div>
+                  <div class="col-12">
+                    <label for="video_file" class="form-label">Server video file (optional)</label>
+                    <input type="text" class="form-control font-monospace" id="video_file" placeholder="my_movie.mp4 or 2026/my_movie.mp4">
+                    <div class="form-text">
+                      Relative path under <code>VIDEO_FILES_DIR</code> (default: <code>public/video</code>). Supports seeking (Range).
+                    </div>
                   </div>
                   <div class="col-12">
                     <label for="embed_src" class="form-label">Embed URL or iframe code</label>
@@ -700,6 +708,12 @@
               <div class="col-12">
                 <label for="edit_video_src" class="form-label">Video URL (mp4/webm/m3u8)</label>
                 <input type="text" class="form-control" id="edit_video_src" placeholder="https://.../movie.mp4 or .../playlist.m3u8">
+                <div class="form-text">If you use a server file (below) and leave this empty, it will auto-use <code>/api/video/&lt;movieId&gt;</code>.</div>
+              </div>
+              <div class="col-12">
+                <label for="edit_video_file" class="form-label">Server video file (optional)</label>
+                <input type="text" class="form-control font-monospace" id="edit_video_file" placeholder="my_movie.mp4 or 2026/my_movie.mp4">
+                <div class="form-text">Relative path under <code>VIDEO_FILES_DIR</code> (default: <code>public/video</code>).</div>
               </div>
               <div class="col-12">
                 <label for="edit_embed_src" class="form-label">Embed URL or iframe code</label>

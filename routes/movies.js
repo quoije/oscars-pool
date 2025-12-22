@@ -52,6 +52,16 @@ function normalizeOptionalString(v, maxLen = 2048) {
   return s.slice(0, maxLen);
 }
 
+function normalizeVideoFile(v) {
+  // Stored as a relative path (no leading slash) like: "my_movie.mp4" or "2026/my_movie.mp4"
+  // Backend streaming endpoint enforces traversal protection too.
+  if (v === undefined) return undefined;
+  if (v === null) return null;
+  const s = String(v).trim();
+  if (!s) return "";
+  return s.slice(0, 1024);
+}
+
 function normalizePlayerMode(v) {
   const s = String(v || "").trim().toLowerCase();
   if (!s) return "auto";
@@ -64,6 +74,14 @@ function hasAnySource({ vod_link, video_src, embed_src }) {
   const b = typeof video_src === "string" ? video_src.trim() : "";
   const c = typeof embed_src === "string" ? embed_src.trim() : "";
   return !!(a || b || c);
+}
+
+function hasAnySourceIncludingFile({ vod_link, video_src, embed_src, video_file }) {
+  const a = typeof vod_link === "string" ? vod_link.trim() : "";
+  const b = typeof video_src === "string" ? video_src.trim() : "";
+  const c = typeof embed_src === "string" ? embed_src.trim() : "";
+  const d = typeof video_file === "string" ? video_file.trim() : "";
+  return !!(a || b || c || d);
 }
 
 // Fetch movie details from OMDb API
@@ -130,7 +148,7 @@ router.get("/", async (req, res) => {
 
     const projection = isChecklist
       ? "imdb_id title"
-      : "imdb_id title description rating poster year category vod_link player_mode video_src embed_src updatedAt createdAt";
+      : "imdb_id title description rating poster year category vod_link player_mode video_src embed_src video_file updatedAt createdAt";
 
     const cacheKey = `movies:list:${year || "all"}:${isChecklist ? "checklist" : "films"}`;
     const cached = cacheGet(cacheKey);
@@ -312,7 +330,7 @@ router.patch("/users/updateWatchedMovies", async (req, res) => {
 
 // Add movie
 router.post("/add", async (req, res) => {
-  const { imdb_id, category, vod_link, year, player_mode, video_src, embed_src } = req.body;
+  const { imdb_id, category, vod_link, year, player_mode, video_src, embed_src, video_file } = req.body;
 
   try {
     // Get the token from the Authorization header
@@ -338,11 +356,19 @@ router.post("/add", async (req, res) => {
     const normalizedVod = normalizeOptionalString(vod_link, 4096);
     const normalizedVideo = normalizeOptionalString(video_src, 4096);
     const normalizedEmbed = normalizeOptionalString(embed_src, 20000);
+    const normalizedFile = normalizeVideoFile(video_file);
     const normalizedMode = normalizePlayerMode(player_mode);
     if (normalizedMode === null) {
       return res.status(400).json({ message: "player_mode invalide (auto|video|embed)" });
     }
-    if (!hasAnySource({ vod_link: normalizedVod || "", video_src: normalizedVideo || "", embed_src: normalizedEmbed || "" })) {
+    if (
+      !hasAnySourceIncludingFile({
+        vod_link: normalizedVod || "",
+        video_src: normalizedVideo || "",
+        embed_src: normalizedEmbed || "",
+        video_file: normalizedFile || "",
+      })
+    ) {
       return res.status(400).json({ message: "Ajoute au moins une source (VOD / video_src / embed_src)." });
     }
 
@@ -377,9 +403,16 @@ router.post("/add", async (req, res) => {
       player_mode: normalizedMode,
       video_src: normalizedVideo || undefined,
       embed_src: normalizedEmbed || undefined,
+      video_file: normalizedFile || undefined,
     });
 
     await movie.save();
+
+    // Convenience: if admin provided a server video_file but no video_src, auto-wire video_src to our streaming endpoint.
+    if ((normalizedFile || "").trim() && !String(movie.video_src || "").trim()) {
+      movie.video_src = `/api/video/${movie._id}`;
+      await movie.save();
+    }
     cacheClear();
 
     res.status(201).json({ message: "Movie added successfully!" });
@@ -463,6 +496,7 @@ router.put("/:id", async (req, res) => {
       player_mode,
       video_src,
       embed_src,
+      video_file,
       refreshOmdb,
     } = req.body || {};
 
@@ -513,6 +547,14 @@ router.put("/:id", async (req, res) => {
       const v = normalizeOptionalString(embed_src, 20000);
       movie.embed_src = v ? v : null;
     }
+    if (video_file !== undefined) {
+      const v = normalizeVideoFile(video_file);
+      movie.video_file = v ? v : null;
+      // If we have a server file and no explicit video_src, set it to our streaming endpoint.
+      if (movie.video_file && !String(movie.video_src || "").trim()) {
+        movie.video_src = `/api/video/${movie._id}`;
+      }
+    }
 
     if (year !== undefined && year !== null && year !== "") {
       movie.year = parseOscarYear(year);
@@ -542,12 +584,15 @@ router.put("/:id", async (req, res) => {
       if (poster !== undefined) movie.poster = poster;
     }
 
-    if (!hasAnySource({
-      vod_link: movie.vod_link || "",
-      video_src: movie.video_src || "",
-      embed_src: movie.embed_src || "",
-    })) {
-      return res.status(400).json({ message: "Ajoute au moins une source (VOD / video_src / embed_src)." });
+    if (
+      !hasAnySourceIncludingFile({
+        vod_link: movie.vod_link || "",
+        video_src: movie.video_src || "",
+        embed_src: movie.embed_src || "",
+        video_file: movie.video_file || "",
+      })
+    ) {
+      return res.status(400).json({ message: "Ajoute au moins une source (VOD / video_src / embed_src / video_file)." });
     }
 
     await movie.save();
