@@ -291,6 +291,9 @@ router.get("/watchedMovies", async (req, res) => {
     const user = await User.findById(decoded.id).select("watchedMovies").lean(); // Get user by ID
     if (!user) return res.status(404).json({ message: "User not found" });
 
+    // User-specific: never allow shared/proxy caching.
+    res.set("Cache-Control", "private, no-store, must-revalidate");
+    res.set("Vary", "Authorization");
     res.status(200).json(user.watchedMovies); // Return the list of watched movies
   } catch (error) {
     res.status(500).json({ error: error.message });

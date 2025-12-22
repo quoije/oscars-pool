@@ -122,6 +122,10 @@ async function getOrInitActiveYear() {
 // Get user stats with watched movie titles and details from the movies collection
 router.get("/stats", verifyToken, async (req, res) => {
   try {
+    // Auth-scoped response: never allow caching.
+    res.set("Cache-Control", "private, no-store, must-revalidate");
+    res.set("Vary", "Authorization");
+
     // Fetch all users (only needed fields)
     const users = await User.find().select("name watchedMovies").lean();
     
@@ -192,6 +196,10 @@ router.get("/stats", verifyToken, async (req, res) => {
 // Returns: { years: number[], totals: { [year]: number }, completersByYear: { [year]: {name, watchedCount, totalMoviesCount}[] } }
 router.get("/completions", verifyToken, async (req, res) => {
   try {
+    // Auth-scoped response: never allow caching.
+    res.set("Cache-Control", "private, no-store, must-revalidate");
+    res.set("Vary", "Authorization");
+
     const yearsRaw = await Movie.distinct("year");
     const years = (Array.isArray(yearsRaw) ? yearsRaw : [])
       .map((y) => Number(y))

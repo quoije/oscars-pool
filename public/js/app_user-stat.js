@@ -130,7 +130,7 @@ window.addEventListener('DOMContentLoaded', async function () {
 
     async function fetchActiveYear() {
       try {
-        const res = await fetch('/api/settings/year', { method: 'GET' });
+        const res = await fetch('/api/settings/year', { method: 'GET', cache: 'no-cache' });
         if (!res.ok) throw new Error('Failed to fetch active year');
         const data = await res.json();
         const year = Number(data?.year);
@@ -142,7 +142,7 @@ window.addEventListener('DOMContentLoaded', async function () {
 
     async function fetchWinners() {
       try {
-        const res = await fetch('/api/settings/winners', { method: 'GET' });
+        const res = await fetch('/api/settings/winners', { method: 'GET', cache: 'no-cache' });
         if (!res.ok) throw new Error('Failed to fetch winners');
         const data = await res.json().catch(() => ({}));
         return Array.isArray(data?.winners) ? data.winners : [];
@@ -155,7 +155,8 @@ window.addEventListener('DOMContentLoaded', async function () {
       try {
         const res = await fetch('/api/users/completions', {
           method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` },
+          cache: 'no-cache',
         });
         if (!res.ok) throw new Error('Failed to fetch completions');
         const data = await res.json().catch(() => ({}));
@@ -650,7 +651,8 @@ window.addEventListener('DOMContentLoaded', async function () {
       const [statsRes, winners, completions] = await Promise.all([
         fetch(statsUrl, {
           method: 'GET',
-          headers: { 'Authorization': `Bearer ${token}` }
+          headers: { 'Authorization': `Bearer ${token}` },
+          cache: 'no-cache',
         }),
         fetchWinners(),
         fetchCompletions(),

@@ -162,7 +162,7 @@ window.addEventListener('DOMContentLoaded', async function () {
 
     async function fetchActiveYear() {
       try {
-        const res = await fetch('/api/settings/year', { method: 'GET' });
+        const res = await fetch('/api/settings/year', { method: 'GET', cache: 'no-cache' });
         if (!res.ok) throw new Error('Failed to fetch active year');
         const data = await res.json();
         const year = Number(data?.year);
@@ -174,7 +174,7 @@ window.addEventListener('DOMContentLoaded', async function () {
 
     async function fetchOscarEffectiveDate(year) {
       try {
-        const res = await fetch(`/api/settings/oscar-date?year=${encodeURIComponent(String(year))}`, { method: 'GET' });
+        const res = await fetch(`/api/settings/oscar-date?year=${encodeURIComponent(String(year))}`, { method: 'GET', cache: 'no-cache' });
         if (!res.ok) throw new Error('Failed to fetch oscar date');
         const data = await res.json();
         const effectiveDate = typeof data?.effectiveDate === 'string' ? data.effectiveDate : null;
@@ -194,6 +194,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       const res = await fetch(`/api/movies/summary?year=${encodeURIComponent(String(year))}`, {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}` },
+        cache: 'no-cache',
       });
       if (!res.ok) throw new Error('Failed to fetch movies summary');
       return await res.json();
@@ -319,6 +320,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       const res = await fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}`, {
           method: 'GET',
           headers: { 'Authorization': `Bearer ${token}` },
+          cache: 'no-cache',
         });
 
       if (!res.ok) {
