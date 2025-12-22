@@ -394,6 +394,10 @@ router.get("/admin/list", verifyToken, async (req, res) => {
   }
 
   try {
+    // Admin + auth-scoped data: never allow caching.
+    res.set("Cache-Control", "private, no-store, must-revalidate");
+    res.set("Vary", "Authorization");
+
     const users = await User.find()
       .select("name email role mustChangePassword")
       .sort({ name: 1, email: 1 });

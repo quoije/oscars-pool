@@ -763,7 +763,8 @@ window.onload = async function () {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${token}`,
-      }
+      },
+      cache: 'no-store',
     });
 
     const data = await res.json().catch(() => ([]));
@@ -1968,7 +1969,7 @@ window.onload = async function () {
 
   async function refreshYears() {
     try {
-      const yearsRes = await fetch('/api/movies/years');
+      const yearsRes = await fetch('/api/movies/years', { cache: 'no-store' });
       const years = yearsRes.ok ? await yearsRes.json() : [];
       const cleanedYears = (Array.isArray(years) ? years : [])
         .map((y) => Number(y))
@@ -2245,7 +2246,7 @@ window.onload = async function () {
     adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-muted">Chargement…</td></tr>`;
 
     try {
-      const res = await fetch(url, { method: 'GET' });
+      const res = await fetch(url, { method: 'GET', cache: 'no-store' });
       if (!res.ok) {
         adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-danger">Erreur lors du chargement (${res.status})</td></tr>`;
         return;
