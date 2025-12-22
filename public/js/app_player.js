@@ -511,6 +511,10 @@ function toVideoSessionUrl(videoSrc) {
   }
 }
 
+// Best-effort cache to avoid spamming /api/video/session.
+// Keyed by sessionUrl + token (token is already in-memory, not persisted here).
+const _videoSessionCache = new Map(); // key -> expiresAt ms
+
 async function ensureVideoSessionForSource(videoSrc, token) {
   // Only needed for our protected /api/video/* streams.
   if (!token) return;
@@ -528,18 +532,64 @@ async function ensureVideoSessionForSource(videoSrc, token) {
     }
   })();
 
+  const cacheKey = `${sessionUrl}::${token}`;
+  const cachedUntil = _videoSessionCache.get(cacheKey) || 0;
+  if (Date.now() < cachedUntil) return;
+
   try {
     await fetch(sessionUrl, {
       method: 'POST',
       headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
-      ...(isCrossOrigin ? { credentials: 'include' } : {}),
+      // Always include credentials so the cookie is stored even if the browser
+      // treats this as cross-origin unexpectedly (hostname differences, etc).
+      credentials: 'include',
+      cache: 'no-store',
     });
+    _videoSessionCache.set(cacheKey, Date.now() + 60_000); // 60s
   } catch (_) {
     // best-effort
   }
 }
 
-async function playVodLink(vodLink) {
+function addTokenToApiVideoUrl(rawUrl, token) {
+  if (!rawUrl || !token) return rawUrl;
+  try {
+    const isRelative = String(rawUrl).trim().startsWith('/');
+    const u = new URL(String(rawUrl), window.location.origin);
+    u.searchParams.set('token', token);
+    return isRelative ? `${u.pathname}${u.search}${u.hash}` : u.toString();
+  } catch (_) {
+    // Fallback: naive append
+    const s = String(rawUrl);
+    const join = s.includes('?') ? '&' : '?';
+    return `${s}${join}token=${encodeURIComponent(token)}`;
+  }
+}
+
+async function probeApiVideoReadable(rawUrl) {
+  try {
+    const res = await fetch(rawUrl, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    return res.status !== 401;
+  } catch (_) {
+    return true; // don't block playback if probe fails (CORS/network/etc)
+  }
+}
+
+async function ensurePlayableApiVideoUrl(rawUrl, token) {
+  if (!isApiVideoUrl(rawUrl) || !token) return rawUrl;
+  await ensureVideoSessionForSource(rawUrl, token);
+  const ok = await probeApiVideoReadable(rawUrl);
+  if (ok) return rawUrl;
+  // Fallback: servers also accept ?token=... (avoids cookie timing/site issues).
+  return addTokenToApiVideoUrl(rawUrl, token);
+}
+
+async function playVodLink(vodLink, { token } = {}) {
   const raw = normalizeVodLink(vodLink);
   if (!raw) {
     showAlert('No VOD link configured for this movie.');
@@ -570,7 +620,8 @@ async function playVodLink(vodLink) {
     setSourceLabel('Server video stream (/api/video)');
     const videoEl = showVideoPlayer();
     if (!videoEl) return;
-    videoEl.src = raw;
+    const playable = await ensurePlayableApiVideoUrl(raw, token);
+    videoEl.src = playable;
     videoEl.addEventListener('error', () => {
       // If the browser can't play it (or CORS blocks), fall back to iframe.
       setSourceLabel('Embed (fallback)');
@@ -744,7 +795,7 @@ window.onload = async function () {
       return;
     }
 
-    await playVodLink(resolved.src);
+    await playVodLink(resolved.src, { token });
 
     // Only the <video> player supports reliable progress tracking (mp4/hls).
     const videoEl = document.getElementById('video');
