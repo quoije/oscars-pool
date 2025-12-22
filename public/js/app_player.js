@@ -582,10 +582,10 @@ async function probeApiVideoReadable(rawUrl) {
 
 async function ensurePlayableApiVideoUrl(rawUrl, token) {
   if (!isApiVideoUrl(rawUrl) || !token) return rawUrl;
-  await ensureVideoSessionForSource(rawUrl, token);
-  const ok = await probeApiVideoReadable(rawUrl);
-  if (ok) return rawUrl;
-  // Fallback: servers also accept ?token=... (avoids cookie timing/site issues).
+  // IMPORTANT: Prefer query-token auth for media elements.
+  // Cookie-based auth is unreliable cross-origin (and even across ports in some setups)
+  // and causes intermittent 401s + preflight noise. Both Node + Python servers already
+  // support ?token=... so we use it consistently.
   return addTokenToApiVideoUrl(rawUrl, token);
 }
 
@@ -625,7 +625,7 @@ async function playVodLink(vodLink, { token } = {}) {
     videoEl.addEventListener('error', () => {
       // If the browser can't play it (or CORS blocks), fall back to iframe.
       setSourceLabel('Embed (fallback)');
-      showEmbedPlayer(raw);
+      showEmbedPlayer(playable);
     }, { once: true });
     try { videoEl.load(); } catch (_) {}
     return;
@@ -782,9 +782,7 @@ window.onload = async function () {
       return;
     }
 
-    // Allow <video> to call protected /api/video/* sources without Authorization headers by using a cookie.
-    // If the source is on a different origin (Python video host), we call THAT host’s /api/video/session.
-    await ensureVideoSessionForSource(resolved.src, token);
+    // We use ?token=... for /api/video/* playback (more reliable than cookies cross-origin).
 
     if (resolved.isLegacy) {
       // Legacy source: never embed it in the player.
