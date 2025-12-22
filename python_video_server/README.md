@@ -52,12 +52,22 @@ python3 -m python_video_server.letsencrypt certonly \
   --domains example.com,www.example.com
 ```
 
-During issuance, you'll be prompted to create a TXT record like:
+During issuance, certbot will prompt you to create a TXT record like:
 - Name: `_acme-challenge.example.com`
 - Type: `TXT`
 - Value: (a token certbot prints)
 
 After it propagates, press Enter and certbot will continue.
+
+If you run into a situation where the prompt/token only shows up in logs, you can try the hook-based mode:
+
+```bash
+python3 -m python_video_server.letsencrypt certonly \
+  --challenge dns \
+  --dns-hooks \
+  --email you@example.com \
+  --domains example.com,www.example.com
+```
 
 Certificates will be written under:
 - `python_video_server/certs/config/live/<primary-domain>/fullchain.pem`

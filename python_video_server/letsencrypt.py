@@ -257,26 +257,42 @@ def cmd_certonly(args: argparse.Namespace) -> int:
 
     if challenge == "dns":
         # DNS-01 works without binding any local ports; suitable for shared hosting / no root.
-        _, work_dir, _ = _ensure_dirs(base_dir)
-        auth_hook, cleanup_hook = _ensure_dns_hook_scripts(work_dir)
+        #
+        # Default: use certbot's built-in interactive manual prompt (most reliable).
+        # Optional: --dns-hooks to use our hook scripts (useful for automation).
         certbot_args = [
             "certonly",
             "--manual",
             "--preferred-challenges",
             "dns",
             "--manual-public-ip-logging-ok",
-            "--manual-auth-hook",
-            str(auth_hook),
-            "--manual-cleanup-hook",
-            str(cleanup_hook),
-            *_common_certbot_flags(
+        ]
+
+        if bool(args.dns_hooks):
+            _, work_dir, _ = _ensure_dirs(base_dir)
+            auth_hook, cleanup_hook = _ensure_dns_hook_scripts(work_dir)
+            certbot_args += [
+                "--manual-auth-hook",
+                str(auth_hook),
+                "--manual-cleanup-hook",
+                str(cleanup_hook),
+            ]
+            certbot_args += _common_certbot_flags(
                 email=args.email,
                 domains=domains,
                 base_dir=base_dir,
                 production=production,
                 non_interactive=True,
-            ),
-        ]
+            )
+        else:
+            # IMPORTANT: manual DNS prompt requires interactive mode.
+            certbot_args += _common_certbot_flags(
+                email=args.email,
+                domains=domains,
+                base_dir=base_dir,
+                production=production,
+                non_interactive=False,
+            )
     else:
         certbot_args = [
             "certonly",
@@ -370,6 +386,12 @@ def _build_parser() -> argparse.ArgumentParser:
         default=os.environ.get("LE_CHALLENGE", "http"),
         choices=["http", "dns"],
         help="ACME challenge type: http (standalone) or dns (manual TXT record). Default: http.",
+    )
+    c.add_argument(
+        "--dns-hooks",
+        action="store_true",
+        default=bool(int(os.environ.get("LE_DNS_HOOKS", "0"))),
+        help="(DNS challenge only) Use hook scripts to print token and wait. Default uses certbot's interactive manual prompt.",
     )
     c.add_argument("--force-renewal", action="store_true", help="Force issuance even if not close to expiry.")
     c.add_argument(
