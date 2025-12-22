@@ -98,6 +98,8 @@ window.onload = async function () {
   const saveMovieChangesBtn = document.getElementById('save-movie-changes');
 
   const editMovieIdEl = document.getElementById('edit_movie_id');
+  const editMovieIdLabelEl = document.getElementById('edit_movie_id_label');
+  const copyMovieIdBtn = document.getElementById('copy-movie-id');
   const editImdbIdEl = document.getElementById('edit_imdb_id');
   const editYearEl = document.getElementById('edit_year');
   const editCategoryEl = document.getElementById('edit_category');
@@ -143,6 +145,17 @@ window.onload = async function () {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  async function copyToClipboard(text) {
+    const t = String(text || '').trim();
+    if (!t) return false;
+    try {
+      await navigator.clipboard.writeText(t);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   function sanitizeHtml(raw) {
@@ -2021,6 +2034,7 @@ window.onload = async function () {
     if (!movie) return;
 
     editMovieIdEl.value = movie._id || '';
+    if (editMovieIdLabelEl) editMovieIdLabelEl.textContent = movie._id || '—';
     editImdbIdEl.value = movie.imdb_id || '';
     editYearEl.value = movie.year ? String(movie.year) : '';
     editCategoryEl.value = movie.category || '';
@@ -2147,12 +2161,12 @@ window.onload = async function () {
   async function loadMoviesForManagement() {
     const year = manageYearSelect.value;
     const url = year ? `/api/movies?year=${encodeURIComponent(year)}` : '/api/movies';
-    adminMoviesBody.innerHTML = `<tr><td colspan="6" class="text-muted">Chargement…</td></tr>`;
+    adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-muted">Chargement…</td></tr>`;
 
     try {
       const res = await fetch(url, { method: 'GET' });
       if (!res.ok) {
-        adminMoviesBody.innerHTML = `<tr><td colspan="6" class="text-danger">Erreur lors du chargement (${res.status})</td></tr>`;
+        adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-danger">Erreur lors du chargement (${res.status})</td></tr>`;
         return;
       }
       const movies = await res.json();
@@ -2160,7 +2174,7 @@ window.onload = async function () {
       moviesById = new Map(movies.map((m) => [m._id, m]));
 
       if (!movies.length) {
-        adminMoviesBody.innerHTML = `<tr><td colspan="6" class="text-muted">Aucun film.</td></tr>`;
+        adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-muted">Aucun film.</td></tr>`;
         updateSelectionUI();
         return;
       }
@@ -2195,10 +2209,18 @@ window.onload = async function () {
           .map((b) => `<span class="badge ${b.cls} me-1 mb-1">${b.text}</span>`)
           .join('');
 
+        const movieId = String(m._id || '');
+        const shortId = movieId ? `${movieId.slice(0, 6)}…${movieId.slice(-4)}` : '—';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
           <td>
             <input type="checkbox" class="form-check-input" data-movie-id="${m._id}">
+          </td>
+          <td class="text-nowrap">
+            <button type="button" class="btn btn-sm btn-outline-secondary font-monospace" data-copy-movie-id="${escapeHtml(movieId)}" title="${escapeHtml(movieId)}">
+              ${escapeHtml(shortId)}
+            </button>
           </td>
           <td>
             <div class="fw-semibold">${m.title || '(sans titre)'}</div>
@@ -2224,9 +2246,22 @@ window.onload = async function () {
         btn.addEventListener('click', () => openEditModal(btn.getAttribute('data-edit-movie-id')));
       });
 
+      adminMoviesBody.querySelectorAll('button[data-copy-movie-id]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const id = btn.getAttribute('data-copy-movie-id');
+          if (!id) return;
+          const ok = await copyToClipboard(id);
+          if (ok) {
+            showResponse('success', 'Movie ID copié.');
+          } else {
+            showResponse('warning', 'Impossible de copier automatiquement. Copie manuellement.');
+          }
+        });
+      });
+
       updateSelectionUI();
     } catch (err) {
-      adminMoviesBody.innerHTML = `<tr><td colspan="6" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
+      adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
     }
   }
 
@@ -2279,6 +2314,19 @@ window.onload = async function () {
 
   if (saveMovieChangesBtn) {
     saveMovieChangesBtn.addEventListener('click', saveMovieChanges);
+  }
+
+  if (copyMovieIdBtn) {
+    copyMovieIdBtn.addEventListener('click', async () => {
+      const id = String(editMovieIdEl?.value || '').trim();
+      if (!id) return;
+      const ok = await copyToClipboard(id);
+      if (ok) {
+        showResponse('success', 'Movie ID copié.');
+      } else {
+        showResponse('warning', 'Impossible de copier automatiquement. Copie manuellement.');
+      }
+    });
   }
 
   // Initial load
