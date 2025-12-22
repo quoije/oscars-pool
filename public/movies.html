@@ -21,40 +21,7 @@
       color: #ddd;
     }
 
-    /* Style for the 'WATCHED' banner */
-    .watched-banner {
-      background-color: green;
-      color: white;
-      text-align: center;
-      padding: 5px;
-      font-weight: bold;
-      position: absolute;
-      top: 10px;
-      width: 100%;
-      z-index: 1;
-    }
-
-    /* Centering checkbox and making card look better */
-    .movie-card {
-      position: relative;
-      margin-bottom: 20px;
-    }
-    .card-body {
-      position: relative;
-    }
-
     #movies-list {
-      margin-top: 10px;
-    }
-
-    /* Style for the filter button */
-    #filter-button {
-      margin-left: 15px;
-    }
-
-    /* Style for the ratio display */
-    .ratio {
-      font-weight: bold;
       margin-top: 10px;
     }
     .navbar-toggler {
@@ -104,31 +71,35 @@
 </nav>
 
 <div class="container mt-5">
-  <div class="d-flex justify-content-between align-items-center">
-    <h2>Films</h2>
+  <h2>Films</h2>
+
+  <!-- Summary card (match Statistiques/Checklist structure) -->
+  <div class="card shadow-sm mt-3">
+    <div class="card-body">
+      <div class="d-flex flex-column gap-1">
+        <div class="text-muted small">
+          Dernière mise à jour des films: <span class="fw-semibold text-dark" id="movies-last-updated">—</span>
+        </div>
+        <div id="watched-ratio" class="fw-semibold">—</div>
+        <div class="text-muted small">
+          Temps avant les Oscars (<span id="oscar-date-day-month">—</span> <span id="oscar-year">—</span>) — <span id="time-left">—</span>
+        </div>
+      </div>
+
+      <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mt-3">
+        <div class="form-check form-switch m-0">
+          <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault">
+          <label class="form-check-label" for="flexSwitchCheckDefault">Films non regardés seulement</label>
+        </div>
+        <div class="text-muted small">Clique sur l’affiche ou le titre pour ouvrir le lecteur.</div>
+      </div>
+    </div>
   </div>
 
-  <!-- Displaying last updated vod_links -->
-  <div class="alert alert-warning fade show" role="alert">
-    Dernière mise à jour des films: <strong id="movies-last-updated">—</strong>
-  </div>
-
-  <!-- Displaying the ratio of watched movies -->
-  <div id="watched-ratio" class="ratio">
-    <!-- This will display the ratio -->
-  </div>
-
-  <h3 class="fs-6">Temps avant les Oscars (<span id="oscar-date-day-month">—</span> <span id="oscar-year">—</span>) - <span id="time-left"></span></h3>
-  <h3 class="fs-6 mb-0">
-
-  </h3>
-  <br>
-  <div class="form-check form-switch">
-    <input class="form-check-input" type="checkbox" id="flexSwitchCheckDefault">
-    <label class="form-check-label" for="flexSwitchCheckDefault">Films non regardés seulement</label>
-  </div>
-  <div id="movies-list" class="row">
-    <!-- Movies will be displayed here -->
+  <div id="movies-list" class="row g-3 mt-1">
+    <div class="col-12">
+      <div class="text-center py-4 text-muted" aria-live="polite" aria-busy="true">Chargement…</div>
+    </div>
   </div>
 </div>
 
