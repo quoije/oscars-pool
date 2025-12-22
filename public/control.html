@@ -199,59 +199,125 @@
     </div>
 
     <div class="tab-pane fade" id="admin-version" role="tabpanel" aria-labelledby="admin-version-tab">
-      <div class="row g-3">
-        <div class="col-12 col-xxl-6">
-          <div class="card p-3">
-            <h4 class="mb-1">Version active (footer)</h4>
-            <div class="text-muted mb-3">
-              Remplace complètement le checker GitHub. La version affichée dans le footer vient de la DB et peut être changée ici.
-            </div>
-
-            <div id="app_version_alert" class="alert d-none" role="alert"></div>
-
-            <div class="mb-3">
-              <label for="app_version_active_select" class="form-label">Choisir la version active</label>
-              <select id="app_version_active_select" class="form-select"></select>
-              <div class="form-text">Cette sélection impacte ce que les utilisateurs voient dans le footer.</div>
-            </div>
-
-            <div class="d-flex flex-wrap justify-content-end gap-2">
-              <button type="button" id="app_version_reload" class="btn btn-outline-primary">Recharger</button>
-              <button type="button" id="app_version_set_active" class="btn btn-warning">Définir active</button>
-            </div>
-
-            <div class="mt-3">
-              <div class="text-muted small mb-1">Aperçu (format footer)</div>
-              <div id="app_version_preview" class="border rounded p-2 bg-light">—</div>
-            </div>
+      <div class="card p-3">
+        <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
+          <div>
+            <h4 class="mb-1">Version</h4>
+            <div class="text-muted">Contrôle la version affichée dans le footer (stockée en DB).</div>
           </div>
         </div>
 
-        <div class="col-12 col-xxl-6">
-          <div class="card p-3">
-            <h4 class="mb-1">Créer une nouvelle version</h4>
-            <div class="text-muted mb-3">
-              Ajoute une entrée dans l’historique, puis tu peux la rendre active.
-            </div>
+        <div id="app_version_alert" class="alert d-none mt-3 mb-0" role="alert"></div>
 
+        <ul class="nav nav-pills admin-subtabs mt-3" id="adminVersionSubTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="admin-version-subtab-active" data-bs-toggle="tab" data-bs-target="#admin-version-pane-active" type="button" role="tab" aria-controls="admin-version-pane-active" aria-selected="true">
+              Active
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="admin-version-subtab-history" data-bs-toggle="tab" data-bs-target="#admin-version-pane-history" type="button" role="tab" aria-controls="admin-version-pane-history" aria-selected="false">
+              Historique
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="admin-version-subtab-create" data-bs-toggle="tab" data-bs-target="#admin-version-pane-create" type="button" role="tab" aria-controls="admin-version-pane-create" aria-selected="false">
+              Nouvelle version
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content pt-3">
+          <!-- Active -->
+          <div class="tab-pane fade show active" id="admin-version-pane-active" role="tabpanel" aria-labelledby="admin-version-subtab-active" tabindex="0">
             <div class="row g-3">
-              <div class="col-md-4">
-                <label for="app_version_new_version" class="form-label">Version</label>
-                <input id="app_version_new_version" type="text" class="form-control" placeholder="ex: 1.0.1" maxlength="80">
+              <div class="col-12 col-xxl-7">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-1">Version active</div>
+                  <div class="text-muted small mb-3">
+                    Met à jour ce que les utilisateurs voient dans le footer.
+                  </div>
+
+                  <label for="app_version_active_select" class="form-label">Choisir une version</label>
+                  <div class="row g-2 align-items-end">
+                    <div class="col-12 col-lg-8">
+                      <select id="app_version_active_select" class="form-select"></select>
+                      <div class="form-text">La liste vient de l’historique stocké en DB.</div>
+                    </div>
+                    <div class="col-12 col-lg-4 d-flex gap-2">
+                      <button type="button" id="app_version_reload" class="btn btn-outline-secondary w-100">Recharger</button>
+                      <button type="button" id="app_version_set_active" class="btn btn-warning w-100">Activer</button>
+                    </div>
+                  </div>
+
+                  <div class="mt-3">
+                    <div class="text-muted small mb-1">Aperçu (footer)</div>
+                    <div id="app_version_preview" class="border rounded p-2 bg-white app-version-preview">—</div>
+                  </div>
+                </div>
               </div>
-              <div class="col-md-8">
-                <label for="app_version_new_message" class="form-label">Message (optionnel)</label>
-                <input id="app_version_new_message" type="text" class="form-control" placeholder="ex: Hotfix login" maxlength="500">
-              </div>
-              <div class="col-12 d-flex flex-wrap justify-content-end gap-2">
-                <button type="button" id="app_version_create" class="btn btn-primary">Créer</button>
-                <button type="button" id="app_version_create_and_activate" class="btn btn-warning">Créer &amp; activer</button>
+
+              <div class="col-12 col-xxl-5">
+                <div class="border rounded p-3 bg-white">
+                  <div class="fw-semibold mb-2">Bon à savoir</div>
+                  <ul class="mb-0 text-muted">
+                    <li>“Recharger” relit l’historique depuis l’API.</li>
+                    <li>“Activer” change la version active en DB.</li>
+                    <li>Le footer lit ensuite la version via <code>/api/version</code>.</li>
+                  </ul>
+                </div>
               </div>
             </div>
+          </div>
 
-            <div class="mt-3">
-              <div class="text-muted small mb-2">Historique</div>
-              <div id="app_version_list" class="border rounded bg-white app-version-list">—</div>
+          <!-- History -->
+          <div class="tab-pane fade" id="admin-version-pane-history" role="tabpanel" aria-labelledby="admin-version-subtab-history" tabindex="0">
+            <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
+              <div>
+                <div class="fw-semibold">Historique</div>
+                <div class="text-muted small">Supprime les entrées obsolètes si besoin.</div>
+              </div>
+            </div>
+            <div id="app_version_list" class="border rounded bg-white app-version-list">—</div>
+          </div>
+
+          <!-- Create -->
+          <div class="tab-pane fade" id="admin-version-pane-create" role="tabpanel" aria-labelledby="admin-version-subtab-create" tabindex="0">
+            <div class="row g-3">
+              <div class="col-12 col-xxl-7">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-1">Créer une nouvelle version</div>
+                  <div class="text-muted small mb-3">
+                    Ajoute une entrée dans l’historique (tu peux l’activer immédiatement).
+                  </div>
+
+                  <div class="row g-3">
+                    <div class="col-12 col-md-4">
+                      <label for="app_version_new_version" class="form-label">Version</label>
+                      <input id="app_version_new_version" type="text" class="form-control" placeholder="ex: 1.0.1" maxlength="80">
+                      <div class="form-text">Ex: <code>1.2.3</code></div>
+                    </div>
+                    <div class="col-12 col-md-8">
+                      <label for="app_version_new_message" class="form-label">Message (optionnel)</label>
+                      <input id="app_version_new_message" type="text" class="form-control" placeholder="ex: Hotfix login" maxlength="500">
+                      <div class="form-text">Court &amp; lisible (affiché dans le footer).</div>
+                    </div>
+                    <div class="col-12 d-flex flex-wrap justify-content-end gap-2">
+                      <button type="button" id="app_version_create" class="btn btn-primary">Créer</button>
+                      <button type="button" id="app_version_create_and_activate" class="btn btn-warning">Créer &amp; activer</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-12 col-xxl-5">
+                <div class="border rounded p-3 bg-white">
+                  <div class="fw-semibold mb-2">Astuce</div>
+                  <div class="text-muted">
+                    Après création, va dans l’onglet “Active” pour vérifier l’aperçu du footer.
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>

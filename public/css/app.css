@@ -166,6 +166,33 @@ footer {
     border-bottom: 0;
   }
 
+  /* Admin: compact "sub tabs" used inside panels */
+  .admin-subtabs.nav-pills .nav-link {
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    background: #fff;
+    color: #111;
+    font-weight: 600;
+    padding: 0.45rem 0.75rem;
+    border-radius: 999px;
+  }
+
+  .admin-subtabs.nav-pills .nav-link:hover {
+    background: rgba(0, 0, 0, 0.03);
+  }
+
+  .admin-subtabs.nav-pills .nav-link.active {
+    background: #111;
+    border-color: #111;
+    color: #fff;
+  }
+
+  /* Admin → Version preview: keep it compact */
+  .app-version-preview {
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 0.92rem;
+  }
+
   /* Movies page helpers (Bootstrap-first, minimal custom) */
   .movie-poster {
     width: 100%;
