@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Generator, Optional, Tuple
 from urllib.parse import quote
+from urllib.parse import urlparse
 
 import jwt
 from bson import ObjectId
@@ -27,6 +28,26 @@ def _jwt_secret() -> str:
 def _mongo_uri() -> str:
     # Read env at runtime (important on Windows/uvicorn worker reloads).
     return _env_str("MONGO_URI")
+
+def _mongo_db_name() -> str:
+    # Prefer explicit env var, otherwise try to parse from URI path.
+    explicit = _env_str("MONGO_DB_NAME")
+    if explicit:
+        return explicit
+
+    uri = _mongo_uri()
+    if not uri:
+        return ""
+
+    try:
+        parsed = urlparse(uri)
+        # Path is like "/dbname"
+        db = (parsed.path or "").lstrip("/")
+        # Strip any extra segments just in case
+        db = db.split("/")[0].strip()
+        return db
+    except Exception:
+        return ""
 
 
 def _video_files_dir() -> Path:
@@ -191,7 +212,13 @@ def stream_video(
         raise HTTPException(status_code=400, detail="Invalid movie id")
 
     with _mongo_client() as client:
-        db = client.get_default_database()
+        db_name = _mongo_db_name()
+        if not db_name:
+            raise HTTPException(
+                status_code=500,
+                detail="Mongo DB name not configured. Add it to MONGO_URI (…/dbname) or set MONGO_DB_NAME.",
+            )
+        db = client[db_name]
         movie = db["movies"].find_one({"_id": oid}, {"video_file": 1})
 
     video_file = (movie or {}).get("video_file") or ""
@@ -259,5 +286,6 @@ def healthz():
         "ok": True,
         "time": datetime.now(timezone.utc).isoformat(),
         "video_files_dir": str(_video_files_dir()),
+        "mongo_db_name": _mongo_db_name() or None,
     }
 
