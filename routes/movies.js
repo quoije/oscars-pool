@@ -719,6 +719,47 @@ router.put("/:id/progress", authenticate, async (req, res) => {
   }
 });
 
+// Get playback progress for the current user (bulk, used by movies.html)
+// Optional query: ?year=2026 (filters to that Oscar year)
+router.get("/progress", authenticate, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId || !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(401).json({ message: "Invalid user" });
+    }
+
+    const year = parseOscarYear(req.query.year);
+    let movieIds = null;
+
+    if (year) {
+      const idDocs = await Movie.find({ year }).select("_id").lean();
+      movieIds = idDocs.map((d) => d?._id).filter(Boolean);
+      if (movieIds.length === 0) {
+        res.set("Cache-Control", "private, no-store, must-revalidate");
+        res.set("Vary", "Authorization");
+        return res.status(200).json([]);
+      }
+    }
+
+    const filter = { userId, ...(movieIds ? { movieId: { $in: movieIds } } : {}) };
+    const rows = await PlaybackProgress.find(filter).select("movieId time duration updatedAt").lean();
+
+    // User-specific: never allow shared/proxy caching.
+    res.set("Cache-Control", "private, no-store, must-revalidate");
+    res.set("Vary", "Authorization");
+    return res.status(200).json(
+      (rows || []).map((r) => ({
+        movieId: String(r.movieId),
+        time: typeof r.time === "number" ? r.time : 0,
+        duration: typeof r.duration === "number" ? r.duration : null,
+        updatedAt: r.updatedAt ? new Date(r.updatedAt).toISOString() : null,
+      }))
+    );
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Get one movie by Mongo _id (used by the custom player page)
 router.get("/:id", async (req, res) => {
   try {
