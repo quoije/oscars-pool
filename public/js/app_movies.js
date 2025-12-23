@@ -423,17 +423,21 @@ window.addEventListener('DOMContentLoaded', async function () {
           if (time > 1) {
             if (duration && Number.isFinite(duration) && duration > 0) {
               const pct = Math.max(0, Math.min(100, (time / duration) * 100));
-              progressHtml = `
-                <div class="mt-2">
-                  <div class="d-flex justify-content-between align-items-center text-muted small">
-                    <span>Reprendre à <span class="fw-semibold text-dark">${formatClock(time)}</span></span>
-                    <span>${pct.toFixed(0)}%</span>
+              // Hide "resume/progress" once we're basically at the credits.
+              // Backend uses 95% as the "credit roll" threshold too.
+              if (pct < 95) {
+                progressHtml = `
+                  <div class="mt-2">
+                    <div class="d-flex justify-content-between align-items-center text-muted small">
+                      <span>Reprendre à <span class="fw-semibold text-dark">${formatClock(time)}</span></span>
+                      <span>${pct.toFixed(0)}%</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                      <div class="progress-bar" role="progressbar" style="width: ${pct.toFixed(2)}%;" aria-valuenow="${pct.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
                   </div>
-                  <div class="progress" style="height: 6px;">
-                    <div class="progress-bar" role="progressbar" style="width: ${pct.toFixed(2)}%;" aria-valuenow="${pct.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"></div>
-                  </div>
-                </div>
-              `;
+                `;
+              }
             } else {
               progressHtml = `
                 <div class="mt-2 text-muted small">
