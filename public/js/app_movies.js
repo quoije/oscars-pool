@@ -151,6 +151,41 @@ window.addEventListener('DOMContentLoaded', async function () {
       subtitle: 'Récupération des données…'
     });
 
+    function formatClock(seconds) {
+      const s = Math.max(0, Math.floor(Number(seconds) || 0));
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      const sec = s % 60;
+      if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+      return `${m}:${String(sec).padStart(2, '0')}`;
+    }
+
+    async function fetchPlaybackProgressByYear(year, token) {
+      try {
+        const res = await fetch(`/api/movies/progress?year=${encodeURIComponent(String(year))}`, {
+          method: 'GET',
+          headers: { 'Authorization': `Bearer ${token}` },
+          cache: 'no-store',
+        });
+        if (!res.ok) return new Map();
+        const rows = await res.json().catch(() => []);
+        const map = new Map();
+        (Array.isArray(rows) ? rows : []).forEach((r) => {
+          const movieId = typeof r?.movieId === 'string' ? r.movieId : '';
+          if (!movieId) return;
+          const time = Number(r?.time);
+          const duration = r?.duration === null || r?.duration === undefined ? null : Number(r.duration);
+          map.set(movieId, {
+            time: Number.isFinite(time) && time >= 0 ? time : 0,
+            duration: duration !== null && Number.isFinite(duration) && duration > 0 ? duration : null,
+          });
+        });
+        return map;
+      } catch (_) {
+        return new Map();
+      }
+    }
+
     function setLoadError(el, message) {
       if (!el) return;
       el.innerHTML = `
@@ -297,6 +332,7 @@ window.addEventListener('DOMContentLoaded', async function () {
     pageLoader.setProgress(18);
 
     let watchedMoviesInYear = [];
+    let progressByMovieId = new Map();
 
     try {
       // Start summary fetch immediately so header can update ASAP.
@@ -316,6 +352,11 @@ window.addEventListener('DOMContentLoaded', async function () {
           return null;
         });
 
+      // Fetch progress in parallel (movies page uses it to show resume/progression).
+      const progressPromise = fetchPlaybackProgressByYear(activeYear, token)
+        .then((m) => { progressByMovieId = m instanceof Map ? m : new Map(); })
+        .catch(() => { progressByMovieId = new Map(); });
+
       pageLoader.setProgress(28);
       const res = await fetch(`/api/movies?year=${encodeURIComponent(String(activeYear))}`, {
           method: 'GET',
@@ -332,7 +373,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       const movies = await res.json();
       pageLoader.setProgress(55);
       // If summary is still in flight, wait for it before rendering watched banners.
-      await summaryPromise;
+      await Promise.all([summaryPromise, progressPromise]);
       pageLoader.setProgress(62);
 
       // Sort movies alphabetically by title (server also sorts, but keep client as a fallback)
@@ -361,6 +402,7 @@ window.addEventListener('DOMContentLoaded', async function () {
         const hasNewPlayerSource = hasVideoSrc || hasEmbedSrc;
         const legacyUrl = cleanUrl(movie?.vod_link);
         const hasLegacy = !!legacyUrl;
+        const movieId = movie && movie._id ? String(movie._id) : '';
 
         // Navigation:
         // - Prefer in-app player when we have a non-legacy source
@@ -370,6 +412,37 @@ window.addEventListener('DOMContentLoaded', async function () {
           ? `/player.html?id=${encodeURIComponent(movie._id)}`
           : (hasLegacy ? legacyUrl : '');
         const isClickable = !!playerUrl;
+
+        // Progress: only show for in-app player sources (not legacy vod_link, not "no source").
+        // Also avoid showing a meaningless "0:00" if they never really started.
+        let progressHtml = '';
+        if (hasNewPlayerSource && movieId) {
+          const p = progressByMovieId.get(movieId);
+          const time = Number(p?.time) || 0;
+          const duration = p?.duration === null || p?.duration === undefined ? null : Number(p.duration);
+          if (time > 1) {
+            if (duration && Number.isFinite(duration) && duration > 0) {
+              const pct = Math.max(0, Math.min(100, (time / duration) * 100));
+              progressHtml = `
+                <div class="mt-2">
+                  <div class="d-flex justify-content-between align-items-center text-muted small">
+                    <span>Reprendre à <span class="fw-semibold text-dark">${formatClock(time)}</span></span>
+                    <span>${pct.toFixed(0)}%</span>
+                  </div>
+                  <div class="progress" style="height: 6px;">
+                    <div class="progress-bar" role="progressbar" style="width: ${pct.toFixed(2)}%;" aria-valuenow="${pct.toFixed(0)}" aria-valuemin="0" aria-valuemax="100"></div>
+                  </div>
+                </div>
+              `;
+            } else {
+              progressHtml = `
+                <div class="mt-2 text-muted small">
+                  Reprendre à <span class="fw-semibold text-dark">${formatClock(time)}</span>
+                </div>
+              `;
+            }
+          }
+        }
 
         const movieDiv = document.createElement('div');
         movieDiv.classList.add('col-12', 'col-sm-6', 'col-lg-4', 'movie-card');
@@ -408,6 +481,7 @@ window.addEventListener('DOMContentLoaded', async function () {
               <div class="text-muted small fw-semibold fst-italic mb-2">${movie.category}</div>
               <p class="card-text small flex-grow-1 mb-2">${movie.description}</p>
               ${isChecked ? `<div class="text-muted small"><span class="fw-semibold text-dark">Regardé le:</span> ${watchedDate}</div>` : ''}
+              ${progressHtml}
             </div>
           </div>`;
         moviesList.appendChild(movieDiv);

@@ -220,6 +220,8 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
   let lastSaveStatus = '—';
   let seekSaveTimer = null;
   let savedUiTimer = null;
+  let startedOnce = false;
+  let startSaveTimer = null;
 
   function getSnapshot() {
     const t = Number(videoEl.currentTime);
@@ -348,7 +350,16 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
     intervalId = null;
   }
 
-  const onPlay = () => startInterval();
+  const onPlay = () => {
+    startInterval();
+    // Ensure we create/refresh a progress row as soon as playback starts
+    // (so the movies page can show a "resume" state quickly).
+    if (!startedOnce) {
+      startedOnce = true;
+      if (startSaveTimer) window.clearTimeout(startSaveTimer);
+      startSaveTimer = window.setTimeout(() => { void persist({ force: true }); }, 650);
+    }
+  };
   const onPause = () => { stopInterval(); void persist({ force: true }); };
   const onSeeking = () => {
     // While scrubbing, browsers fire many events; debounce a forced save so it lands quickly.
@@ -396,6 +407,7 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
     stopInterval();
     if (seekSaveTimer) window.clearTimeout(seekSaveTimer);
     if (savedUiTimer) window.clearTimeout(savedUiTimer);
+    if (startSaveTimer) window.clearTimeout(startSaveTimer);
     videoEl.removeEventListener('play', onPlay);
     videoEl.removeEventListener('pause', onPause);
     videoEl.removeEventListener('seeking', onSeeking);
