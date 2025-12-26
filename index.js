@@ -25,6 +25,8 @@ const versionRoutes = require("./routes/version");
 const settingsRoutes = require("./routes/settings");
 const adminDbRoutes = require("./routes/adminDb");
 const videoRoutes = require("./routes/video");
+const picksRoutes = require("./routes/picks");
+const categoriesRoutes = require("./routes/categories");
 
 app.use(express.static('public'));
 app.use("/api/users", userRoutes);
@@ -33,7 +35,9 @@ app.use("/api/version", versionRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/admin", adminDbRoutes);
 app.use("/api/video", videoRoutes);
+app.use("/api/picks", picksRoutes);
+app.use("/api/categories", categoriesRoutes);
 
 // Start Server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5050;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

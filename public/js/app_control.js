@@ -2094,6 +2094,97 @@ window.onload = async function () {
       // Winners year dropdown (optional tab)
       setWinnerYearOptions(cleanedYears);
       applyWinnerFormFromCache();
+
+      // Categories year dropdowns
+      const categoriesYearSelect = document.getElementById('categories-year');
+      const manualYearSelect = document.getElementById('manual-year');
+      const listYearFilterSelect = document.getElementById('list-year-filter');
+
+      // Populate PDF import year dropdown
+      if (categoriesYearSelect) {
+        const previousCategoriesYear = categoriesYearSelect.value;
+        categoriesYearSelect.innerHTML = '';
+        
+        if (cleanedYears.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'Aucune année (ajoute un film)';
+          opt.disabled = true;
+          categoriesYearSelect.appendChild(opt);
+        } else {
+          cleanedYears.forEach((y) => {
+            const opt = document.createElement('option');
+            opt.value = String(y);
+            opt.textContent = String(y);
+            categoriesYearSelect.appendChild(opt);
+          });
+          
+          const desired = previousCategoriesYear && cleanedYears.map(String).includes(previousCategoriesYear)
+            ? previousCategoriesYear
+            : (activeYear && cleanedYears.map(String).includes(String(activeYear)))
+              ? String(activeYear)
+              : cleanedYears.length > 0 ? String(cleanedYears[0]) : '';
+          if (desired) categoriesYearSelect.value = desired;
+        }
+      }
+
+      // Populate manual creation year dropdown
+      if (manualYearSelect) {
+        const previousManualYear = manualYearSelect.value;
+        manualYearSelect.innerHTML = '';
+        
+        if (cleanedYears.length === 0) {
+          const opt = document.createElement('option');
+          opt.value = '';
+          opt.textContent = 'Aucune année (ajoute un film)';
+          opt.disabled = true;
+          manualYearSelect.appendChild(opt);
+        } else {
+          cleanedYears.forEach((y) => {
+            const opt = document.createElement('option');
+            opt.value = String(y);
+            opt.textContent = String(y);
+            manualYearSelect.appendChild(opt);
+          });
+          
+          const desired = previousManualYear && cleanedYears.map(String).includes(previousManualYear)
+            ? previousManualYear
+            : (activeYear && cleanedYears.map(String).includes(String(activeYear)))
+              ? String(activeYear)
+              : cleanedYears.length > 0 ? String(cleanedYears[0]) : '';
+          if (desired) manualYearSelect.value = desired;
+        }
+      }
+
+      // Populate list filter year dropdown
+      if (listYearFilterSelect) {
+        const previousListYear = listYearFilterSelect.value;
+        listYearFilterSelect.innerHTML = '';
+        
+        // Add "All years" option
+        const allOpt = document.createElement('option');
+        allOpt.value = '';
+        allOpt.textContent = 'Toutes les années';
+        listYearFilterSelect.appendChild(allOpt);
+        
+        if (cleanedYears.length > 0) {
+          cleanedYears.forEach((y) => {
+            const opt = document.createElement('option');
+            opt.value = String(y);
+            opt.textContent = String(y);
+            listYearFilterSelect.appendChild(opt);
+          });
+          
+          // Keep previous selection if still valid
+          if (previousListYear && cleanedYears.map(String).includes(previousListYear)) {
+            listYearFilterSelect.value = previousListYear;
+          } else if (activeYear && cleanedYears.map(String).includes(String(activeYear))) {
+            listYearFilterSelect.value = String(activeYear);
+          } else {
+            listYearFilterSelect.value = '';
+          }
+        }
+      }
     } catch (_) {
       // ignore
     }
@@ -2485,5 +2576,424 @@ window.onload = async function () {
 
   await refreshYears();
   await loadMoviesForManagement();
+
+  // Points configuration
+  const pointsPerMovieInput = document.getElementById('points-per-movie');
+  const pointsPerCorrectPickInput = document.getElementById('points-per-correct-pick');
+  const pointsConfigReloadBtn = document.getElementById('points-config-reload');
+  const pointsConfigSaveBtn = document.getElementById('points-config-save');
+  const pointsConfigAlert = document.getElementById('points-config-alert');
+  const pointsPerMoviePreview = document.getElementById('points-per-movie-preview');
+  const pointsPerCorrectPickPreview = document.getElementById('points-per-correct-pick-preview');
+
+  async function loadPointsConfig() {
+    try {
+      const res = await fetch('/api/settings/points-config', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load points config');
+      const config = await res.json();
+      
+      if (pointsPerMovieInput) pointsPerMovieInput.value = config.pointsPerMovie || 1;
+      if (pointsPerCorrectPickInput) pointsPerCorrectPickInput.value = config.pointsPerCorrectPick || 1;
+      if (pointsPerMoviePreview) pointsPerMoviePreview.textContent = config.pointsPerMovie || 1;
+      if (pointsPerCorrectPickPreview) pointsPerCorrectPickPreview.textContent = config.pointsPerCorrectPick || 1;
+    } catch (err) {
+      console.error('Error loading points config:', err);
+    }
+  }
+
+  function updatePointsPreview() {
+    const moviePoints = pointsPerMovieInput ? parseInt(pointsPerMovieInput.value) || 1 : 1;
+    const pickPoints = pointsPerCorrectPickInput ? parseInt(pointsPerCorrectPickInput.value) || 1 : 1;
+    if (pointsPerMoviePreview) pointsPerMoviePreview.textContent = moviePoints;
+    if (pointsPerCorrectPickPreview) pointsPerCorrectPickPreview.textContent = pickPoints;
+  }
+
+  if (pointsPerMovieInput) {
+    pointsPerMovieInput.addEventListener('input', updatePointsPreview);
+  }
+  if (pointsPerCorrectPickInput) {
+    pointsPerCorrectPickInput.addEventListener('input', updatePointsPreview);
+  }
+
+  if (pointsConfigReloadBtn) {
+    pointsConfigReloadBtn.addEventListener('click', async () => {
+      await loadPointsConfig();
+      showResponse('success', 'Configuration rechargée');
+    });
+  }
+
+  if (pointsConfigSaveBtn) {
+    pointsConfigSaveBtn.addEventListener('click', async () => {
+      const pointsPerMovie = parseInt(pointsPerMovieInput?.value) || 1;
+      const pointsPerCorrectPick = parseInt(pointsPerCorrectPickInput?.value) || 1;
+
+      if (pointsPerMovie < 0 || pointsPerCorrectPick < 0) {
+        if (pointsConfigAlert) {
+          pointsConfigAlert.className = 'alert alert-warning';
+          pointsConfigAlert.textContent = 'Les points doivent être positifs ou nuls';
+          pointsConfigAlert.classList.remove('d-none');
+        }
+        return;
+      }
+
+      try {
+        pointsConfigSaveBtn.disabled = true;
+        const oldText = pointsConfigSaveBtn.textContent;
+        pointsConfigSaveBtn.textContent = 'Enregistrement...';
+
+        const res = await fetch('/api/settings/points-config', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            pointsPerMovie,
+            pointsPerCorrectPick
+          })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.message || 'Failed to save');
+        }
+
+        const data = await res.json();
+        updatePointsPreview();
+        showResponse('success', `Configuration enregistrée: ${data.pointsPerMovie} pts/film, ${data.pointsPerCorrectPick} pts/bonne réponse`);
+      } catch (err) {
+        if (pointsConfigAlert) {
+          pointsConfigAlert.className = 'alert alert-danger';
+          pointsConfigAlert.textContent = 'Erreur: ' + err.message;
+          pointsConfigAlert.classList.remove('d-none');
+        }
+      } finally {
+        pointsConfigSaveBtn.disabled = false;
+        pointsConfigSaveBtn.textContent = oldText;
+      }
+    });
+  }
+
+  await loadPointsConfig();
+
+  // Categories management
+  const importPdfForm = document.getElementById('import-pdf-form');
+  const createCategoryForm = document.getElementById('create-category-form');
+  const refreshCategoriesListBtn = document.getElementById('refresh-categories-list');
+  const categoriesListContainer = document.getElementById('categories-list-container');
+  const listYearFilter = document.getElementById('list-year-filter');
+
+  function showCategoriesAlert(message, type = 'info') {
+    const alertEl = document.getElementById('categories-import-alert') || document.getElementById('categories-manual-alert');
+    if (!alertEl) return;
+    alertEl.className = `alert alert-${type}`;
+    alertEl.textContent = message;
+    alertEl.classList.remove('d-none');
+    setTimeout(() => {
+      alertEl.classList.add('d-none');
+    }, 5000);
+  }
+
+  if (importPdfForm) {
+    importPdfForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const year = parseYear(document.getElementById('categories-year').value);
+      const fileInput = document.getElementById('pdf-file');
+      const file = fileInput.files[0];
+
+      if (!file || !year) {
+        showCategoriesAlert('Veuillez remplir tous les champs', 'warning');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('pdf', file);
+      formData.append('year', year);
+
+      try {
+        const res = await fetch('/api/categories/import-pdf', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+          body: formData
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.message || 'Import failed');
+        }
+
+        const data = await res.json();
+        showCategoriesAlert(`Import réussi: ${data.categories.length} catégories importées`, 'success');
+        fileInput.value = '';
+        if (refreshCategoriesListBtn) refreshCategoriesListBtn.click();
+      } catch (err) {
+        showCategoriesAlert('Erreur: ' + err.message, 'danger');
+      }
+    });
+  }
+
+  if (createCategoryForm) {
+    createCategoryForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const year = parseYear(document.getElementById('manual-year').value);
+      const categoryNumber = parseInt(document.getElementById('category-number').value);
+      const categoryName = document.getElementById('category-name').value.trim();
+      const nomineesText = document.getElementById('nominees-list').value.trim();
+
+      if (!year || !categoryNumber || !categoryName || !nomineesText) {
+        showCategoriesAlert('Veuillez remplir tous les champs', 'warning');
+        return;
+      }
+
+      const nominees = nomineesText.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+      if (nominees.length === 0) {
+        showCategoriesAlert('Veuillez entrer au moins un nommé', 'warning');
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/categories/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            year,
+            categoryNumber,
+            categoryName,
+            nominees
+          })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.message || 'Creation failed');
+        }
+
+        const data = await res.json();
+        showCategoriesAlert('Catégorie créée avec succès', 'success');
+        createCategoryForm.reset();
+        if (refreshCategoriesListBtn) refreshCategoriesListBtn.click();
+      } catch (err) {
+        showCategoriesAlert('Erreur: ' + err.message, 'danger');
+      }
+    });
+  }
+
+  async function loadCategoriesList() {
+    if (!categoriesListContainer) return;
+    
+    const year = listYearFilter?.value ? parseYear(listYearFilter.value) : null;
+    const url = year ? `/api/categories/list?year=${year}` : '/api/categories/list';
+
+    try {
+      categoriesListContainer.innerHTML = '<div class="text-muted">Chargement…</div>';
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to load categories');
+      }
+
+      const data = await res.json();
+      const categories = data.categories || [];
+
+      if (categories.length === 0) {
+        categoriesListContainer.innerHTML = `<div class="text-muted">Aucune catégorie trouvée${year ? ` pour l'année ${year}` : ''}.</div>`;
+        return;
+      }
+
+      categoriesListContainer.innerHTML = `
+        <div class="table-responsive">
+          <table class="table table-sm">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Nom</th>
+                <th>Nommés</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${categories.map(cat => `
+                <tr>
+                  <td>${cat.categoryNumber}</td>
+                  <td><strong>${cat.categoryName}</strong></td>
+                  <td>
+                    <ul class="mb-0 small">
+                      ${cat.nominees.map(n => `<li>${n.name}</li>`).join('')}
+                    </ul>
+                  </td>
+                  <td>
+                    <button class="btn btn-sm btn-primary me-1" onclick="editCategory('${cat._id}')">Éditer</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCategory('${cat._id}')">Supprimer</button>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } catch (err) {
+      categoriesListContainer.innerHTML = `<div class="alert alert-danger">Erreur: ${err.message}</div>`;
+    }
+  }
+
+  window.editCategory = async function(categoryId) {
+    try {
+      // Fetch category details
+      const res = await fetch(`/api/categories/list`, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to load categories');
+      }
+
+      const data = await res.json();
+      const category = data.categories.find(c => c._id === categoryId);
+      
+      if (!category) {
+        showResponse('danger', 'Catégorie non trouvée');
+        return;
+      }
+
+      // Populate modal
+      document.getElementById('edit_category_id').value = categoryId;
+      document.getElementById('edit_category_number').value = category.categoryNumber;
+      document.getElementById('edit_category_name').value = category.categoryName;
+      document.getElementById('edit_nominees_list').value = category.nominees.map(n => n.name).join('\n');
+      
+      // Hide alert
+      const alertEl = document.getElementById('edit-category-alert');
+      if (alertEl) {
+        alertEl.classList.add('d-none');
+      }
+
+      // Show modal
+      const modal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
+      modal.show();
+    } catch (err) {
+      showResponse('danger', 'Erreur: ' + err.message);
+    }
+  };
+
+  window.deleteCategory = async function(categoryId) {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer cette catégorie?')) return;
+
+    try {
+      const res = await fetch(`/api/categories/${categoryId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.message || 'Delete failed');
+      }
+
+      showResponse('success', 'Catégorie supprimée');
+      await loadCategoriesList();
+    } catch (err) {
+      showResponse('danger', 'Erreur: ' + err.message);
+    }
+  };
+
+  // Save category changes
+  const saveCategoryChangesBtn = document.getElementById('save-category-changes');
+  if (saveCategoryChangesBtn) {
+    saveCategoryChangesBtn.addEventListener('click', async () => {
+      const categoryId = document.getElementById('edit_category_id').value;
+      const categoryName = document.getElementById('edit_category_name').value.trim();
+      const nomineesText = document.getElementById('edit_nominees_list').value.trim();
+      const alertEl = document.getElementById('edit-category-alert');
+
+      if (!categoryName || !nomineesText) {
+        if (alertEl) {
+          alertEl.className = 'alert alert-warning';
+          alertEl.textContent = 'Veuillez remplir tous les champs';
+          alertEl.classList.remove('d-none');
+        }
+        return;
+      }
+
+      const nominees = nomineesText.split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+      if (nominees.length === 0) {
+        if (alertEl) {
+          alertEl.className = 'alert alert-warning';
+          alertEl.textContent = 'Veuillez entrer au moins un nommé';
+          alertEl.classList.remove('d-none');
+        }
+        return;
+      }
+
+      try {
+        saveCategoryChangesBtn.disabled = true;
+        const oldText = saveCategoryChangesBtn.textContent || 'Enregistrer';
+        saveCategoryChangesBtn.textContent = 'Enregistrement...';
+
+        const res = await fetch(`/api/categories/${categoryId}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            categoryName,
+            nominees
+          })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.message || 'Update failed');
+        }
+
+        const data = await res.json();
+        showResponse('success', 'Catégorie mise à jour avec succès');
+        
+        // Close modal
+        const modal = bootstrap.Modal.getInstance(document.getElementById('editCategoryModal'));
+        if (modal) modal.hide();
+        
+        // Reload list
+        await loadCategoriesList();
+      } catch (err) {
+        if (alertEl) {
+          alertEl.className = 'alert alert-danger';
+          alertEl.textContent = 'Erreur: ' + err.message;
+          alertEl.classList.remove('d-none');
+        }
+      } finally {
+        saveCategoryChangesBtn.disabled = false;
+        saveCategoryChangesBtn.textContent = oldText;
+      }
+    });
+  }
+
+  if (refreshCategoriesListBtn) {
+    refreshCategoriesListBtn.addEventListener('click', loadCategoriesList);
+    
+    // Auto-reload when year filter changes
+    if (listYearFilter) {
+      listYearFilter.addEventListener('change', loadCategoriesList);
+    }
+  }
+
+  // Auto-load when tab is shown
+  const categoriesTabBtn = document.getElementById('admin-categories-tab');
+  if (categoriesTabBtn) {
+    categoriesTabBtn.addEventListener('shown.bs.tab', () => {
+      loadCategoriesList();
+    });
+  }
 };
 

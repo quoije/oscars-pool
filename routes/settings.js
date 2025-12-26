@@ -14,6 +14,7 @@ const WINNERS_BY_YEAR_KEY = "winners_by_year";
 const OSCAR_DATES_BY_YEAR_KEY = "oscar_date_by_year";
 const APP_VERSION_KEY = "app_version_control";
 const PLAYER_ADMIN_STATUS_UI_KEY = "player_admin_status_ui";
+const POINTS_CONFIG_KEY = "points_config";
 
 const crypto = require("crypto");
 
@@ -28,6 +29,11 @@ const DEFAULT_PLAYER_ADMIN_STATUS_UI = Object.freeze({
   // Controls the admin-only debug/status block in player.html
   showSource: true,
   showProgress: true,
+});
+
+const DEFAULT_POINTS_CONFIG = Object.freeze({
+  pointsPerMovie: 1,
+  pointsPerCorrectPick: 1,
 });
 
 function parseOscarYear(raw) {
@@ -741,6 +747,51 @@ router.delete("/winners/:year/:userId", async (req, res) => {
     );
 
     return res.status(200).json({ year, winners: winners[key] || [] });
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+function normalizePointsConfig(rawValue) {
+  const v = rawValue && typeof rawValue === "object" && !Array.isArray(rawValue) ? rawValue : {};
+  const pointsPerMovie = typeof v.pointsPerMovie === "number" && v.pointsPerMovie >= 0 ? Math.round(v.pointsPerMovie) : DEFAULT_POINTS_CONFIG.pointsPerMovie;
+  const pointsPerCorrectPick = typeof v.pointsPerCorrectPick === "number" && v.pointsPerCorrectPick >= 0 ? Math.round(v.pointsPerCorrectPick) : DEFAULT_POINTS_CONFIG.pointsPerCorrectPick;
+  return { pointsPerMovie, pointsPerCorrectPick };
+}
+
+// Public: get points configuration
+router.get("/points-config", async (req, res) => {
+  try {
+    const existing = await Setting.findOne({ key: POINTS_CONFIG_KEY }).select("value");
+    const normalized = normalizePointsConfig(existing?.value);
+    return res.status(200).json(normalized);
+  } catch (err) {
+    return res.status(200).json(DEFAULT_POINTS_CONFIG);
+  }
+});
+
+// Admin-only: set points configuration
+router.put("/points-config", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+
+    const normalized = normalizePointsConfig(req.body);
+    const updated = await Setting.findOneAndUpdate(
+      { key: POINTS_CONFIG_KEY },
+      { $set: { value: normalized } },
+      { upsert: true, new: true }
+    ).select("value");
+
+    return res.status(200).json(normalizePointsConfig(updated?.value));
   } catch (err) {
     if (err instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Invalid or expired token" });

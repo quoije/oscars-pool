@@ -650,14 +650,24 @@ window.addEventListener('DOMContentLoaded', async function () {
       const stats = await statsRes.json();
       const userTableBody = document.getElementById('user-table-body');
 
-      // Ensure watchedRatio is treated as a number and sort in descending order
-      stats.sort((a, b) => parseFloat(b.watchedRatio) - parseFloat(a.watchedRatio));
+      // Sort by total points (descending), then by watched ratio
+      stats.sort((a, b) => {
+        const pointsDiff = (b.totalPoints || 0) - (a.totalPoints || 0);
+        if (pointsDiff !== 0) return pointsDiff;
+        return parseFloat(b.watchedRatio) - parseFloat(a.watchedRatio);
+      });
 
       // Clear previous rows to prevent duplication
       userTableBody.innerHTML = '';
 
-      stats.forEach(userStat => {
+      stats.forEach((userStat, index) => {
         const userRow = document.createElement('tr');
+        const rank = index + 1;
+        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+        
+        const rankTd = document.createElement('td');
+        rankTd.innerHTML = `<strong>${rank}${medal ? ' ' + medal : ''}</strong>`;
+
         const nameTd = document.createElement('td');
         const link = document.createElement('a');
         link.href = '#';
@@ -670,13 +680,25 @@ window.addEventListener('DOMContentLoaded', async function () {
         nameTd.appendChild(link);
 
         const countTd = document.createElement('td');
-        countTd.textContent = String(userStat.watchedCount ?? '');
+        const pointsConfig = userStat.pointsConfig || { pointsPerMovie: 1 };
+        countTd.innerHTML = `${userStat.watchedCount ?? 0} <small class="text-muted">(${userStat.moviePoints || 0} pts)</small>`;
+
+        const picksTd = document.createElement('td');
+        const pickPointsConfig = userStat.pointsConfig || { pointsPerCorrectPick: 1 };
+        picksTd.innerHTML = `${userStat.correctPicks || 0} <small class="text-muted">(${userStat.pickPoints || 0} pts)</small>`;
+
+        const pointsTd = document.createElement('td');
+        pointsTd.className = 'text-center';
+        pointsTd.innerHTML = `<strong class="text-success">${userStat.totalPoints || 0}</strong>`;
 
         const ratioTd = document.createElement('td');
         ratioTd.textContent = String(userStat.watchedRatio ?? '');
 
+        userRow.appendChild(rankTd);
         userRow.appendChild(nameTd);
         userRow.appendChild(countTd);
+        userRow.appendChild(picksTd);
+        userRow.appendChild(pointsTd);
         userRow.appendChild(ratioTd);
         userTableBody.appendChild(userRow);
       });
