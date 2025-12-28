@@ -156,3 +156,15 @@ exemple/
 # OCR training data
 *.traineddata
 eng.traineddata
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python cache files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
