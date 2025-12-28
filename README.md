@@ -1,6 +1,8 @@
 ## Oscars Pool 2026
 Little nodejs + mongodb app that I hack together with ChatGPT and Cursor to keep track of watched movies for an incoming Oscars Pool with some friends.
 
+**Note:** The application interface is in French.
+
 ![Oscars Pool 2026](https://raw.githubusercontent.com/quoije/oscars-pool/refs/heads/prod/img/preview.png)
 
 ## Features
