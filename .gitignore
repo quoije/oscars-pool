@@ -143,3 +143,6 @@ python_video_server/certs/
 
 # Backup files
 backups/
+
+# Video files in public/video/
+public/video/*
