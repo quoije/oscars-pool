@@ -649,6 +649,24 @@ window.addEventListener('DOMContentLoaded', async function () {
       pageLoader.setProgress(70);
       const stats = await statsRes.json();
       const userTableBody = document.getElementById('user-table-body');
+      
+      // Check visibility config for Bon picks column
+      let showBonPicksColumn = true;
+      try {
+        const visibilityRes = await fetch('/api/settings/visibility-config', { cache: 'no-store' });
+        if (visibilityRes.ok) {
+          const visibilityConfig = await visibilityRes.json();
+          showBonPicksColumn = visibilityConfig.showBonPicksColumn !== false;
+        }
+      } catch (err) {
+        console.error('Error loading visibility config:', err);
+      }
+      
+      // Hide/show Bon picks header
+      const bonPicksHeader = document.getElementById('bon-picks-header');
+      if (bonPicksHeader) {
+        bonPicksHeader.style.display = showBonPicksColumn ? '' : 'none';
+      }
 
       // Sort by total points (descending), then by watched ratio
       stats.sort((a, b) => {
@@ -686,6 +704,9 @@ window.addEventListener('DOMContentLoaded', async function () {
         const picksTd = document.createElement('td');
         const pickPointsConfig = userStat.pointsConfig || { pointsPerCorrectPick: 1 };
         picksTd.innerHTML = `${userStat.correctPicks || 0} <small class="text-muted">(${userStat.pickPoints || 0} pts)</small>`;
+        if (!showBonPicksColumn) {
+          picksTd.style.display = 'none';
+        }
 
         const pointsTd = document.createElement('td');
         pointsTd.className = 'text-center';

@@ -7,6 +7,7 @@ const Movie = require("../models/Movie");
 const Setting = require("../models/Setting");
 const PlaybackProgress = require("../models/PlaybackProgress");
 const OscarPick = require("../models/OscarPick");
+const OscarCategory = require("../models/OscarCategory");
 const axios = require("axios");
 
 const router = express.Router();
@@ -153,16 +154,38 @@ router.get("/stats", verifyToken, async (req, res) => {
         }
       : { pointsPerMovie: 1, pointsPerCorrectPick: 1 };
 
-    // Get all picks for this year with scores
+    // Get all categories with winners marked for this year
+    const categories = await OscarCategory.find({ year }).lean();
+    const categoryWinners = new Map();
+    categories.forEach(cat => {
+      const winner = cat.nominees.find(n => n.isWinner);
+      if (winner) {
+        categoryWinners.set(cat.categoryNumber, winner.name);
+      }
+    });
+
+    // Get all picks for this year and calculate correct picks on-the-fly
     let picksByUserId = new Map();
     try {
       const allPicks = await OscarPick.find({ year })
-        .select("userId score")
+        .select("userId picks")
         .lean();
 
       allPicks.forEach(pick => {
         const userId = String(pick.userId);
-        picksByUserId.set(userId, pick.score !== null && pick.score !== undefined ? pick.score : 0);
+        let correctCount = 0;
+        
+        // Calculate correct picks based on current winners
+        if (Array.isArray(pick.picks)) {
+          pick.picks.forEach(p => {
+            const correctWinner = categoryWinners.get(p.categoryNumber);
+            if (correctWinner && p.selectedNominee === correctWinner) {
+              correctCount++;
+            }
+          });
+        }
+        
+        picksByUserId.set(userId, correctCount);
       });
     } catch (err) {
       console.error("Error fetching picks for stats:", err);

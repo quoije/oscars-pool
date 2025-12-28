@@ -24,8 +24,6 @@
 
   // Check if admin and show admin tabs
   if (decoded.admin) {
-    const adminTabAllPicks = document.getElementById('tab-all-picks');
-    if (adminTabAllPicks) adminTabAllPicks.classList.remove('d-none');
     const adminTabWinners = document.getElementById('tab-winners');
     if (adminTabWinners) adminTabWinners.classList.remove('d-none');
   }
@@ -80,7 +78,7 @@
       // Use active year if not set
       if (!currentYear) {
         currentYear = await fetchActiveYear();
-        document.title = `Pool Oscars (${currentYear}) - Mes choix`;
+        document.title = `Pool Oscars (${currentYear}) - Mes picks`;
       }
 
       const res = await fetch(`/api/picks/categories?year=${currentYear}`, {
@@ -101,9 +99,6 @@
       currentYear = data.year || currentYear;
       
       document.getElementById('current-year').textContent = currentYear;
-      if (document.getElementById('all-picks-year')) {
-        document.getElementById('all-picks-year').textContent = currentYear;
-      }
       
       if (categories.length === 0) {
         document.getElementById('categories-container').innerHTML = `
@@ -156,29 +151,49 @@
       return;
     }
     
-    container.innerHTML = categories.map(cat => `
-      <div class="card category-card shadow-sm">
-        <div class="card-header">
-          <h5 class="mb-0">${cat.categoryNumber}. ${cat.categoryName}</h5>
-        </div>
-        <div class="card-body">
-          <div class="row g-2">
-            ${cat.nominees.map(nominee => {
-              const isSelected = myPicks[cat.categoryNumber] === nominee.name;
+    container.innerHTML = `
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 50px;">#</th>
+              <th>Catégorie</th>
+              <th>Choix</th>
+              <th>Nommés</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${categories.map(cat => {
+              const selectedNominee = myPicks[cat.categoryNumber];
               return `
-                <div class="col-12 col-md-6 col-lg-4">
-                  <div class="nominee-option p-3 border rounded ${isSelected ? 'selected' : ''}" 
-                       data-category="${cat.categoryNumber}" 
-                       data-nominee="${nominee.name}">
-                    ${nominee.name}
-                  </div>
-                </div>
+                <tr class="${selectedNominee ? 'table-primary' : ''}">
+                  <td class="fw-semibold">${cat.categoryNumber}</td>
+                  <td>${cat.categoryName}</td>
+                  <td>
+                    ${selectedNominee ? `<span class="badge bg-primary">${selectedNominee}</span>` : '<span class="text-muted">—</span>'}
+                  </td>
+                  <td>
+                    <div class="d-flex flex-wrap gap-1">
+                      ${cat.nominees.map(nominee => {
+                        const isSelected = selectedNominee === nominee.name;
+                        return `
+                          <span class="nominee-option badge ${isSelected ? 'bg-primary' : 'bg-secondary'} ${isSelected ? '' : 'bg-opacity-50'}" 
+                                 style="cursor: pointer; font-weight: normal;"
+                                 data-category="${cat.categoryNumber}" 
+                                 data-nominee="${nominee.name}">
+                            ${nominee.name}
+                          </span>
+                        `;
+                      }).join('')}
+                    </div>
+                  </td>
+                </tr>
               `;
             }).join('')}
-          </div>
-        </div>
+          </tbody>
+        </table>
       </div>
-    `).join('');
+    `;
     
     // Add click handlers
     container.querySelectorAll('.nominee-option').forEach(el => {
@@ -186,15 +201,17 @@
         const category = parseInt(this.dataset.category);
         const nominee = this.dataset.nominee;
         
-        // Remove selection from other options in same category
-        container.querySelectorAll(`[data-category="${category}"]`).forEach(opt => {
-          opt.classList.remove('selected');
-        });
+        // Toggle selection
+        if (myPicks[category] === nominee) {
+          // Deselect if clicking the same nominee
+          delete myPicks[category];
+        } else {
+          // Select this nominee
+          myPicks[category] = nominee;
+        }
         
-        // Select this option
-        this.classList.add('selected');
-        myPicks[category] = nominee;
-        updateProgress();
+        // Re-render to update the display
+        renderCategories();
       });
     });
     
@@ -250,144 +267,12 @@
     }
   }
 
-  // All picks functionality (admin only)
-  let allPicks = [];
-  let allPicksCategories = [];
-
-  async function fetchAllPicks() {
-    try {
-      // Use active year if not set
-      if (!currentYear) {
-        currentYear = await fetchActiveYear();
-      }
-
-      const res = await fetch(`/api/picks/all?year=${currentYear}`, {
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-      
-      if (!res.ok) {
-        if (res.status === 401) {
-          localStorage.removeItem('auth_token');
-          window.location.href = '/';
-          return;
-        }
-        if (res.status === 403) {
-          showAlert('Vous n\'avez pas les privilèges administrateur', 'warning');
-          return;
-        }
-        throw new Error('Failed to fetch picks');
-      }
-      
-      const data = await res.json();
-      allPicks = data.picks || [];
-      allPicksCategories = data.categories || [];
-      currentYear = data.year || currentYear;
-      
-      const yearEl = document.getElementById('all-picks-year');
-      if (yearEl) yearEl.textContent = currentYear;
-      
-      const countEl = document.getElementById('users-count');
-      if (countEl) countEl.textContent = allPicks.length;
-      
-      renderAllPicks();
-    } catch (err) {
-      console.error('Error fetching all picks:', err);
-      showAlert('Erreur lors du chargement des choix: ' + err.message, 'danger');
-    }
-  }
-
-  function renderAllPicks() {
-    const container = document.getElementById('all-picks-container');
-    if (!container) return;
-    
-    if (allPicks.length === 0) {
-      container.innerHTML = `
-        <div class="alert alert-info">
-          Aucun utilisateur n'a encore soumis ses choix pour l'année ${currentYear}.
-        </div>
-      `;
-      return;
-    }
-    
-    // Create a map of category info
-    const categoryMap = new Map();
-    allPicksCategories.forEach(cat => {
-      categoryMap.set(cat.categoryNumber, cat);
-    });
-    
-    container.innerHTML = allPicks.map(pick => {
-      const userName = pick.userId?.name || 'Utilisateur inconnu';
-      const userEmail = pick.userId?.email || '';
-      const submittedDate = pick.submittedAt ? new Date(pick.submittedAt).toLocaleString('fr-FR') : '—';
-      
-      // Create a map of picks by category
-      const picksMap = new Map();
-      pick.picks.forEach(p => {
-        picksMap.set(p.categoryNumber, p.selectedNominee);
-      });
-      
-      // Build picks list
-      const picksList = allPicksCategories.map(cat => {
-        const selected = picksMap.get(cat.categoryNumber);
-        if (!selected) return null;
-        
-        // Check if it's a winner (if winners are set)
-        const nominee = cat.nominees.find(n => n.name === selected);
-        const isWinner = nominee?.isWinner || false;
-        
-        return `
-          <div class="pick-item ${isWinner ? 'correct-pick' : ''}">
-            <div class="d-flex justify-content-between align-items-start">
-              <div>
-                <strong>${cat.categoryNumber}. ${cat.categoryName}</strong><br>
-                <span class="text-muted">${selected}</span>
-              </div>
-              ${isWinner ? '<span class="badge bg-success">Gagnant</span>' : ''}
-            </div>
-          </div>
-        `;
-      }).filter(Boolean).join('');
-      
-      return `
-        <div class="card user-picks-card shadow-sm mb-3">
-          <div class="card-header">
-            <div class="d-flex justify-content-between align-items-center">
-              <div>
-                <h5 class="mb-0">${userName}</h5>
-                <small class="text-muted">${userEmail}</small>
-              </div>
-              <div class="text-end">
-                <small class="text-muted">Soumis le: ${submittedDate}</small><br>
-                <span class="badge bg-primary">${pick.picks.length} / ${allPicksCategories.length} catégories</span>
-              </div>
-            </div>
-          </div>
-          <div class="card-body">
-            ${picksList || '<div class="text-muted">Aucun choix enregistré</div>'}
-          </div>
-        </div>
-      `;
-    }).join('');
-  }
-
   // Event listeners
   document.getElementById('submit-picks')?.addEventListener('click', submitPicks);
   document.getElementById('load-my-picks')?.addEventListener('click', () => {
     loadMyPicks();
     showAlert('Choix rechargés', 'info');
   });
-  document.getElementById('refresh-all-picks')?.addEventListener('click', () => {
-    fetchAllPicks();
-    showAlert('Choix rafraîchis', 'info');
-  });
-
-  // Load all picks when admin tab is shown
-  const allPicksTab = document.getElementById('tab-all-picks');
-  if (allPicksTab) {
-    allPicksTab.addEventListener('shown.bs.tab', () => {
-      fetchAllPicks();
-    });
-  }
 
   // Winners & Scores functionality (admin only)
   let winnersCategories = [];
@@ -437,28 +322,42 @@
     const progressEl = document.getElementById('winners-progress');
     if (progressEl) progressEl.textContent = `${winnersCount} / ${winnersCategories.length}`;
 
-    container.innerHTML = winnersCategories.map(cat => {
-      const winner = cat.nominees.find(n => n.isWinner);
-      return `
-        <div class="card category-winner-card shadow-sm mb-3">
-          <div class="card-header">
-            <h5 class="mb-0">${cat.categoryNumber}. ${cat.categoryName}</h5>
-          </div>
-          <div class="card-body">
-            <div class="mb-2">
-              <label class="form-label fw-semibold">Gagnant:</label>
-              <select class="form-select winner-select" data-category-id="${cat._id}" data-category-number="${cat.categoryNumber}">
-                <option value="">-- Sélectionner un gagnant --</option>
-                ${cat.nominees.map(nominee => `
-                  <option value="${nominee.name}" ${nominee.isWinner ? 'selected' : ''}>${nominee.name}</option>
-                `).join('')}
-              </select>
-            </div>
-            ${winner ? `<div class="alert alert-success mb-0 mt-2"><strong>Gagnant actuel:</strong> ${winner.name}</div>` : ''}
-          </div>
-        </div>
-      `;
-    }).join('');
+    container.innerHTML = `
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width: 50px;">#</th>
+              <th>Catégorie</th>
+              <th style="width: 200px;">Sélection</th>
+              <th>Gagnant</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${winnersCategories.map(cat => {
+              const winner = cat.nominees.find(n => n.isWinner);
+              return `
+                <tr class="${winner ? 'table-success' : ''}">
+                  <td class="fw-semibold">${cat.categoryNumber}</td>
+                  <td>${cat.categoryName}</td>
+                  <td>
+                    <select class="form-select form-select-sm winner-select" data-category-id="${cat._id}" data-category-number="${cat.categoryNumber}">
+                      <option value="">—</option>
+                      ${cat.nominees.map(nominee => `
+                        <option value="${nominee.name}" ${nominee.isWinner ? 'selected' : ''}>${nominee.name}</option>
+                      `).join('')}
+                    </select>
+                  </td>
+                  <td>
+                    ${winner ? `<span class="badge bg-success">${winner.name}</span>` : '<span class="text-muted">—</span>'}
+                  </td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
 
     // Add event listeners for winner selection
     container.querySelectorAll('.winner-select').forEach(select => {
@@ -466,34 +365,35 @@
         const categoryId = this.dataset.categoryId;
         const winnerName = this.value;
 
-        if (!winnerName) return;
-
         try {
+          // If empty value, clear the winner (set to null/empty)
           const res = await fetch(`/api/categories/${categoryId}/winner`, {
             method: 'PUT',
             headers: {
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ winnerName })
+            body: JSON.stringify({ winnerName: winnerName || null })
           });
 
           if (!res.ok) {
             const error = await res.json();
-            throw new Error(error.message || 'Failed to mark winner');
+            throw new Error(error.message || 'Failed to update winner');
           }
 
-          showAlert('Gagnant marqué avec succès', 'success');
+          showAlert(winnerName ? 'Gagnant marqué avec succès' : 'Gagnant supprimé', 'success');
           await fetchWinnersCategories();
+          // Auto-refresh scores after marking/clearing a winner (silent mode)
+          await calculateScores(true);
         } catch (err) {
-          console.error('Error marking winner:', err);
+          console.error('Error updating winner:', err);
           showAlert('Erreur: ' + err.message, 'danger');
         }
       });
     });
   }
 
-  async function calculateScores() {
+  async function calculateScores(silent = false) {
     try {
       if (!currentYear) {
         currentYear = await fetchActiveYear();
@@ -516,15 +416,29 @@
 
       if (!res.ok) {
         const error = await res.json();
+        // If no winners marked, handle gracefully (especially for auto-refresh)
+        if (error.message && error.message.includes('No winners marked')) {
+          if (!silent) {
+            // Only show as info/warning, not error
+            showAlert('Aucun gagnant marqué. Les scores seront calculés une fois les gagnants définis.', 'info');
+          }
+          // Still try to fetch existing scores
+          await fetchScores();
+          return;
+        }
         throw new Error(error.message || 'Failed to calculate scores');
       }
 
       const data = await res.json();
-      showAlert(`Scores calculés avec succès! ${data.scores.length} utilisateur(s) évalué(s).`, 'success');
+      if (!silent) {
+        showAlert(`Scores calculés avec succès! ${data.scores.length} utilisateur(s) évalué(s).`, 'success');
+      }
       await fetchScores();
     } catch (err) {
       console.error('Error calculating scores:', err);
-      showAlert('Erreur: ' + err.message, 'danger');
+      if (!silent) {
+        showAlert('Erreur: ' + err.message, 'danger');
+      }
     } finally {
       const btn = document.getElementById('calculate-scores');
       if (btn) {
@@ -540,21 +454,29 @@
         currentYear = await fetchActiveYear();
       }
 
+      // Update scores year display
+      const scoresYearEl = document.getElementById('scores-year');
+      if (scoresYearEl) {
+        scoresYearEl.textContent = currentYear;
+      }
+
       const res = await fetch(`/api/picks/scores?year=${currentYear}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (!res.ok) {
-        if (res.status === 403) {
-          return; // Not admin, skip
-        }
-        throw new Error('Failed to fetch scores');
+        const errorData = await res.json().catch(() => ({ message: 'Failed to fetch scores' }));
+        throw new Error(errorData.message || 'Failed to fetch scores');
       }
 
       const data = await res.json();
       renderScores(data.scores || [], data.totalCategories || 0);
     } catch (err) {
       console.error('Error fetching scores:', err);
+      const container = document.getElementById('scores-container');
+      if (container) {
+        container.innerHTML = '<div class="text-danger">Erreur lors du chargement des scores.</div>';
+      }
     }
   }
 
@@ -569,15 +491,15 @@
 
     container.innerHTML = `
       <div class="table-responsive">
-        <table class="table table-striped table-hover">
-          <thead>
+        <table class="table table-sm table-striped table-hover mb-0">
+          <thead class="table-light">
             <tr>
-              <th style="width: 50px;">#</th>
+              <th style="width: 40px;">#</th>
               <th>Utilisateur</th>
-              <th class="text-center">Score</th>
-              <th class="text-center">Total</th>
-              <th class="text-center">%</th>
-              <th class="text-center" style="width: 120px;">Actions</th>
+              <th class="text-center" style="width: 80px;">Score</th>
+              <th class="text-center" style="width: 70px;">Total</th>
+              <th class="text-center" style="width: 70px;">%</th>
+              <th class="text-center" style="width: 100px;">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -588,13 +510,13 @@
               return `
                 <tr>
                   <td><strong>${rank}${medal ? ' ' + medal : ''}</strong></td>
-                  <td>${score.userName}${score.userEmail ? ` <small class="text-muted">(${score.userEmail})</small>` : ''}</td>
+                  <td>${score.userName}</td>
                   <td class="text-center"><strong class="text-success">${score.score}</strong></td>
-                  <td class="text-center text-muted">${totalCategories}</td>
+                  <td class="text-center text-muted small">${totalCategories}</td>
                   <td class="text-center"><strong>${percentage}%</strong></td>
                   <td class="text-center">
                     <button class="btn btn-sm btn-outline-primary view-picks-btn" data-user-id="${score.userId}" data-user-name="${score.userName}" data-score-index="${index}">
-                      Voir détails
+                      Détails
                     </button>
                   </td>
                 </tr>
@@ -723,19 +645,53 @@
     showAlert('Données rafraîchies', 'info');
   });
 
+  // Load scores when scores tab is shown
+  const scoresTab = document.getElementById('tab-scores');
+  if (scoresTab) {
+    scoresTab.addEventListener('shown.bs.tab', async () => {
+      await fetchScores();
+    });
+  }
+
   // Load winners when admin tab is shown
   const winnersTab = document.getElementById('tab-winners');
   if (winnersTab) {
-    winnersTab.addEventListener('shown.bs.tab', () => {
-      fetchWinnersCategories();
+    winnersTab.addEventListener('shown.bs.tab', async () => {
+      await fetchWinnersCategories();
+      // Auto-refresh scores when entering the winners tab (silent mode)
+      await calculateScores(true);
     });
   }
+
+  // Refresh scores button
+  document.getElementById('refresh-scores')?.addEventListener('click', async () => {
+    await fetchScores();
+    showAlert('Scores rafraîchis', 'info');
+  });
 
   // Initial load
   (async () => {
     currentYear = await fetchActiveYear();
     document.title = `Pool Oscars (${currentYear}) - Mes choix`;
     await fetchCategories();
+    
+    // Auto-refresh scores on page load if scores tab is active
+    const scoresTab = document.getElementById('tab-scores');
+    const scoresPane = document.getElementById('pane-scores');
+    if (scoresTab && scoresPane && (scoresTab.classList.contains('active') || scoresPane.classList.contains('active'))) {
+      await fetchScores();
+    }
+    
+    // Auto-refresh winners on page load if admin and winners tab is active
+    if (decoded.admin) {
+      const winnersTab = document.getElementById('tab-winners');
+      const winnersPane = document.getElementById('pane-winners');
+      // Check if winners tab is active (either by default or if it becomes active)
+      if (winnersTab && winnersPane && (winnersTab.classList.contains('active') || winnersPane.classList.contains('active'))) {
+        await fetchWinnersCategories();
+        await calculateScores(true); // Silent mode for auto-refresh
+      }
+    }
   })();
 })();
 

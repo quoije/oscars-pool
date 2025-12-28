@@ -15,6 +15,7 @@ const OSCAR_DATES_BY_YEAR_KEY = "oscar_date_by_year";
 const APP_VERSION_KEY = "app_version_control";
 const PLAYER_ADMIN_STATUS_UI_KEY = "player_admin_status_ui";
 const POINTS_CONFIG_KEY = "points_config";
+const VISIBILITY_CONFIG_KEY = "visibility_config";
 
 const crypto = require("crypto");
 
@@ -34,6 +35,11 @@ const DEFAULT_PLAYER_ADMIN_STATUS_UI = Object.freeze({
 const DEFAULT_POINTS_CONFIG = Object.freeze({
   pointsPerMovie: 1,
   pointsPerCorrectPick: 1,
+});
+
+const DEFAULT_VISIBILITY_CONFIG = Object.freeze({
+  showPicksButton: true,
+  showBonPicksColumn: true,
 });
 
 function parseOscarYear(raw) {
@@ -762,6 +768,13 @@ function normalizePointsConfig(rawValue) {
   return { pointsPerMovie, pointsPerCorrectPick };
 }
 
+function normalizeVisibilityConfig(rawValue) {
+  const v = rawValue && typeof rawValue === "object" && !Array.isArray(rawValue) ? rawValue : {};
+  const showPicksButton = typeof v.showPicksButton === "boolean" ? v.showPicksButton : DEFAULT_VISIBILITY_CONFIG.showPicksButton;
+  const showBonPicksColumn = typeof v.showBonPicksColumn === "boolean" ? v.showBonPicksColumn : DEFAULT_VISIBILITY_CONFIG.showBonPicksColumn;
+  return { showPicksButton, showBonPicksColumn };
+}
+
 // Public: get points configuration
 router.get("/points-config", async (req, res) => {
   try {
@@ -792,6 +805,44 @@ router.put("/points-config", async (req, res) => {
     ).select("value");
 
     return res.status(200).json(normalizePointsConfig(updated?.value));
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Public: get visibility configuration
+router.get("/visibility-config", async (req, res) => {
+  try {
+    const existing = await Setting.findOne({ key: VISIBILITY_CONFIG_KEY }).select("value");
+    const normalized = normalizeVisibilityConfig(existing?.value);
+    return res.status(200).json(normalized);
+  } catch (err) {
+    return res.status(200).json(DEFAULT_VISIBILITY_CONFIG);
+  }
+});
+
+// Admin-only: set visibility configuration
+router.put("/visibility-config", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+
+    const normalized = normalizeVisibilityConfig(req.body);
+    const updated = await Setting.findOneAndUpdate(
+      { key: VISIBILITY_CONFIG_KEY },
+      { $set: { value: normalized } },
+      { upsert: true, new: true }
+    ).select("value");
+
+    return res.status(200).json(normalizeVisibilityConfig(updated?.value));
   } catch (err) {
     if (err instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Invalid or expired token" });

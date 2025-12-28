@@ -2676,6 +2676,90 @@ window.onload = async function () {
 
   await loadPointsConfig();
 
+  // Visibility config
+  const visibilityShowPicksFeaturesEl = document.getElementById('visibility-show-picks-features');
+  const visibilityConfigReloadBtn = document.getElementById('visibility-config-reload');
+  const visibilityConfigSaveBtn = document.getElementById('visibility-config-save');
+  const visibilityConfigAlert = document.getElementById('visibility-config-alert');
+
+  async function loadVisibilityConfig() {
+    try {
+      const res = await fetch('/api/settings/visibility-config', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load visibility config');
+      const config = await res.json();
+      
+      // Both settings should be the same - use showPicksButton as the master
+      const isEnabled = config.showPicksButton !== false && config.showBonPicksColumn !== false;
+      if (visibilityShowPicksFeaturesEl) visibilityShowPicksFeaturesEl.checked = isEnabled;
+    } catch (err) {
+      console.error('Error loading visibility config:', err);
+      // Default to showing both
+      if (visibilityShowPicksFeaturesEl) visibilityShowPicksFeaturesEl.checked = true;
+    }
+  }
+
+  if (visibilityConfigReloadBtn) {
+    visibilityConfigReloadBtn.addEventListener('click', async () => {
+      await loadVisibilityConfig();
+      showResponse('success', 'Configuration rechargée');
+    });
+  }
+
+  if (visibilityConfigSaveBtn) {
+    visibilityConfigSaveBtn.addEventListener('click', async () => {
+      const isEnabled = visibilityShowPicksFeaturesEl ? visibilityShowPicksFeaturesEl.checked : true;
+      const showPicksButton = isEnabled;
+      const showBonPicksColumn = isEnabled;
+
+      try {
+        visibilityConfigSaveBtn.disabled = true;
+        const oldText = visibilityConfigSaveBtn.textContent;
+        visibilityConfigSaveBtn.textContent = 'Enregistrement...';
+
+        const res = await fetch('/api/settings/visibility-config', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            showPicksButton,
+            showBonPicksColumn
+          })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.message || 'Failed to save');
+        }
+
+        const data = await res.json();
+        
+        // Clear cache so all pages get the new setting immediately
+        localStorage.removeItem('visibility_config_cache');
+        
+        showResponse('success', 'Configuration de visibilité enregistrée');
+      } catch (err) {
+        if (visibilityConfigAlert) {
+          visibilityConfigAlert.className = 'alert alert-danger';
+          visibilityConfigAlert.textContent = 'Erreur: ' + err.message;
+          visibilityConfigAlert.classList.remove('d-none');
+        }
+      } finally {
+        visibilityConfigSaveBtn.disabled = false;
+        visibilityConfigSaveBtn.textContent = oldText;
+      }
+    });
+  }
+
+  // Load visibility config when visibility tab is shown
+  const visibilitySubTab = document.getElementById('admin-settings-subtab-visibility');
+  if (visibilitySubTab) {
+    visibilitySubTab.addEventListener('shown.bs.tab', async () => {
+      await loadVisibilityConfig();
+    });
+  }
+
   // Categories management
   const importPdfForm = document.getElementById('import-pdf-form');
   const createCategoryForm = document.getElementById('create-category-form');

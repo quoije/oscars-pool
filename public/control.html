@@ -43,7 +43,7 @@
         <a href="movies.html" class="nav-link btn btn-outline-light me-2">Films</a>
         <a href="checklist.html" class="nav-link btn btn-outline-light me-2">Checklist</a>
         <a href="user-stat.html" class="nav-link btn btn-outline-light me-2">Statistiques</a>
-        <a href="picks.html" class="nav-link btn btn-outline-light me-2">Mes choix</a>
+        <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;">Mes picks</a>
         <a href="control.html" class="nav-link btn btn-warning me-2">Admin</a>
       </div>
       <div class="d-flex ms-auto mt-2 mt-lg-0 align-items-center">
@@ -134,6 +134,11 @@
           <li class="nav-item" role="presentation">
             <button class="nav-link" id="admin-settings-subtab-points" data-bs-toggle="tab" data-bs-target="#admin-settings-pane-points" type="button" role="tab" aria-controls="admin-settings-pane-points" aria-selected="false">
               Points
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="admin-settings-subtab-visibility" data-bs-toggle="tab" data-bs-target="#admin-settings-pane-visibility" type="button" role="tab" aria-controls="admin-settings-pane-visibility" aria-selected="false">
+              Visibilité
             </button>
           </li>
         </ul>
@@ -241,6 +246,32 @@
                   <div class="small">
                     <strong>Total =</strong> (Films regardés × <span id="points-per-movie-preview">1</span>) + (Bonnes réponses × <span id="points-per-correct-pick-preview">1</span>)
                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Visibility settings -->
+          <div class="tab-pane fade" id="admin-settings-pane-visibility" role="tabpanel" aria-labelledby="admin-settings-subtab-visibility" tabindex="0">
+            <div class="border rounded p-3 bg-light">
+              <div class="text-muted small mb-3">
+                Contrôle la visibilité de certains éléments dans l'interface.
+              </div>
+
+              <div id="visibility-config-alert" class="alert d-none" role="alert"></div>
+
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="visibility-show-picks-features">
+                <label class="form-check-label" for="visibility-show-picks-features">
+                  Afficher les fonctionnalités "Picks"
+                </label>
+                <div class="form-text">Contrôle l'affichage du bouton "Mes picks" dans la navigation et de la colonne "Bon picks" dans les statistiques.</div>
+              </div>
+
+              <div class="mt-3">
+                <div class="d-flex gap-2">
+                  <button type="button" id="visibility-config-reload" class="btn btn-outline-secondary">Recharger</button>
+                  <button type="button" id="visibility-config-save" class="btn btn-warning">Enregistrer</button>
                 </div>
               </div>
             </div>

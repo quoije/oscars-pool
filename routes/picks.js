@@ -248,13 +248,9 @@ router.post("/calculate-scores", verifyToken, async (req, res) => {
   }
 });
 
-// Get scores for all users (admin only)
+// Get scores for all users (available to all authenticated users)
 router.get("/scores", verifyToken, async (req, res) => {
   try {
-    if (!isAdmin(req.user)) {
-      return res.status(403).json({ message: "You do not have admin privileges" });
-    }
-
     const year = parseOscarYear(req.query.year) || await getOrInitActiveYear();
 
     const picks = await OscarPick.find({ year })
