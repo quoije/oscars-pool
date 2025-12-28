@@ -369,11 +369,6 @@ router.delete("/:categoryId", verifyToken, async (req, res) => {
   }
 });
 
-// Ensure uploads directory exists
-const uploadsDir = path.join(__dirname, '../uploads/');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
 
 module.exports = router;
 
