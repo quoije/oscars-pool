@@ -146,3 +146,13 @@ backups/
 
 # Video files in public/video/
 public/video/*
+
+# Uploads directory (temporary files)
+uploads/
+
+# Example files
+exemple/
+
+# OCR training data
+*.traineddata
+eng.traineddata
