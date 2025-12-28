@@ -168,10 +168,36 @@ sudo -E python -m python_video_server.letsencrypt renew --production
 ## Endpoints
 
 - `POST /api/video/session`  
-  Sets `video_auth` cookie (send `Authorization: Bearer <token>`).
+  Sets `video_auth` cookie (send `Authorization: Bearer <token>`). Returns `204 No Content`.
 
 - `GET|HEAD /api/video/{movieId}`  
-  Streams the movie file (supports `Range: bytes=...`).
+  Streams the movie file (supports `Range: bytes=...`). Returns `200` (full file) or `206` (partial content) or `404` (not found).
 
-- `GET /healthz`
+- `GET /healthz`  
+  Health check endpoint. Returns JSON with server status, video files directory, MongoDB database name, and OpenSSL version.
+
+## Functions Reference
+
+### Public Endpoints
+- `create_video_session(request, response, authorization)` - POST `/api/video/session` - Creates video authentication cookie
+- `stream_video(movie_id, request, authorization, range)` - GET|HEAD `/api/video/{movie_id}` - Streams video file with Range support
+- `healthz()` - GET `/healthz` - Health check endpoint
+
+### Helper Functions (Internal)
+- `_env_str(name, default)` - Get environment variable as string
+- `_jwt_secret()` - Get JWT secret from environment
+- `_mongo_uri()` - Get MongoDB connection URI from environment
+- `_mongo_db_name()` - Get MongoDB database name (from env or parsed from URI)
+- `_env_int(name, default)` - Get environment variable as integer
+- `_video_files_dir()` - Get video files directory path (default: `./public/video`)
+- `_parse_bearer(authorization)` - Parse Bearer token from Authorization header
+- `_is_safe_relative_file(path)` - Security check: validates file path is safe (no directory traversal)
+- `_guess_content_type(file_path)` - Guess MIME content type from file extension
+- `_parse_range(range_header, file_size)` - Parse HTTP Range header into start/end tuple
+- `_file_iter(path, start, end, chunk_size)` - Generator that yields file chunks for streaming
+- `_get_token(request, authorization)` - Get authentication token from cookie, header, or query string (priority order)
+- `_verify_token(token)` - Verify JWT token and return decoded payload
+- `_mongo_client()` - Create MongoDB client with TLS/connection timeout configuration
+- `_mongo_client_cached()` - Cached MongoDB client (LRU cache, reused across requests)
+- `_shutdown()` - Event handler for graceful MongoDB client shutdown
 

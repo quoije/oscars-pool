@@ -649,15 +649,50 @@ window.addEventListener('DOMContentLoaded', async function () {
       pageLoader.setProgress(70);
       const stats = await statsRes.json();
       const userTableBody = document.getElementById('user-table-body');
+      
+      // Check visibility config for Bon picks column
+      let showBonPicksColumn = true;
+      try {
+        const visibilityRes = await fetch('/api/settings/visibility-config', { cache: 'no-store' });
+        if (visibilityRes.ok) {
+          const visibilityConfig = await visibilityRes.json();
+          showBonPicksColumn = visibilityConfig.showBonPicksColumn !== false;
+        }
+      } catch (err) {
+        console.error('Error loading visibility config:', err);
+      }
+      
+      // Hide/show Bon picks header
+      const bonPicksHeader = document.getElementById('bon-picks-header');
+      if (bonPicksHeader) {
+        bonPicksHeader.style.display = showBonPicksColumn ? '' : 'none';
+      }
 
-      // Ensure watchedRatio is treated as a number and sort in descending order
-      stats.sort((a, b) => parseFloat(b.watchedRatio) - parseFloat(a.watchedRatio));
+      // Sort by total points (descending)
+      stats.sort((a, b) => {
+        return (b.totalPoints || 0) - (a.totalPoints || 0);
+      });
 
       // Clear previous rows to prevent duplication
       userTableBody.innerHTML = '';
 
-      stats.forEach(userStat => {
+      // Get total movies count (same for all users in the same year)
+      const totalMovies = stats.length > 0 ? (stats[0].totalMoviesCount || 0) : 0;
+      
+      // Update Films column header with total
+      const filmsHeader = document.getElementById('films-header');
+      if (filmsHeader && totalMovies > 0) {
+        filmsHeader.innerHTML = `Films <small class="text-muted" style="font-weight: normal;">(${totalMovies})</small>`;
+      }
+
+      stats.forEach((userStat, index) => {
         const userRow = document.createElement('tr');
+        const rank = index + 1;
+        const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+        
+        const rankTd = document.createElement('td');
+        rankTd.innerHTML = `<strong>${rank}${medal ? ' ' + medal : ''}</strong>`;
+
         const nameTd = document.createElement('td');
         const link = document.createElement('a');
         link.href = '#';
@@ -670,14 +705,25 @@ window.addEventListener('DOMContentLoaded', async function () {
         nameTd.appendChild(link);
 
         const countTd = document.createElement('td');
-        countTd.textContent = String(userStat.watchedCount ?? '');
+        const pointsConfig = userStat.pointsConfig || { pointsPerMovie: 1 };
+        countTd.innerHTML = `${userStat.watchedCount ?? 0} <small class="text-muted">(${userStat.moviePoints || 0} pts)</small>`;
 
-        const ratioTd = document.createElement('td');
-        ratioTd.textContent = String(userStat.watchedRatio ?? '');
+        const picksTd = document.createElement('td');
+        const pickPointsConfig = userStat.pointsConfig || { pointsPerCorrectPick: 1 };
+        picksTd.innerHTML = `${userStat.correctPicks || 0} <small class="text-muted">(${userStat.pickPoints || 0} pts)</small>`;
+        if (!showBonPicksColumn) {
+          picksTd.style.display = 'none';
+        }
 
+        const pointsTd = document.createElement('td');
+        pointsTd.className = 'text-center';
+        pointsTd.innerHTML = `<strong class="text-success">${userStat.totalPoints || 0}</strong>`;
+
+        userRow.appendChild(rankTd);
         userRow.appendChild(nameTd);
         userRow.appendChild(countTd);
-        userRow.appendChild(ratioTd);
+        userRow.appendChild(picksTd);
+        userRow.appendChild(pointsTd);
         userTableBody.appendChild(userRow);
       });
 

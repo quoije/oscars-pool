@@ -140,3 +140,19 @@ ayylmao.js
 
 # Python video server - generated TLS material (certbot state)
 python_video_server/certs/
+
+# Backup files
+backups/
+
+# Video files in public/video/
+public/video/*
+
+# Uploads directory (temporary files)
+uploads/
+
+# Example files
+exemple/
+
+# OCR training data
+*.traineddata
+eng.traineddata

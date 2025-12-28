@@ -1,21 +1,34 @@
 ## Oscars Pool 2026
 Little nodejs + mongodb app that I hack together with ChatGPT and Cursor to keep track of watched movies for an incoming Oscars Pool with some friends.
 
+**Note:** The application interface is in French.
+
 ![Oscars Pool 2026](https://raw.githubusercontent.com/quoije/oscars-pool/refs/heads/prod/img/preview.png)
 
 ## Features
-- User accounts: register, login, JWT auth
-- Optional registration "verification" via `DOG_NAMES` (if unset, verification is skipped)
-- Mark nominees as watched (per user), with watched date
-- Browse movies by Oscar year + API for available years
-- User stats: watched count/ratio and watched titles
-- Movie details pulled from OMDb (title/plot/rating/poster) via IMDb ID (optional)
-- Admin movie management: add, edit (optionally refresh from OMDb), delete
-- Built-in player page with multiple source options (VOD link, direct video URL, embed, or server file)
-- Resume playback: per-user playback progress saving (time/duration)
-- Global settings: active Oscar year, “completion” modal content for checklist
-- Password flows: admin temp password reset + forced change on next login
-- App version display (footer) managed from Admin panel (no GitHub dependency)
+
+### User Features
+- **User accounts**: register, login, JWT authentication
+- **Optional registration verification**: via `DOG_NAMES` environment variable (if unset, verification is skipped)
+- **Movie tracking**: mark nominees/movies as watched (per user), with watched date
+- **Movie browsing**: browse movies by Oscar year + API for available years
+- **Movie details**: pulled from OMDb (title/plot/rating/poster) via IMDb ID (optional)
+- **User statistics**: watched count, points from movies watched and Oscar picks, leaderboard
+- **Video player**: built-in player page with multiple source options (VOD link, direct video URL, embed, or server file)
+- **Resume playback**: per-user playback progress saving (time/duration)
+- **Oscar picks**: make picks for each category, auto-save on selection
+- **Scores**: view leaderboard with correct/incorrect pick counts, detailed breakdown per user
+- **View all picks**: see everyone's picks in a comparison view
+
+### Admin Features
+- **Movie management**: add, edit (optionally refresh from OMDb), delete movies
+- **User management**: view users, reset passwords (temp password + forced change on next login)
+- **Oscar category management**: create, edit, delete categories with nominees, bulk delete
+- **Winner management**: mark winners for each category (can clear winners)
+- **Global settings**: active Oscar year, "completion" modal content for checklist
+- **Database backup/restore**: create backups and restore from backup files
+- **App version control**: manage app version display (footer) from admin panel (no GitHub dependency)
+- **Player UI settings**: control player page admin status display
 
 ## Setup
 Create a `.env` file at the project root (same folder as `package.json`).
@@ -52,7 +65,13 @@ This app uses **MongoDB** via Mongoose. Provide a connection string in `MONGO_UR
 - `MONGO_URI` examples:
   - Atlas: `mongodb+srv://USER:PASS@cluster0.XXXX.mongodb.net/<dbName>?retryWrites=true&w=majority`
   - Local: `mongodb://127.0.0.1:27017/<dbName>`
-- Collections are created/managed automatically from the models in `models/` (e.g. `User`, `Movie`, `Setting`, `PlaybackProgress`).
+- Collections are created/managed automatically from the models in `models/`:
+  - `User` - user accounts
+  - `Movie` - Oscar-nominated movies
+  - `OscarCategory` - Oscar categories with nominees
+  - `OscarPick` - user picks for each category
+  - `Setting` - global settings (active year, etc.)
+  - `PlaybackProgress` - video playback progress per user
 
 ## More `.env` options
 The app also reads these environment variables (all optional):
@@ -70,9 +89,5 @@ Notes:
 - If you use `video_file` in a movie record, it must be a **relative path** under `VIDEO_FILES_DIR` (the backend blocks traversal/absolute paths).
 
 ## Python video server (optional)
-There is also a standalone Python server in `python_video_server/` that mirrors `/api/video/:id` (Range streaming + JWT + Mongo).
-See `python_video_server/README.md` for full instructions. In addition to `MONGO_URI` and `JWT_SECRET`, you may need:
+There is also a standalone Python server in `python_video_server/` that mirrors `/api/video/:id` (Range streaming + JWT + Mongo). See `python_video_server/README.md` for setup and usage instructions.
 
-```bash
-export MONGO_DB_NAME="oscars-pool"  # if your MONGO_URI doesn't include a /<dbName> path
-```

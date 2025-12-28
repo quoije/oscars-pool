@@ -6,6 +6,8 @@ const User = require("../models/User");
 const Movie = require("../models/Movie");
 const Setting = require("../models/Setting");
 const PlaybackProgress = require("../models/PlaybackProgress");
+const OscarPick = require("../models/OscarPick");
+const OscarCategory = require("../models/OscarCategory");
 const axios = require("axios");
 
 const router = express.Router();
@@ -142,6 +144,54 @@ router.get("/stats", verifyToken, async (req, res) => {
       return res.status(400).json({ message: "Aucun films disponible." });
     }
 
+    // Get points configuration
+    const POINTS_CONFIG_KEY = "points_config";
+    const pointsConfigSetting = await Setting.findOne({ key: POINTS_CONFIG_KEY }).select("value").lean();
+    const pointsConfig = pointsConfigSetting?.value && typeof pointsConfigSetting.value === "object" 
+      ? {
+          pointsPerMovie: typeof pointsConfigSetting.value.pointsPerMovie === "number" ? pointsConfigSetting.value.pointsPerMovie : 1,
+          pointsPerCorrectPick: typeof pointsConfigSetting.value.pointsPerCorrectPick === "number" ? pointsConfigSetting.value.pointsPerCorrectPick : 1,
+        }
+      : { pointsPerMovie: 1, pointsPerCorrectPick: 1 };
+
+    // Get all categories with winners marked for this year
+    const categories = await OscarCategory.find({ year }).lean();
+    const categoryWinners = new Map();
+    categories.forEach(cat => {
+      const winner = cat.nominees.find(n => n.isWinner);
+      if (winner) {
+        categoryWinners.set(cat.categoryNumber, winner.name);
+      }
+    });
+
+    // Get all picks for this year and calculate correct picks on-the-fly
+    let picksByUserId = new Map();
+    try {
+      const allPicks = await OscarPick.find({ year })
+        .select("userId picks")
+        .lean();
+
+      allPicks.forEach(pick => {
+        const userId = String(pick.userId);
+        let correctCount = 0;
+        
+        // Calculate correct picks based on current winners
+        if (Array.isArray(pick.picks)) {
+          pick.picks.forEach(p => {
+            const correctWinner = categoryWinners.get(p.categoryNumber);
+            if (correctWinner && p.selectedNominee === correctWinner) {
+              correctCount++;
+            }
+          });
+        }
+        
+        picksByUserId.set(userId, correctCount);
+      });
+    } catch (err) {
+      console.error("Error fetching picks for stats:", err);
+      // Continue without picks - users will just have 0 pick points
+    }
+
     // Build stats for each user
     const userStats = users.map((user) => {
       const movieByImdbId = new Map(allMovies.map((m) => [m.imdb_id, m]));
@@ -175,13 +225,26 @@ router.get("/stats", verifyToken, async (req, res) => {
       const watchedCount = watchedMoviesDetails.length;
       const watchedRatio = ((watchedCount / totalMoviesCount) * 100).toFixed(1);
 
+      // Calculate points
+      const userId = String(user._id);
+      const correctPicks = picksByUserId.get(userId) || 0;
+      const moviePoints = watchedCount * pointsConfig.pointsPerMovie;
+      const pickPoints = correctPicks * pointsConfig.pointsPerCorrectPick;
+      const totalPoints = moviePoints + pickPoints;
+
       return {
         name: user.name,
+        userId: userId,
         year,
         watchedCount,
         totalMoviesCount,
         watchedRatio: `${watchedRatio}%`,
-        watchedMovies: watchedMoviesDetails // Include movie details
+        watchedMovies: watchedMoviesDetails, // Include movie details
+        correctPicks: correctPicks,
+        moviePoints: moviePoints,
+        pickPoints: pickPoints,
+        totalPoints: totalPoints,
+        pointsConfig: pointsConfig
       };
     });
 

@@ -32,7 +32,7 @@
 
 <nav class="navbar navbar-expand-lg navbar-custom">
   <div class="container">
-    <a class="navbar-brand" style="margin-left: -7px;">
+    <a class="navbar-brand" style="margin-left: -7px;" href="movies.html">
       <img src="img/logo_w.png" width="220" height="70" loading="eager" fetchpriority="high" decoding="async" style="max-width: 220px; height: 70px; object-fit: contain;">
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
@@ -43,6 +43,7 @@
         <a href="movies.html" class="nav-link btn btn-outline-light me-2">Films</a>
         <a href="checklist.html" class="nav-link btn btn-outline-light me-2">Checklist</a>
         <a href="user-stat.html" class="nav-link btn btn-outline-light me-2">Statistiques</a>
+        <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;">Mes picks</a>
         <a href="control.html" class="nav-link btn btn-warning me-2">Admin</a>
       </div>
       <div class="d-flex ms-auto mt-2 mt-lg-0 align-items-center">
@@ -88,6 +89,11 @@
       </button>
     </li>
     <li class="nav-item" role="presentation">
+      <button class="nav-link" id="admin-categories-tab" data-bs-toggle="tab" data-bs-target="#admin-categories" type="button" role="tab" aria-controls="admin-categories" aria-selected="false">
+        Catégories Oscars
+      </button>
+    </li>
+    <li class="nav-item" role="presentation">
       <button class="nav-link" id="admin-backup-tab" data-bs-toggle="tab" data-bs-target="#admin-backup" type="button" role="tab" aria-controls="admin-backup" aria-selected="false">
         Backup / Restore
       </button>
@@ -123,6 +129,16 @@
           <li class="nav-item" role="presentation">
             <button class="nav-link" id="admin-settings-subtab-oscar-date" data-bs-toggle="tab" data-bs-target="#admin-settings-pane-oscar-date" type="button" role="tab" aria-controls="admin-settings-pane-oscar-date" aria-selected="false">
               Date Oscars
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="admin-settings-subtab-points" data-bs-toggle="tab" data-bs-target="#admin-settings-pane-points" type="button" role="tab" aria-controls="admin-settings-pane-points" aria-selected="false">
+              Points
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="admin-settings-subtab-visibility" data-bs-toggle="tab" data-bs-target="#admin-settings-pane-visibility" type="button" role="tab" aria-controls="admin-settings-pane-visibility" aria-selected="false">
+              Visibilité
             </button>
           </li>
         </ul>
@@ -191,6 +207,72 @@
               <div class="mt-3">
                 <div class="text-muted small mb-1">Dates configurées</div>
                 <div id="oscar-date-current" class="border rounded p-2 bg-white">—</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Points configuration -->
+          <div class="tab-pane fade" id="admin-settings-pane-points" role="tabpanel" aria-labelledby="admin-settings-subtab-points" tabindex="0">
+            <div class="border rounded p-3 bg-light">
+              <div class="text-muted small mb-3">
+                Configure les points attribués pour les films regardés et les bonnes réponses aux Oscars.
+              </div>
+
+              <div id="points-config-alert" class="alert d-none" role="alert"></div>
+
+              <div class="row g-3">
+                <div class="col-12 col-md-6">
+                  <label for="points-per-movie" class="form-label">Points par film regardé</label>
+                  <input type="number" class="form-control" id="points-per-movie" min="0" step="1" value="1">
+                  <div class="form-text">Points attribués pour chaque film complété.</div>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label for="points-per-correct-pick" class="form-label">Points par bonne réponse</label>
+                  <input type="number" class="form-control" id="points-per-correct-pick" min="0" step="1" value="1">
+                  <div class="form-text">Points attribués pour chaque bonne réponse aux Oscars.</div>
+                </div>
+              </div>
+
+              <div class="mt-3">
+                <div class="d-flex gap-2">
+                  <button type="button" id="points-config-reload" class="btn btn-outline-secondary">Recharger</button>
+                  <button type="button" id="points-config-save" class="btn btn-warning">Enregistrer</button>
+                </div>
+              </div>
+
+              <div class="mt-3">
+                <div class="text-muted small mb-1">Calcul des points</div>
+                <div class="border rounded p-2 bg-white">
+                  <div class="small">
+                    <strong>Total =</strong> (Films regardés × <span id="points-per-movie-preview">1</span>) + (Bonnes réponses × <span id="points-per-correct-pick-preview">1</span>)
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Visibility settings -->
+          <div class="tab-pane fade" id="admin-settings-pane-visibility" role="tabpanel" aria-labelledby="admin-settings-subtab-visibility" tabindex="0">
+            <div class="border rounded p-3 bg-light">
+              <div class="text-muted small mb-3">
+                Contrôle la visibilité de certains éléments dans l'interface.
+              </div>
+
+              <div id="visibility-config-alert" class="alert d-none" role="alert"></div>
+
+              <div class="form-check">
+                <input class="form-check-input" type="checkbox" id="visibility-show-picks-features">
+                <label class="form-check-label" for="visibility-show-picks-features">
+                  Afficher les fonctionnalités "Picks"
+                </label>
+                <div class="form-text">Contrôle l'affichage du bouton "Mes picks" dans la navigation et de la colonne "Bon picks" dans les statistiques.</div>
+              </div>
+
+              <div class="mt-3">
+                <div class="d-flex gap-2">
+                  <button type="button" id="visibility-config-reload" class="btn btn-outline-secondary">Recharger</button>
+                  <button type="button" id="visibility-config-save" class="btn btn-warning">Enregistrer</button>
+                </div>
               </div>
             </div>
           </div>
@@ -805,6 +887,113 @@
       </div>
     </div>
 
+    <div class="tab-pane fade" id="admin-categories" role="tabpanel" aria-labelledby="admin-categories-tab">
+      <div class="card p-3">
+        <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
+          <div>
+            <h4 class="mb-1">Catégories Oscars</h4>
+            <div class="text-muted">Créez et gérez les catégories manuellement.</div>
+          </div>
+        </div>
+
+        <ul class="nav nav-pills admin-subtabs mt-3" id="adminCategoriesSubTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="admin-categories-subtab-manual" data-bs-toggle="tab" data-bs-target="#admin-categories-pane-manual" type="button" role="tab" aria-controls="admin-categories-pane-manual" aria-selected="true">
+              Création manuelle
+            </button>
+          </li>
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="admin-categories-subtab-list" data-bs-toggle="tab" data-bs-target="#admin-categories-pane-list" type="button" role="tab" aria-controls="admin-categories-pane-list" aria-selected="false">
+              Liste
+            </button>
+          </li>
+        </ul>
+
+        <div class="tab-content pt-3">
+          <!-- Manual creation -->
+          <div class="tab-pane fade show active" id="admin-categories-pane-manual" role="tabpanel" aria-labelledby="admin-categories-subtab-manual" tabindex="0">
+            <div class="row g-3">
+              <div class="col-12 col-xxl-7">
+                <div class="border rounded p-3 bg-light">
+                  <div class="fw-semibold mb-1">Créer une catégorie manuellement</div>
+                  <div class="text-muted small mb-3">
+                    Ajoutez une catégorie et ses nommés un par un.
+                  </div>
+
+                  <div id="categories-manual-alert" class="alert d-none" role="alert"></div>
+
+                  <form id="create-category-form">
+                    <div class="mb-3">
+                      <label for="manual-year" class="form-label">Année</label>
+                      <select class="form-select" id="manual-year" required>
+                        <option value="">Chargement...</option>
+                      </select>
+                    </div>
+
+                    <div class="mb-3">
+                      <label for="category-number" class="form-label">Numéro de catégorie</label>
+                      <input type="number" class="form-control" id="category-number" placeholder="1" min="1" max="50" required>
+                    </div>
+
+                    <div class="mb-3">
+                      <label for="category-name" class="form-label">Nom de la catégorie</label>
+                      <input type="text" class="form-control" id="category-name" placeholder="Best Picture" required>
+                    </div>
+
+                    <div class="mb-3">
+                      <label for="nominees-list" class="form-label">Nommés (un par ligne)</label>
+                      <textarea class="form-control" id="nominees-list" rows="10" placeholder="Anora&#10;The Brutalist&#10;Dune: Part Two" required></textarea>
+                      <div class="form-text">Entrez un nommé par ligne.</div>
+                    </div>
+
+                    <div class="d-flex flex-wrap justify-content-end gap-2">
+                      <button type="submit" class="btn btn-primary">Créer</button>
+                    </div>
+                  </form>
+                </div>
+              </div>
+
+              <div class="col-12 col-xxl-5">
+                <div class="border rounded p-3 bg-white">
+                  <div class="fw-semibold mb-2">Note</div>
+                  <div class="text-muted">
+                    Vous pouvez créer plusieurs catégories pour la même année. 
+                    Le numéro de catégorie doit être unique par année.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- List -->
+          <div class="tab-pane fade" id="admin-categories-pane-list" role="tabpanel" aria-labelledby="admin-categories-subtab-list" tabindex="0">
+            <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
+              <div>
+                <div class="fw-semibold">Catégories importées</div>
+                <div class="text-muted small">Gérez les catégories existantes</div>
+              </div>
+              <div class="d-flex flex-column gap-2">
+                <div class="d-flex gap-2">
+                  <select class="form-select" id="list-year-filter" style="width: 150px;">
+                    <option value="">Toutes les années</option>
+                  </select>
+                  <button type="button" id="refresh-categories-list" class="btn btn-outline-secondary">Rafraîchir</button>
+                  <button type="button" id="bulk-delete-categories-btn" class="btn btn-sm btn-danger" disabled>Supprimer</button>
+                </div>
+                <div id="categories-selection-text" class="text-muted small" style="display: none;">
+                  <span id="bulk-delete-count">0</span> catégorie(s) sélectionnée(s)
+                </div>
+              </div>
+            </div>
+
+            <div id="categories-list-container" class="border rounded bg-white p-3">
+              <div class="text-muted">Charge la liste…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="tab-pane fade" id="admin-winners" role="tabpanel" aria-labelledby="admin-winners-tab">
       <div class="card p-3">
         <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
@@ -1027,6 +1216,43 @@
         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
         <button type="button" id="add-user-reset" class="btn btn-outline-secondary">Reset</button>
         <button type="submit" form="add-user-form" class="btn btn-warning" id="add-user-submit">Créer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit category modal -->
+<div class="modal fade" id="editCategoryModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Modifier la catégorie</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="edit_category_id">
+        
+        <div class="mb-3">
+          <label for="edit_category_number" class="form-label">Numéro de catégorie</label>
+          <input type="number" class="form-control" id="edit_category_number" min="1" max="50" required>
+        </div>
+
+        <div class="mb-3">
+          <label for="edit_category_name" class="form-label">Nom de la catégorie</label>
+          <input type="text" class="form-control" id="edit_category_name" required>
+        </div>
+
+        <div class="mb-3">
+          <label for="edit_nominees_list" class="form-label">Nommés (un par ligne)</label>
+          <textarea class="form-control" id="edit_nominees_list" rows="10" required></textarea>
+          <div class="form-text">Entrez un nommé par ligne.</div>
+        </div>
+
+        <div id="edit-category-alert" class="alert d-none" role="alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-primary" id="save-category-changes">Enregistrer</button>
       </div>
     </div>
   </div>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pool Oscars - Voir Tous les Choix</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="./css/app.css" rel="stylesheet">
+  <link rel="preload" as="image" href="img/logo_w.png">
+  <script src="./js/app_header_boot.js" defer></script>
+  <style>
+    .navbar-custom {
+      background-color: black;
+      color: white;
+    }
+    .navbar-custom .navbar-brand,
+    .navbar-custom .nav-link {
+      color: white;
+    }
+    .navbar-custom .nav-link:hover {
+      color: #ddd;
+    }
+    .navbar-toggler {
+      border-color: white;
+    }
+    .navbar-toggler-icon {
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
+    }
+    .user-picks-card {
+      margin-bottom: 1.5rem;
+    }
+    .pick-item {
+      padding: 0.5rem;
+      border-bottom: 1px solid #dee2e6;
+    }
+    .pick-item:last-child {
+      border-bottom: none;
+    }
+    .correct-pick {
+      background-color: #d1e7dd;
+    }
+    .incorrect-pick {
+      background-color: #f8d7da;
+    }
+  </style>
+</head>
+<body class="bg-light">
+
+<nav class="navbar navbar-expand-lg navbar-custom">
+  <div class="container">
+    <a class="navbar-brand" style="margin-left: -7px;" href="movies.html">
+      <img src="img/logo_w.png" width="220" height="70" loading="eager" fetchpriority="high" decoding="async" style="max-width: 220px; height: 70px; object-fit: contain;">
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <div class="navbar-nav">
+        <a href="movies.html" class="nav-link btn btn-outline-light me-2">Films</a>
+        <a href="checklist.html" class="nav-link btn btn-outline-light me-2">Checklist</a>
+        <a href="user-stat.html" class="nav-link btn btn-outline-light me-2">Statistiques</a>
+        <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;">Mes picks</a>
+        <a href="control.html" class="nav-link btn btn-warning me-2">Admin</a>
+        <a href="view-picks.html" class="nav-link btn btn-info me-2 active">Voir Tous les Choix</a>
+      </div>
+      <div class="d-flex ms-auto mt-2 mt-lg-0 align-items-center">
+        <span id="user-name" class="navbar-text me-3"></span>
+        <button id="log-off" class="btn btn-danger">Déconnexion</button>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<div class="container mt-5 pb-5">
+  <h2>Voir Tous les Choix</h2>
+  
+  <div id="alert-container"></div>
+  
+  <div class="card shadow-sm mt-3 mb-4">
+    <div class="card-body">
+      <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
+        <div>
+          <div class="fw-semibold">Année: <span id="current-year">—</span></div>
+          <div class="text-muted small">Vue d'ensemble de tous les choix des utilisateurs</div>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="button" id="refresh-picks" class="btn btn-outline-secondary">Rafraîchir</button>
+        </div>
+      </div>
+      <div class="mt-3">
+        <div class="text-muted small">
+          <span id="users-count">0</span> utilisateur(s) ont soumis leurs choix
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="picks-container">
+    <div class="text-center py-4 text-muted">Chargement des choix…</div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.js"></script>
+<script src="./js/app_view-picks.js"></script>
+
+</body>
+</html>
+

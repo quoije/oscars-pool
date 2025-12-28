@@ -50,5 +50,59 @@
   if (adminLink && decoded.admin) {
     adminLink.classList.remove('d-none');
   }
+
+  // Check visibility config for picks button
+  const picksButton = document.getElementById('nav-link-picks');
+  if (picksButton) {
+    // Check cached value first for immediate display
+    const cachedConfig = localStorage.getItem('visibility_config_cache');
+    let cachedValue = null;
+    let cachedTimestamp = null;
+    
+    if (cachedConfig) {
+      try {
+        const parsed = JSON.parse(cachedConfig);
+        cachedValue = parsed.value;
+        cachedTimestamp = parsed.timestamp;
+      } catch (e) {
+        // Invalid cache, ignore
+      }
+    }
+    
+    // Use cached value if it's less than 5 minutes old
+    const cacheAge = cachedTimestamp ? Date.now() - cachedTimestamp : Infinity;
+    const useCache = cachedValue !== null && cacheAge < 5 * 60 * 1000;
+    
+    if (useCache) {
+      // Show button immediately based on cached value
+      if (cachedValue.showPicksButton !== false) {
+        picksButton.style.display = '';
+      }
+    } else {
+      // Default to showing while we fetch
+      picksButton.style.display = '';
+    }
+    
+    // Fetch fresh value from server
+    fetch('/api/settings/visibility-config', { cache: 'no-store' })
+      .then(res => res.json())
+      .then(config => {
+        // Cache the result
+        localStorage.setItem('visibility_config_cache', JSON.stringify({
+          value: config,
+          timestamp: Date.now()
+        }));
+        
+        // Update display based on fresh value
+        if (config.showPicksButton !== false) {
+          picksButton.style.display = '';
+        } else {
+          picksButton.style.display = 'none';
+        }
+      })
+      .catch(() => {
+        // On error, keep current state (already set from cache or default)
+      });
+  }
 })();
 
