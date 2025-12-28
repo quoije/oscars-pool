@@ -107,7 +107,17 @@
     }
   </style>
 </head>
-<body class="bg-light">
+<body class="bg-light page-loading">
+
+<!-- Preloaded loader overlay to avoid initial "clear" flash -->
+<div id="page-loader-overlay" class="page-loader-overlay" data-preloaded="true" role="status" aria-live="polite" aria-busy="true">
+  <div class="page-loader-card page-loader-card--baronly">
+    <span class="visually-hidden">Chargement…</span>
+    <div class="page-loader-progress" aria-hidden="true">
+      <div class="page-loader-bar" id="page-loader-bar" style="width: 8%;"></div>
+    </div>
+  </div>
+</div>
 
 <nav class="navbar navbar-expand-lg navbar-custom">
   <div class="container">
