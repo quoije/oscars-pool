@@ -122,11 +122,6 @@
             </button>
           </li>
           <li class="nav-item" role="presentation">
-            <button class="nav-link" id="admin-settings-subtab-player" data-bs-toggle="tab" data-bs-target="#admin-settings-pane-player" type="button" role="tab" aria-controls="admin-settings-pane-player" aria-selected="false">
-              Lecteur
-            </button>
-          </li>
-          <li class="nav-item" role="presentation">
             <button class="nav-link" id="admin-settings-subtab-oscar-date" data-bs-toggle="tab" data-bs-target="#admin-settings-pane-oscar-date" type="button" role="tab" aria-controls="admin-settings-pane-oscar-date" aria-selected="false">
               Date Oscars
             </button>
@@ -158,25 +153,6 @@
                 </div>
               </div>
               <div class="form-text">Basé sur les années présentes dans les films.</div>
-            </div>
-          </div>
-
-          <!-- Player -->
-          <div class="tab-pane fade" id="admin-settings-pane-player" role="tabpanel" aria-labelledby="admin-settings-subtab-player" tabindex="0">
-            <div class="border rounded p-3 bg-light">
-              <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="player_ui_show_status">
-                  <label class="form-check-label" for="player_ui_show_status">Afficher “Source” + “Progress” (admins)</label>
-                </div>
-                <div class="d-flex gap-2">
-                  <button type="button" id="player_ui_reload" class="btn btn-outline-secondary">Recharger</button>
-                  <button type="button" id="player_ui_save" class="btn btn-warning">Enregistrer</button>
-                </div>
-              </div>
-              <div class="form-text mt-2">
-                Contrôle l’affichage du bloc debug dans <code>player.html</code> (admins uniquement).
-              </div>
             </div>
           </div>
 
@@ -254,25 +230,27 @@
           <!-- Visibility settings -->
           <div class="tab-pane fade" id="admin-settings-pane-visibility" role="tabpanel" aria-labelledby="admin-settings-subtab-visibility" tabindex="0">
             <div class="border rounded p-3 bg-light">
-              <div class="text-muted small mb-3">
-                Contrôle la visibilité de certains éléments dans l'interface.
-              </div>
+              <div id="visibility-config-alert" class="alert d-none mb-3" role="alert"></div>
 
-              <div id="visibility-config-alert" class="alert d-none" role="alert"></div>
-
-              <div class="form-check">
+              <div class="form-check mb-4">
                 <input class="form-check-input" type="checkbox" id="visibility-show-picks-features">
                 <label class="form-check-label" for="visibility-show-picks-features">
                   Afficher les fonctionnalités "Picks"
                 </label>
-                <div class="form-text">Contrôle l'affichage du bouton "Mes picks" dans la navigation et de la colonne "Bon picks" dans les statistiques.</div>
+                <div class="form-text small text-muted">Contrôle l'affichage du bouton "Mes picks" dans la navigation et de la colonne "Bon picks" dans les statistiques.</div>
               </div>
 
-              <div class="mt-3">
-                <div class="d-flex gap-2">
-                  <button type="button" id="visibility-config-reload" class="btn btn-outline-secondary">Recharger</button>
-                  <button type="button" id="visibility-config-save" class="btn btn-warning">Enregistrer</button>
-                </div>
+              <div class="form-check mb-4">
+                <input class="form-check-input" type="checkbox" id="player_ui_show_status">
+                <label class="form-check-label" for="player_ui_show_status">
+                  Afficher "Source" + "Progress" (admins)
+                </label>
+                <div class="form-text small text-muted">Contrôle l'affichage du bloc debug dans <code>player.html</code> (admins uniquement).</div>
+              </div>
+
+              <div class="d-flex gap-2">
+                <button type="button" id="visibility-config-reload" class="btn btn-outline-secondary">Recharger</button>
+                <button type="button" id="visibility-config-save" class="btn btn-warning">Enregistrer</button>
               </div>
             </div>
           </div>

@@ -2671,8 +2671,21 @@ window.onload = async function () {
 
   if (visibilityConfigReloadBtn) {
     visibilityConfigReloadBtn.addEventListener('click', async () => {
-      await loadVisibilityConfig();
-      showResponse('success', 'Configuration rechargée');
+      visibilityConfigReloadBtn.disabled = true;
+      const oldText = visibilityConfigReloadBtn.textContent;
+      visibilityConfigReloadBtn.textContent = 'Chargement...';
+      try {
+        await Promise.all([
+          loadVisibilityConfig(),
+          loadPlayerUiIntoUi()
+        ]);
+        showResponse('success', 'Configuration rechargée');
+      } catch (err) {
+        showResponse('warning', 'Erreur lors du rechargement: ' + (err.message || 'Erreur inconnue'));
+      } finally {
+        visibilityConfigReloadBtn.disabled = false;
+        visibilityConfigReloadBtn.textContent = oldText;
+      }
     });
   }
 
@@ -2687,35 +2700,49 @@ window.onload = async function () {
         const oldText = visibilityConfigSaveBtn.textContent;
         visibilityConfigSaveBtn.textContent = 'Enregistrement...';
 
-        const res = await fetch('/api/settings/visibility-config', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            showPicksButton,
-            showBonPicksColumn
-          })
-        });
+        // Save both visibility config and player UI settings
+        const [visibilityRes, playerUiPayload] = await Promise.all([
+          fetch('/api/settings/visibility-config', {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              showPicksButton,
+              showBonPicksColumn
+            })
+          }),
+          Promise.resolve(getPlayerUiFormValue())
+        ]);
 
-        if (!res.ok) {
-          const error = await res.json();
-          throw new Error(error.message || 'Failed to save');
+        if (!visibilityRes.ok) {
+          const error = await visibilityRes.json();
+          throw new Error(error.message || 'Failed to save visibility config');
         }
 
-        const data = await res.json();
+        // Save player UI settings
+        try {
+          const saved = await savePlayerUi(playerUiPayload);
+          setPlayerUiForm(saved);
+        } catch (playerErr) {
+          // If player UI save fails, still show success for visibility but warn
+          console.warn('Player UI save failed:', playerErr);
+        }
+
+        const data = await visibilityRes.json();
         
         // Clear cache so all pages get the new setting immediately
         localStorage.removeItem('visibility_config_cache');
         
-        showResponse('success', 'Configuration de visibilité enregistrée');
+        showResponse('success', 'Configuration enregistrée');
       } catch (err) {
         if (visibilityConfigAlert) {
           visibilityConfigAlert.className = 'alert alert-danger';
           visibilityConfigAlert.textContent = 'Erreur: ' + err.message;
           visibilityConfigAlert.classList.remove('d-none');
         }
+        showResponse('danger', 'Erreur lors de l\'enregistrement: ' + err.message);
       } finally {
         visibilityConfigSaveBtn.disabled = false;
         visibilityConfigSaveBtn.textContent = oldText;
@@ -2723,11 +2750,14 @@ window.onload = async function () {
     });
   }
 
-  // Load visibility config when visibility tab is shown
+  // Load visibility config and player UI when visibility tab is shown
   const visibilitySubTab = document.getElementById('admin-settings-subtab-visibility');
   if (visibilitySubTab) {
     visibilitySubTab.addEventListener('shown.bs.tab', async () => {
-      await loadVisibilityConfig();
+      await Promise.all([
+        loadVisibilityConfig(),
+        loadPlayerUiIntoUi()
+      ]);
     });
   }
 

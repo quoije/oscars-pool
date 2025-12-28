@@ -1,6 +1,125 @@
 (function() {
   'use strict';
 
+  function createPageLoader(options = {}) {
+    const title = String(options.title || 'Chargement…');
+    // Subtitle kept for backwards-compat with callers, but we no longer render text in the UI.
+    const subtitle = String(options.subtitle || 'Préparation de la page…');
+
+    let progress = 0;
+    let removed = false;
+    let navResizeObserver = null;
+
+    // Reuse a preloaded overlay if present (prevents initial "clear" flash).
+    const preloadedOverlay = document.getElementById('page-loader-overlay');
+    const overlay = preloadedOverlay || document.createElement('div');
+    if (!preloadedOverlay) {
+      overlay.className = 'page-loader-overlay';
+      overlay.setAttribute('role', 'status');
+      overlay.setAttribute('aria-live', 'polite');
+      overlay.setAttribute('aria-busy', 'true');
+
+      overlay.innerHTML = `
+        <div class="page-loader-card page-loader-card--baronly">
+          <span class="visually-hidden">${title}</span>
+          <div class="page-loader-progress" aria-hidden="true">
+            <div class="page-loader-bar" id="page-loader-bar"></div>
+          </div>
+        </div>
+      `;
+    } else {
+      // Keep screen reader label up to date.
+      const label = overlay.querySelector('.visually-hidden');
+      if (label) label.textContent = title;
+    }
+
+    const barEl = () => overlay.querySelector('#page-loader-bar');
+
+    function clampPct(p) {
+      const n = Number(p);
+      if (!Number.isFinite(n)) return 0;
+      return Math.max(0, Math.min(100, n));
+    }
+
+    function setProgress(p) {
+      progress = clampPct(p);
+      const bar = barEl();
+      if (bar) bar.style.width = `${progress}%`;
+    }
+
+    function setSubtitle(_) {
+      // Intentionally no-op (we only show the bar now).
+    }
+
+    function getNavHeightPx() {
+      const nav = document.querySelector('nav.navbar');
+      if (!nav) return 0;
+      const rect = nav.getBoundingClientRect();
+      const h = Number(rect?.height) || 0;
+      return h > 0 ? Math.round(h) : 0;
+    }
+
+    function updateOverlayTopOffset() {
+      // Scope the offset to this overlay instance (no global CSS var).
+      overlay.style.setProperty('--page-loader-top', `${getNavHeightPx()}px`);
+    }
+
+    function ensureMounted() {
+      if (removed) return;
+      // IMPORTANT: even if the overlay is preloaded in HTML (already connected),
+      // we still need to compute the navbar offset. Otherwise it defaults to 0px
+      // and the blur covers the header.
+      updateOverlayTopOffset();
+      document.body.classList.add('page-loading');
+
+      if (!overlay.isConnected) document.body.appendChild(overlay);
+
+      // Keep the overlay aligned if the navbar height changes (mobile collapse, resize, etc.)
+      if (!navResizeObserver) {
+        const nav = document.querySelector('nav.navbar');
+        if (nav && typeof ResizeObserver !== 'undefined') {
+          try {
+            navResizeObserver = new ResizeObserver(() => updateOverlayTopOffset());
+            navResizeObserver.observe(nav);
+          } catch (_) {
+            navResizeObserver = null;
+          }
+        }
+      }
+    }
+
+    function hideAndRemoveSoon() {
+      if (removed) return;
+      overlay.classList.add('page-loader-hide');
+      overlay.setAttribute('aria-busy', 'false');
+      document.body.classList.remove('page-loading');
+      window.setTimeout(() => {
+        removed = true;
+        if (navResizeObserver) {
+          try { navResizeObserver.disconnect(); } catch (_) {}
+          navResizeObserver = null;
+        }
+        try { overlay.remove(); } catch (_) {}
+      }, 220);
+    }
+
+    function done() {
+      setProgress(100);
+      hideAndRemoveSoon();
+    }
+
+    function fail(_) {
+      // Don't block the UI on errors: let the page render its own error message.
+      setProgress(Math.max(progress, 95));
+      window.setTimeout(() => hideAndRemoveSoon(), 200);
+    }
+
+    ensureMounted();
+    setProgress(8);
+
+    return { setProgress, setSubtitle, done, fail };
+  }
+
   const token = localStorage.getItem('auth_token');
   if (!token) {
     window.location.href = '/';
@@ -74,13 +193,15 @@
     }, 5000);
   }
 
-  async function fetchCategories() {
+  async function fetchCategories(pageLoader) {
     try {
       // Use active year if not set
       if (!currentYear) {
         currentYear = await fetchActiveYear();
         document.title = `Pool Oscars (${currentYear}) - Mes picks`;
       }
+
+      if (pageLoader) pageLoader.setProgress(18);
 
       const res = await fetch(`/api/picks/categories?year=${currentYear}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -95,6 +216,8 @@
         throw new Error('Failed to fetch categories');
       }
       
+      if (pageLoader) pageLoader.setProgress(40);
+      
       const data = await res.json();
       categories = data.categories || [];
       currentYear = data.year || currentYear;
@@ -108,19 +231,27 @@
             Un administrateur doit d'abord importer les catégories.
           </div>
         `;
+        if (pageLoader) pageLoader.done();
         return;
       }
       
+      if (pageLoader) pageLoader.setProgress(60);
+      
       renderCategories();
-      await loadMyPicks();
+      await loadMyPicks(pageLoader);
+      
+      if (pageLoader) pageLoader.setProgress(85);
     } catch (err) {
       console.error('Error fetching categories:', err);
       showAlert('Erreur lors du chargement des catégories: ' + err.message, 'danger');
+      if (pageLoader) pageLoader.fail();
     }
   }
 
-  async function loadMyPicks() {
+  async function loadMyPicks(pageLoader) {
     try {
+      if (pageLoader) pageLoader.setProgress(70);
+      
       const res = await fetch(`/api/picks/my-picks?year=${currentYear}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -128,6 +259,8 @@
       if (!res.ok && res.status !== 404) {
         throw new Error('Failed to load picks');
       }
+      
+      if (pageLoader) pageLoader.setProgress(80);
       
       const data = await res.json();
       if (data.pick && data.pick.picks) {
@@ -738,28 +871,42 @@
   });
 
   // Initial load
-  (async () => {
-    currentYear = await fetchActiveYear();
-    document.title = `Pool Oscars (${currentYear}) - Mes choix`;
-    await fetchCategories();
-    
-    // Auto-refresh scores on page load if scores tab is active
-    const scoresTab = document.getElementById('tab-scores');
-    const scoresPane = document.getElementById('pane-scores');
-    if (scoresTab && scoresPane && (scoresTab.classList.contains('active') || scoresPane.classList.contains('active'))) {
-      await fetchScores();
-    }
-    
-    // Auto-refresh winners on page load if admin and winners tab is active
-    if (decoded.admin) {
-      const winnersTab = document.getElementById('tab-winners');
-      const winnersPane = document.getElementById('pane-winners');
-      // Check if winners tab is active (either by default or if it becomes active)
-      if (winnersTab && winnersPane && (winnersTab.classList.contains('active') || winnersPane.classList.contains('active'))) {
-        await fetchWinnersCategories();
-        await calculateScores(true); // Silent mode for auto-refresh
+  window.addEventListener('DOMContentLoaded', async function() {
+    const pageLoader = createPageLoader({
+      title: 'Chargement des picks',
+      subtitle: 'Récupération des données…'
+    });
+
+    try {
+      currentYear = await fetchActiveYear();
+      document.title = `Pool Oscars (${currentYear}) - Mes choix`;
+      
+      pageLoader.setProgress(12);
+      await fetchCategories(pageLoader);
+      
+      // Auto-refresh scores on page load if scores tab is active
+      const scoresTab = document.getElementById('tab-scores');
+      const scoresPane = document.getElementById('pane-scores');
+      if (scoresTab && scoresPane && (scoresTab.classList.contains('active') || scoresPane.classList.contains('active'))) {
+        await fetchScores();
       }
+      
+      // Auto-refresh winners on page load if admin and winners tab is active
+      if (decoded.admin) {
+        const winnersTab = document.getElementById('tab-winners');
+        const winnersPane = document.getElementById('pane-winners');
+        // Check if winners tab is active (either by default or if it becomes active)
+        if (winnersTab && winnersPane && (winnersTab.classList.contains('active') || winnersPane.classList.contains('active'))) {
+          await fetchWinnersCategories();
+          await calculateScores(true); // Silent mode for auto-refresh
+        }
+      }
+      
+      pageLoader.done();
+    } catch (err) {
+      console.error('Error during initial load:', err);
+      pageLoader.fail();
     }
-  })();
+  });
 })();
 
