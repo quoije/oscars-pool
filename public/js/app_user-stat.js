@@ -668,15 +668,22 @@ window.addEventListener('DOMContentLoaded', async function () {
         bonPicksHeader.style.display = showBonPicksColumn ? '' : 'none';
       }
 
-      // Sort by total points (descending), then by watched ratio
+      // Sort by total points (descending)
       stats.sort((a, b) => {
-        const pointsDiff = (b.totalPoints || 0) - (a.totalPoints || 0);
-        if (pointsDiff !== 0) return pointsDiff;
-        return parseFloat(b.watchedRatio) - parseFloat(a.watchedRatio);
+        return (b.totalPoints || 0) - (a.totalPoints || 0);
       });
 
       // Clear previous rows to prevent duplication
       userTableBody.innerHTML = '';
+
+      // Get total movies count (same for all users in the same year)
+      const totalMovies = stats.length > 0 ? (stats[0].totalMoviesCount || 0) : 0;
+      
+      // Update Films column header with total
+      const filmsHeader = document.getElementById('films-header');
+      if (filmsHeader && totalMovies > 0) {
+        filmsHeader.innerHTML = `Films <small class="text-muted" style="font-weight: normal;">(${totalMovies})</small>`;
+      }
 
       stats.forEach((userStat, index) => {
         const userRow = document.createElement('tr');
@@ -712,15 +719,11 @@ window.addEventListener('DOMContentLoaded', async function () {
         pointsTd.className = 'text-center';
         pointsTd.innerHTML = `<strong class="text-success">${userStat.totalPoints || 0}</strong>`;
 
-        const ratioTd = document.createElement('td');
-        ratioTd.textContent = String(userStat.watchedRatio ?? '');
-
         userRow.appendChild(rankTd);
         userRow.appendChild(nameTd);
         userRow.appendChild(countTd);
         userRow.appendChild(picksTd);
         userRow.appendChild(pointsTd);
-        userRow.appendChild(ratioTd);
         userTableBody.appendChild(userRow);
       });
 

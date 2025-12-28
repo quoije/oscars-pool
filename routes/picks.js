@@ -68,8 +68,8 @@ router.post("/submit", verifyToken, async (req, res) => {
     const userId = req.user.id;
     const yearNum = parseOscarYear(year) || await getOrInitActiveYear();
 
-    if (!Array.isArray(picks) || picks.length === 0) {
-      return res.status(400).json({ message: "Picks array is required" });
+    if (!Array.isArray(picks)) {
+      return res.status(400).json({ message: "Picks must be an array" });
     }
 
     // Verify categories exist for this year
@@ -78,31 +78,38 @@ router.post("/submit", verifyToken, async (req, res) => {
       return res.status(400).json({ message: "No categories found for this year. Please import categories first." });
     }
 
-    // Validate picks
+    // Filter and validate picks - remove picks for deleted categories
     const categoryMap = new Map(categories.map(c => [c.categoryNumber, c]));
-    for (const pick of picks) {
-      if (!pick.categoryNumber || !pick.selectedNominee) {
-        return res.status(400).json({ message: "Each pick must have categoryNumber and selectedNominee" });
-      }
-      const category = categoryMap.get(pick.categoryNumber);
-      if (!category) {
-        return res.status(400).json({ message: `Category ${pick.categoryNumber} not found` });
-      }
-      const nomineeExists = category.nominees.some(n => n.name === pick.selectedNominee);
-      if (!nomineeExists) {
-        return res.status(400).json({ message: `Nominee "${pick.selectedNominee}" not found in category ${pick.categoryNumber}` });
+    const validPicks = [];
+    
+    if (picks.length > 0) {
+      for (const pick of picks) {
+        if (!pick.categoryNumber || !pick.selectedNominee) {
+          continue; // Skip invalid picks
+        }
+        const category = categoryMap.get(pick.categoryNumber);
+        if (!category) {
+          // Category was deleted - skip this pick
+          continue;
+        }
+        const nomineeExists = category.nominees.some(n => n.name === pick.selectedNominee);
+        if (!nomineeExists) {
+          // Nominee doesn't exist in this category - skip this pick
+          continue;
+        }
+        validPicks.push({
+          categoryNumber: pick.categoryNumber,
+          categoryName: category.categoryName,
+          selectedNominee: pick.selectedNominee
+        });
       }
     }
 
-    // Create or update picks
+    // Create or update picks (only with valid picks)
     const pickData = {
       userId,
       year: yearNum,
-      picks: picks.map(p => ({
-        categoryNumber: p.categoryNumber,
-        categoryName: categoryMap.get(p.categoryNumber).categoryName,
-        selectedNominee: p.selectedNominee
-      }))
+      picks: validPicks
     };
 
     const existingPick = await OscarPick.findOne({ userId, year: yearNum });
@@ -128,15 +135,32 @@ router.get("/my-picks", verifyToken, async (req, res) => {
     const userId = req.user.id;
     const year = parseOscarYear(req.query.year) || await getOrInitActiveYear();
     
-    const pick = await OscarPick.findOne({ userId, year })
-      .populate('userId', 'name email')
-      .lean();
+    const pick = await OscarPick.findOne({ userId, year });
     
     if (!pick) {
       return res.json({ pick: null, year });
     }
     
-    res.json({ pick, year });
+    // Clean up picks for deleted categories
+    const categories = await OscarCategory.find({ year }).lean();
+    const categoryMap = new Map(categories.map(c => [c.categoryNumber, c]));
+    
+    if (pick.picks && Array.isArray(pick.picks)) {
+      const originalLength = pick.picks.length;
+      pick.picks = pick.picks.filter(p => {
+        const category = categoryMap.get(p.categoryNumber);
+        if (!category) return false; // Category was deleted
+        // Also check if nominee still exists in category
+        return category.nominees.some(n => n.name === p.selectedNominee);
+      });
+      
+      // If picks were cleaned up, save the updated pick
+      if (pick.picks.length !== originalLength) {
+        await pick.save();
+      }
+    }
+    
+    res.json({ pick: pick.toObject(), year });
   } catch (err) {
     console.error("Error fetching user picks:", err);
     res.status(500).json({ error: err.message });
@@ -199,13 +223,23 @@ router.post("/calculate-scores", verifyToken, async (req, res) => {
       .populate('userId', 'name email')
       .lean();
 
+    // Create a map of all categories for reference
+    const categoryMap = new Map(categories.map(c => [c.categoryNumber, c]));
+
     // Calculate scores
     const scores = [];
     for (const pick of allPicks) {
       let correctCount = 0;
       const pickDetails = [];
 
+      // Only process picks for categories that still exist
       pick.picks.forEach(p => {
+        const category = categoryMap.get(p.categoryNumber);
+        if (!category) {
+          // Category was deleted - skip this pick
+          return;
+        }
+        
         const correctWinner = categoryWinners.get(p.categoryNumber);
         const isCorrect = correctWinner && p.selectedNominee === correctWinner;
         if (isCorrect) correctCount++;
@@ -219,8 +253,12 @@ router.post("/calculate-scores", verifyToken, async (req, res) => {
         });
       });
 
-      // Update the pick with score
-      await OscarPick.findByIdAndUpdate(pick._id, { score: correctCount });
+      // Update the pick with score and clean up deleted category picks
+      const validPicks = pick.picks.filter(p => categoryMap.has(p.categoryNumber));
+      await OscarPick.findByIdAndUpdate(pick._id, { 
+        score: correctCount,
+        picks: validPicks
+      });
 
       scores.push({
         userId: pick.userId?._id || pick.userId,
@@ -253,12 +291,33 @@ router.get("/scores", verifyToken, async (req, res) => {
   try {
     const year = parseOscarYear(req.query.year) || await getOrInitActiveYear();
 
+    // Clean up picks for deleted categories before fetching scores
+    const categories = await OscarCategory.find({ year }).lean();
+    const categoryMap = new Map(categories.map(c => [c.categoryNumber, c]));
+    
+    const picksToClean = await OscarPick.find({ year });
+    for (const pick of picksToClean) {
+      if (pick.picks && Array.isArray(pick.picks)) {
+        const originalLength = pick.picks.length;
+        pick.picks = pick.picks.filter(p => {
+          const category = categoryMap.get(p.categoryNumber);
+          if (!category) return false; // Category was deleted
+          // Also check if nominee still exists in category
+          return category.nominees.some(n => n.name === p.selectedNominee);
+        });
+        
+        if (pick.picks.length !== originalLength) {
+          await pick.save();
+        }
+      }
+    }
+
     const picks = await OscarPick.find({ year })
       .populate('userId', 'name email')
       .sort({ score: -1, submittedAt: 1 })
       .lean();
 
-    const categories = await OscarCategory.find({ year }).lean();
+    // Reuse categories already fetched for cleanup
     const categoryWinners = new Map();
     categories.forEach(cat => {
       const winner = cat.nominees.find(n => n.isWinner);
@@ -274,13 +333,19 @@ router.get("/scores", verifyToken, async (req, res) => {
       // Create a map of all categories for reference
       const categoryMap = new Map(categories.map(c => [c.categoryNumber, c]));
 
+      // Only process picks for categories that still exist
       pick.picks.forEach(p => {
+        const category = categoryMap.get(p.categoryNumber);
+        if (!category) {
+          // Category was deleted - skip this pick
+          return;
+        }
+        
         const correctWinner = categoryWinners.get(p.categoryNumber);
         const isCorrect = correctWinner && p.selectedNominee === correctWinner;
         if (isCorrect) correctCount++;
         
-        const category = categoryMap.get(p.categoryNumber);
-        const allNominees = category ? category.nominees.map(n => n.name) : [];
+        const allNominees = category.nominees.map(n => n.name);
         
         pickDetails.push({
           categoryNumber: p.categoryNumber,
@@ -296,7 +361,7 @@ router.get("/scores", verifyToken, async (req, res) => {
         userId: pick.userId?._id || pick.userId,
         userName: pick.userId?.name || 'Unknown',
         userEmail: pick.userId?.email || '',
-        score: pick.score !== null && pick.score !== undefined ? pick.score : correctCount,
+        score: correctCount, // Always use the calculated score from existing categories
         totalCategories: categories.length,
         pickDetails,
         submittedAt: pick.submittedAt

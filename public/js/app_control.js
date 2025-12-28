@@ -2096,37 +2096,8 @@ window.onload = async function () {
       applyWinnerFormFromCache();
 
       // Categories year dropdowns
-      const categoriesYearSelect = document.getElementById('categories-year');
       const manualYearSelect = document.getElementById('manual-year');
       const listYearFilterSelect = document.getElementById('list-year-filter');
-
-      // Populate PDF import year dropdown
-      if (categoriesYearSelect) {
-        const previousCategoriesYear = categoriesYearSelect.value;
-        categoriesYearSelect.innerHTML = '';
-        
-        if (cleanedYears.length === 0) {
-          const opt = document.createElement('option');
-          opt.value = '';
-          opt.textContent = 'Aucune année (ajoute un film)';
-          opt.disabled = true;
-          categoriesYearSelect.appendChild(opt);
-        } else {
-          cleanedYears.forEach((y) => {
-            const opt = document.createElement('option');
-            opt.value = String(y);
-            opt.textContent = String(y);
-            categoriesYearSelect.appendChild(opt);
-          });
-          
-          const desired = previousCategoriesYear && cleanedYears.map(String).includes(previousCategoriesYear)
-            ? previousCategoriesYear
-            : (activeYear && cleanedYears.map(String).includes(String(activeYear)))
-              ? String(activeYear)
-              : cleanedYears.length > 0 ? String(cleanedYears[0]) : '';
-          if (desired) categoriesYearSelect.value = desired;
-        }
-      }
 
       // Populate manual creation year dropdown
       if (manualYearSelect) {
@@ -2761,14 +2732,13 @@ window.onload = async function () {
   }
 
   // Categories management
-  const importPdfForm = document.getElementById('import-pdf-form');
   const createCategoryForm = document.getElementById('create-category-form');
   const refreshCategoriesListBtn = document.getElementById('refresh-categories-list');
   const categoriesListContainer = document.getElementById('categories-list-container');
   const listYearFilter = document.getElementById('list-year-filter');
 
   function showCategoriesAlert(message, type = 'info') {
-    const alertEl = document.getElementById('categories-import-alert') || document.getElementById('categories-manual-alert');
+    const alertEl = document.getElementById('categories-manual-alert');
     if (!alertEl) return;
     alertEl.className = `alert alert-${type}`;
     alertEl.textContent = message;
@@ -2776,44 +2746,6 @@ window.onload = async function () {
     setTimeout(() => {
       alertEl.classList.add('d-none');
     }, 5000);
-  }
-
-  if (importPdfForm) {
-    importPdfForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const year = parseYear(document.getElementById('categories-year').value);
-      const fileInput = document.getElementById('pdf-file');
-      const file = fileInput.files[0];
-
-      if (!file || !year) {
-        showCategoriesAlert('Veuillez remplir tous les champs', 'warning');
-        return;
-      }
-
-      const formData = new FormData();
-      formData.append('pdf', file);
-      formData.append('year', year);
-
-      try {
-        const res = await fetch('/api/categories/import-pdf', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-          body: formData
-        });
-
-        if (!res.ok) {
-          const error = await res.json();
-          throw new Error(error.message || 'Import failed');
-        }
-
-        const data = await res.json();
-        showCategoriesAlert(`Import réussi: ${data.categories.length} catégories importées`, 'success');
-        fileInput.value = '';
-        if (refreshCategoriesListBtn) refreshCategoriesListBtn.click();
-      } catch (err) {
-        showCategoriesAlert('Erreur: ' + err.message, 'danger');
-      }
-    });
   }
 
   if (createCategoryForm) {
@@ -2897,6 +2829,9 @@ window.onload = async function () {
           <table class="table table-sm">
             <thead>
               <tr>
+                <th style="width: 40px;">
+                  <input type="checkbox" class="form-check-input" id="select-all-categories" title="Sélectionner tout">
+                </th>
                 <th>#</th>
                 <th>Nom</th>
                 <th>Nommés</th>
@@ -2906,6 +2841,9 @@ window.onload = async function () {
             <tbody>
               ${categories.map(cat => `
                 <tr>
+                  <td>
+                    <input type="checkbox" class="form-check-input category-checkbox" data-category-id="${cat._id}" data-category-name="${cat.categoryName}">
+                  </td>
                   <td>${cat.categoryNumber}</td>
                   <td><strong>${cat.categoryName}</strong></td>
                   <td>
@@ -2923,6 +2861,9 @@ window.onload = async function () {
           </table>
         </div>
       `;
+      
+      // Setup bulk selection handlers
+      setupBulkCategorySelection();
     } catch (err) {
       categoriesListContainer.innerHTML = `<div class="alert alert-danger">Erreur: ${err.message}</div>`;
     }
@@ -2930,17 +2871,21 @@ window.onload = async function () {
 
   window.editCategory = async function(categoryId) {
     try {
-      // Fetch category details
-      const res = await fetch(`/api/categories/list`, {
+      // Fetch category directly by ID
+      const res = await fetch(`/api/categories/${categoryId}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (!res.ok) {
-        throw new Error('Failed to load categories');
+        if (res.status === 404) {
+          showResponse('danger', 'Catégorie non trouvée');
+          return;
+        }
+        throw new Error('Failed to load category');
       }
 
       const data = await res.json();
-      const category = data.categories.find(c => c._id === categoryId);
+      const category = data.category;
       
       if (!category) {
         showResponse('danger', 'Catégorie non trouvée');
@@ -3019,10 +2964,27 @@ window.onload = async function () {
         return;
       }
 
+      const categoryNumber = parseInt(document.getElementById('edit_category_number').value);
+      if (!categoryNumber || categoryNumber < 1 || categoryNumber > 50) {
+        if (alertEl) {
+          alertEl.className = 'alert alert-warning';
+          alertEl.textContent = 'Le numéro de catégorie doit être entre 1 et 50';
+          alertEl.classList.remove('d-none');
+        }
+        return;
+      }
+
+      // Store button state before async operation
+      const oldText = saveCategoryChangesBtn.textContent || 'Enregistrer';
+      
       try {
         saveCategoryChangesBtn.disabled = true;
-        const oldText = saveCategoryChangesBtn.textContent || 'Enregistrer';
         saveCategoryChangesBtn.textContent = 'Enregistrement...';
+        
+        // Hide any previous alerts
+        if (alertEl) {
+          alertEl.classList.add('d-none');
+        }
 
         const res = await fetch(`/api/categories/${categoryId}`, {
           method: 'PUT',
@@ -3031,6 +2993,7 @@ window.onload = async function () {
             'Authorization': `Bearer ${token}`
           },
           body: JSON.stringify({
+            categoryNumber,
             categoryName,
             nominees
           })
@@ -3051,12 +3014,19 @@ window.onload = async function () {
         // Reload list
         await loadCategoriesList();
       } catch (err) {
+        // Show error in modal alert
         if (alertEl) {
           alertEl.className = 'alert alert-danger';
           alertEl.textContent = 'Erreur: ' + err.message;
           alertEl.classList.remove('d-none');
+          // Scroll to alert to make it visible
+          alertEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          // Fallback to main response if alert element not found
+          showResponse('danger', 'Erreur: ' + err.message);
         }
       } finally {
+        // Always restore button state
         saveCategoryChangesBtn.disabled = false;
         saveCategoryChangesBtn.textContent = oldText;
       }
@@ -3078,6 +3048,105 @@ window.onload = async function () {
     categoriesTabBtn.addEventListener('shown.bs.tab', () => {
       loadCategoriesList();
     });
+  }
+  
+  // Bulk category selection and deletion
+  function setupBulkCategorySelection() {
+    const selectAllCheckbox = document.getElementById('select-all-categories');
+    const bulkDeleteBtn = document.getElementById('bulk-delete-categories-btn');
+    const bulkDeleteCount = document.getElementById('bulk-delete-count');
+    const selectionText = document.getElementById('categories-selection-text');
+    const categoryCheckboxes = document.querySelectorAll('.category-checkbox');
+    
+    if (!selectAllCheckbox || !bulkDeleteBtn) return;
+    
+    // Select all checkbox handler
+    selectAllCheckbox.addEventListener('change', function() {
+      categoryCheckboxes.forEach(checkbox => {
+        checkbox.checked = this.checked;
+      });
+      updateBulkDeleteButton();
+    });
+    
+    // Individual checkbox handlers
+    categoryCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', function() {
+        updateBulkDeleteButton();
+        // Update select all checkbox state
+        const allChecked = Array.from(categoryCheckboxes).every(cb => cb.checked);
+        const someChecked = Array.from(categoryCheckboxes).some(cb => cb.checked);
+        selectAllCheckbox.checked = allChecked;
+        selectAllCheckbox.indeterminate = someChecked && !allChecked;
+      });
+    });
+    
+    // Update bulk delete button state
+    function updateBulkDeleteButton() {
+      const selected = Array.from(categoryCheckboxes).filter(cb => cb.checked);
+      const count = selected.length;
+      if (bulkDeleteCount) {
+        bulkDeleteCount.textContent = count;
+      }
+      bulkDeleteBtn.disabled = count === 0;
+      if (selectionText) {
+        selectionText.style.display = count > 0 ? 'block' : 'none';
+      }
+    }
+    
+    // Bulk delete handler
+    bulkDeleteBtn.addEventListener('click', async function() {
+      const selected = Array.from(categoryCheckboxes).filter(cb => cb.checked);
+      if (selected.length === 0) return;
+      
+      const categoryIds = selected.map(cb => cb.dataset.categoryId);
+      const categoryNames = selected.map(cb => cb.dataset.categoryName);
+      
+      const confirmMessage = `Êtes-vous sûr de vouloir supprimer ${categoryIds.length} catégorie(s)?\n\n${categoryNames.join('\n')}\n\nCette action est irréversible.`;
+      if (!confirm(confirmMessage)) return;
+      
+      try {
+        bulkDeleteBtn.disabled = true;
+        const oldText = bulkDeleteBtn.textContent;
+        bulkDeleteBtn.textContent = 'Suppression...';
+        
+        // Delete categories one by one
+        let successCount = 0;
+        let errorCount = 0;
+        
+        for (const categoryId of categoryIds) {
+          try {
+            const res = await fetch(`/api/categories/${categoryId}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${token}` }
+            });
+            
+            if (res.ok) {
+              successCount++;
+            } else {
+              errorCount++;
+            }
+          } catch (err) {
+            console.error(`Error deleting category ${categoryId}:`, err);
+            errorCount++;
+          }
+        }
+        
+        if (successCount > 0) {
+          showResponse('success', `${successCount} catégorie(s) supprimée(s)${errorCount > 0 ? `, ${errorCount} erreur(s)` : ''}`);
+          await loadCategoriesList();
+        } else {
+          showResponse('danger', `Erreur lors de la suppression: ${errorCount} erreur(s)`);
+        }
+      } catch (err) {
+        showResponse('danger', 'Erreur: ' + err.message);
+      } finally {
+        bulkDeleteBtn.disabled = false;
+        bulkDeleteBtn.textContent = oldText;
+      }
+    });
+    
+    // Initialize button state
+    updateBulkDeleteButton();
   }
 };
 

@@ -39,9 +39,8 @@
 
   let categories = [];
   let myPicks = {};
-  let savedPicks = {}; // Track saved state to detect changes
   let currentYear = null;
-  let hasUnsavedChanges = false;
+  let isSaving = false; // Prevent multiple simultaneous saves
 
   async function fetchActiveYear() {
     try {
@@ -133,20 +132,17 @@
       const data = await res.json();
       if (data.pick && data.pick.picks) {
         myPicks = {};
-        savedPicks = {}; // Reset saved state
+        // Create a map of existing category numbers
+        const existingCategoryNumbers = new Set(categories.map(c => c.categoryNumber));
+        
+        // Only load picks for categories that still exist
         data.pick.picks.forEach(p => {
-          myPicks[p.categoryNumber] = p.selectedNominee;
-          savedPicks[p.categoryNumber] = p.selectedNominee; // Store saved state
+          if (existingCategoryNumbers.has(p.categoryNumber)) {
+            myPicks[p.categoryNumber] = p.selectedNominee;
+          }
         });
-        hasUnsavedChanges = false;
         renderCategories();
         updateProgress();
-        updateUnsavedChangesIndicator();
-      } else {
-        // No picks saved yet
-        savedPicks = {};
-        hasUnsavedChanges = false;
-        updateUnsavedChangesIndicator();
       }
     } catch (err) {
       console.error('Error loading picks:', err);
@@ -227,71 +223,41 @@
         
         // Re-render to update the display
         renderCategories();
-        checkForUnsavedChanges();
+        
+        // Auto-save after selection change
+        autoSavePicks();
       });
     });
     
     updateProgress();
   }
 
-  function checkForUnsavedChanges() {
-    // Compare current picks with saved picks
-    const currentKeys = Object.keys(myPicks).sort();
-    const savedKeys = Object.keys(savedPicks).sort();
-    
-    // Check if counts differ
-    if (currentKeys.length !== savedKeys.length) {
-      hasUnsavedChanges = true;
-      updateUnsavedChangesIndicator();
-      return;
+  async function autoSavePicks() {
+    // Clear any existing timeout to reset the debounce
+    if (autoSavePicks.timeout) {
+      clearTimeout(autoSavePicks.timeout);
     }
     
-    // Check if any values differ or keys are different
-    const allKeys = new Set([...currentKeys, ...savedKeys]);
-    for (const key of allKeys) {
-      if (myPicks[key] !== savedPicks[key]) {
-        hasUnsavedChanges = true;
-        updateUnsavedChangesIndicator();
+    // Debounce: wait for user to stop clicking before saving
+    autoSavePicks.timeout = setTimeout(async () => {
+      // Skip if already saving (will retry after current save completes)
+      if (isSaving) {
+        // Retry after a short delay
+        setTimeout(() => autoSavePicks(), 200);
         return;
       }
-    }
-    
-    // No changes detected
-    hasUnsavedChanges = false;
-    updateUnsavedChangesIndicator();
-  }
-
-  function updateUnsavedChangesIndicator() {
-    const submitBtn = document.getElementById('submit-picks');
-    const banner = document.getElementById('unsaved-changes-banner');
-    
-    if (hasUnsavedChanges) {
-      // Enable button and change style
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.classList.add('btn-warning');
-        submitBtn.classList.remove('btn-primary');
+      
+      isSaving = true;
+      try {
+        await submitPicks(true); // Pass true for silent mode (no alert)
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+        // Show error alert only on failure
+        showAlert('Erreur lors de l\'enregistrement automatique: ' + err.message, 'danger');
+      } finally {
+        isSaving = false;
       }
-      // Show banner
-      if (banner) {
-        banner.classList.remove('d-none');
-        if (!banner.classList.contains('show')) {
-          banner.classList.add('show');
-        }
-      }
-    } else {
-      // Disable button and change style
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.classList.remove('btn-warning');
-        submitBtn.classList.add('btn-primary');
-      }
-      // Hide banner
-      if (banner) {
-        banner.classList.add('d-none');
-        banner.classList.remove('show');
-      }
-    }
+    }, 250); // Reduced to 250ms for better responsiveness
   }
 
   function updateProgress() {
@@ -300,18 +266,20 @@
     document.getElementById('picks-progress').textContent = `${completed} / ${total}`;
   }
 
-  async function submitPicks() {
+  async function submitPicks(silent = false) {
     const picks = Object.keys(myPicks).map(catNum => ({
       categoryNumber: parseInt(catNum),
       selectedNominee: myPicks[catNum]
     }));
     
-    if (picks.length === 0) {
-      showAlert('Veuillez sélectionner au moins un choix', 'warning');
-      return;
+    // Allow empty picks to be saved (to clear all selections)
+    // Only show warning in non-silent mode if user explicitly tries to submit with no picks
+    if (picks.length === 0 && !silent) {
+      // Don't block - allow saving empty picks to clear selections
     }
     
-    if (picks.length < categories.length) {
+    // Skip confirmation dialog in silent mode (auto-save)
+    if (!silent && picks.length < categories.length) {
       if (!confirm(`Vous n'avez sélectionné que ${picks.length} sur ${categories.length} catégories. Voulez-vous enregistrer quand même?`)) {
         return;
       }
@@ -336,11 +304,9 @@
       }
       
       const data = await res.json();
-      // Update saved state after successful save
-      savedPicks = { ...myPicks };
-      hasUnsavedChanges = false;
-      updateUnsavedChangesIndicator();
-      showAlert('Vos choix ont été enregistrés avec succès!', 'success');
+      if (!silent) {
+        showAlert('Vos choix ont été enregistrés avec succès!', 'success');
+      }
     } catch (err) {
       console.error('Error submitting picks:', err);
       showAlert('Erreur lors de l\'enregistrement: ' + err.message, 'danger');
@@ -348,7 +314,6 @@
   }
 
   // Event listeners
-  document.getElementById('submit-picks')?.addEventListener('click', submitPicks);
   document.getElementById('load-my-picks')?.addEventListener('click', () => {
     loadMyPicks();
     showAlert('Choix rechargés', 'info');
@@ -599,7 +564,6 @@
               <th>Utilisateur</th>
               <th class="text-center" style="width: 80px;">Score</th>
               <th class="text-center" style="width: 70px;">Total</th>
-              <th class="text-center" style="width: 70px;">%</th>
               <th class="text-center" style="width: 100px;">Actions</th>
             </tr>
           </thead>
@@ -607,7 +571,6 @@
             ${validScores.map((score, index) => {
               // Use the pre-calculated actualScore (always use it, even if 0)
               const actualScore = score.actualScore !== undefined ? score.actualScore : (score.score || 0);
-              const percentage = totalCategories > 0 ? Math.round((actualScore / totalCategories) * 100) : 0;
               const rank = index + 1;
               const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
               return `
@@ -616,7 +579,6 @@
                   <td>${score.userName}</td>
                   <td class="text-center"><strong class="text-success">${actualScore}</strong></td>
                   <td class="text-center text-muted small">${totalCategories}</td>
-                  <td class="text-center"><strong>${percentage}%</strong></td>
                   <td class="text-center">
                     <button class="btn btn-sm btn-outline-primary view-picks-btn" data-user-id="${score.userId}" data-user-name="${score.userName}" data-score-index="${index}">
                       Détails
@@ -746,7 +708,6 @@
   }
 
   // Event listeners for winners tab
-  document.getElementById('calculate-scores')?.addEventListener('click', calculateScores);
   document.getElementById('refresh-winners')?.addEventListener('click', () => {
     fetchWinnersCategories();
     showAlert('Données rafraîchies', 'info');
@@ -755,14 +716,6 @@
   // Load scores when scores tab is shown
   const scoresTab = document.getElementById('tab-scores');
   if (scoresTab) {
-    scoresTab.addEventListener('show.bs.tab', (e) => {
-      if (hasUnsavedChanges) {
-        if (!confirm('Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir changer d\'onglet? Vos modifications seront perdues.')) {
-          e.preventDefault();
-          return false;
-        }
-      }
-    });
     scoresTab.addEventListener('shown.bs.tab', async () => {
       await fetchScores();
     });
@@ -771,14 +724,6 @@
   // Load winners when admin tab is shown
   const winnersTab = document.getElementById('tab-winners');
   if (winnersTab) {
-    winnersTab.addEventListener('show.bs.tab', (e) => {
-      if (hasUnsavedChanges) {
-        if (!confirm('Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir changer d\'onglet? Vos modifications seront perdues.')) {
-          e.preventDefault();
-          return false;
-        }
-      }
-    });
     winnersTab.addEventListener('shown.bs.tab', async () => {
       await fetchWinnersCategories();
       // Auto-refresh scores when entering the winners tab (silent mode)
@@ -792,44 +737,8 @@
     showAlert('Scores rafraîchis', 'info');
   });
 
-  // Warn before leaving page with unsaved changes
-  window.addEventListener('beforeunload', (e) => {
-    if (hasUnsavedChanges) {
-      e.preventDefault();
-      e.returnValue = 'Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir quitter cette page?';
-      return e.returnValue;
-    }
-  });
-
-  // Intercept navigation links to warn about unsaved changes
-  document.addEventListener('click', (e) => {
-    // Check if clicking on a navigation link
-    const link = e.target.closest('a[href]');
-    if (!link) return;
-    
-    // Skip if it's the same page or a hash link
-    const href = link.getAttribute('href');
-    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
-    
-    // Skip if it's the submit button or other action buttons
-    if (link.closest('#pane-my-picks') || link.id === 'submit-picks') return;
-    
-    // Check for unsaved changes
-    if (hasUnsavedChanges) {
-      e.preventDefault();
-      const confirmed = confirm('Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir quitter cette page? Vos modifications seront perdues.');
-      if (confirmed) {
-        hasUnsavedChanges = false; // Allow navigation
-        window.location.href = href;
-      }
-    }
-  });
-
   // Initial load
   (async () => {
-    // Initialize button state (disabled by default)
-    updateUnsavedChangesIndicator();
-    
     currentYear = await fetchActiveYear();
     document.title = `Pool Oscars (${currentYear}) - Mes choix`;
     await fetchCategories();

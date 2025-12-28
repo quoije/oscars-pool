@@ -892,18 +892,13 @@
         <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
           <div>
             <h4 class="mb-1">Catégories Oscars</h4>
-            <div class="text-muted">Importez les catégories depuis un PDF ou créez-les manuellement.</div>
+            <div class="text-muted">Créez et gérez les catégories manuellement.</div>
           </div>
         </div>
 
         <ul class="nav nav-pills admin-subtabs mt-3" id="adminCategoriesSubTabs" role="tablist">
           <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="admin-categories-subtab-import" data-bs-toggle="tab" data-bs-target="#admin-categories-pane-import" type="button" role="tab" aria-controls="admin-categories-pane-import" aria-selected="true">
-              Import PDF
-            </button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="admin-categories-subtab-manual" data-bs-toggle="tab" data-bs-target="#admin-categories-pane-manual" type="button" role="tab" aria-controls="admin-categories-pane-manual" aria-selected="false">
+            <button class="nav-link active" id="admin-categories-subtab-manual" data-bs-toggle="tab" data-bs-target="#admin-categories-pane-manual" type="button" role="tab" aria-controls="admin-categories-pane-manual" aria-selected="true">
               Création manuelle
             </button>
           </li>
@@ -915,54 +910,8 @@
         </ul>
 
         <div class="tab-content pt-3">
-          <!-- Import PDF -->
-          <div class="tab-pane fade show active" id="admin-categories-pane-import" role="tabpanel" aria-labelledby="admin-categories-subtab-import" tabindex="0">
-            <div class="row g-3">
-              <div class="col-12 col-xxl-7">
-                <div class="border rounded p-3 bg-light">
-                  <div class="fw-semibold mb-1">Importer depuis un PDF</div>
-                  <div class="text-muted small mb-3">
-                    Téléchargez le fichier PDF de la feuille de props Oscars. Le système extraira automatiquement les catégories et les nommés.
-                  </div>
-
-                  <div id="categories-import-alert" class="alert d-none" role="alert"></div>
-
-                  <form id="import-pdf-form">
-                    <div class="mb-3">
-                      <label for="categories-year" class="form-label">Année</label>
-                      <select class="form-select" id="categories-year" required>
-                        <option value="">Chargement...</option>
-                      </select>
-                      <div class="form-text">Année des Oscars pour ces catégories.</div>
-                    </div>
-
-                    <div class="mb-3">
-                      <label for="pdf-file" class="form-label">Fichier PDF</label>
-                      <input type="file" class="form-control" id="pdf-file" accept=".pdf,application/pdf" required>
-                      <div class="form-text">Format attendu: feuille de props Oscars avec catégories numérotées.</div>
-                    </div>
-
-                    <div class="d-flex flex-wrap justify-content-end gap-2">
-                      <button type="submit" class="btn btn-warning">Importer</button>
-                    </div>
-                  </form>
-                </div>
-              </div>
-
-              <div class="col-12 col-xxl-5">
-                <div class="border rounded p-3 bg-white">
-                  <div class="fw-semibold mb-2">Astuce</div>
-                  <div class="text-muted">
-                    Le PDF doit contenir des catégories numérotées (1., 2., etc.) suivies de leurs nommés. 
-                    Vérifiez la liste après import pour corriger si nécessaire.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <!-- Manual creation -->
-          <div class="tab-pane fade" id="admin-categories-pane-manual" role="tabpanel" aria-labelledby="admin-categories-subtab-manual" tabindex="0">
+          <div class="tab-pane fade show active" id="admin-categories-pane-manual" role="tabpanel" aria-labelledby="admin-categories-subtab-manual" tabindex="0">
             <div class="row g-3">
               <div class="col-12 col-xxl-7">
                 <div class="border rounded p-3 bg-light">
@@ -1023,11 +972,17 @@
                 <div class="fw-semibold">Catégories importées</div>
                 <div class="text-muted small">Gérez les catégories existantes</div>
               </div>
-              <div class="d-flex gap-2">
-                <select class="form-select" id="list-year-filter" style="width: 150px;">
-                  <option value="">Toutes les années</option>
-                </select>
-                <button type="button" id="refresh-categories-list" class="btn btn-outline-secondary">Rafraîchir</button>
+              <div class="d-flex flex-column gap-2">
+                <div class="d-flex gap-2">
+                  <select class="form-select" id="list-year-filter" style="width: 150px;">
+                    <option value="">Toutes les années</option>
+                  </select>
+                  <button type="button" id="refresh-categories-list" class="btn btn-outline-secondary">Rafraîchir</button>
+                  <button type="button" id="bulk-delete-categories-btn" class="btn btn-sm btn-danger" disabled>Supprimer</button>
+                </div>
+                <div id="categories-selection-text" class="text-muted small" style="display: none;">
+                  <span id="bulk-delete-count">0</span> catégorie(s) sélectionnée(s)
+                </div>
               </div>
             </div>
 
@@ -1279,7 +1234,7 @@
         
         <div class="mb-3">
           <label for="edit_category_number" class="form-label">Numéro de catégorie</label>
-          <input type="number" class="form-control" id="edit_category_number" readonly>
+          <input type="number" class="form-control" id="edit_category_number" min="1" max="50" required>
         </div>
 
         <div class="mb-3">
