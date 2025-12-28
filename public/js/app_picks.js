@@ -39,7 +39,9 @@
 
   let categories = [];
   let myPicks = {};
+  let savedPicks = {}; // Track saved state to detect changes
   let currentYear = null;
+  let hasUnsavedChanges = false;
 
   async function fetchActiveYear() {
     try {
@@ -131,11 +133,20 @@
       const data = await res.json();
       if (data.pick && data.pick.picks) {
         myPicks = {};
+        savedPicks = {}; // Reset saved state
         data.pick.picks.forEach(p => {
           myPicks[p.categoryNumber] = p.selectedNominee;
+          savedPicks[p.categoryNumber] = p.selectedNominee; // Store saved state
         });
+        hasUnsavedChanges = false;
         renderCategories();
         updateProgress();
+        updateUnsavedChangesIndicator();
+      } else {
+        // No picks saved yet
+        savedPicks = {};
+        hasUnsavedChanges = false;
+        updateUnsavedChangesIndicator();
       }
     } catch (err) {
       console.error('Error loading picks:', err);
@@ -153,12 +164,12 @@
     
     container.innerHTML = `
       <div class="table-responsive">
-        <table class="table table-sm table-hover align-middle mb-0">
+        <table class="table table-sm picks-table align-middle mb-0">
           <thead class="table-light">
             <tr>
               <th style="width: 50px;">#</th>
               <th>Catégorie</th>
-              <th>Choix</th>
+              <th style="width: 200px;">Choix</th>
               <th>Nommés</th>
             </tr>
           </thead>
@@ -166,22 +177,26 @@
             ${categories.map(cat => {
               const selectedNominee = myPicks[cat.categoryNumber];
               return `
-                <tr class="${selectedNominee ? 'table-primary' : ''}">
-                  <td class="fw-semibold">${cat.categoryNumber}</td>
-                  <td>${cat.categoryName}</td>
+                <tr class="${selectedNominee ? 'has-selection' : ''}">
+                  <td class="fw-semibold text-muted">${cat.categoryNumber}</td>
+                  <td class="fw-semibold">${cat.categoryName}</td>
                   <td>
-                    ${selectedNominee ? `<span class="badge bg-primary">${selectedNominee}</span>` : '<span class="text-muted">—</span>'}
+                    ${selectedNominee ? `
+                      <span class="selected-choice-badge badge bg-success">
+                        <span>${selectedNominee}</span>
+                      </span>
+                    ` : '<span class="text-muted fst-italic">Aucun choix</span>'}
                   </td>
                   <td>
-                    <div class="d-flex flex-wrap gap-1">
+                    <div class="d-flex flex-wrap gap-2">
                       ${cat.nominees.map(nominee => {
                         const isSelected = selectedNominee === nominee.name;
                         return `
-                          <span class="nominee-option badge ${isSelected ? 'bg-primary' : 'bg-secondary'} ${isSelected ? '' : 'bg-opacity-50'}" 
-                                 style="cursor: pointer; font-weight: normal;"
+                          <span class="nominee-option badge ${isSelected ? 'bg-primary selected' : 'bg-secondary bg-opacity-50'}" 
                                  data-category="${cat.categoryNumber}" 
                                  data-nominee="${nominee.name}">
-                            ${nominee.name}
+                            ${isSelected ? '<span class="nominee-checkmark">✓</span>' : ''}
+                            <span>${nominee.name}</span>
                           </span>
                         `;
                       }).join('')}
@@ -212,10 +227,71 @@
         
         // Re-render to update the display
         renderCategories();
+        checkForUnsavedChanges();
       });
     });
     
     updateProgress();
+  }
+
+  function checkForUnsavedChanges() {
+    // Compare current picks with saved picks
+    const currentKeys = Object.keys(myPicks).sort();
+    const savedKeys = Object.keys(savedPicks).sort();
+    
+    // Check if counts differ
+    if (currentKeys.length !== savedKeys.length) {
+      hasUnsavedChanges = true;
+      updateUnsavedChangesIndicator();
+      return;
+    }
+    
+    // Check if any values differ or keys are different
+    const allKeys = new Set([...currentKeys, ...savedKeys]);
+    for (const key of allKeys) {
+      if (myPicks[key] !== savedPicks[key]) {
+        hasUnsavedChanges = true;
+        updateUnsavedChangesIndicator();
+        return;
+      }
+    }
+    
+    // No changes detected
+    hasUnsavedChanges = false;
+    updateUnsavedChangesIndicator();
+  }
+
+  function updateUnsavedChangesIndicator() {
+    const submitBtn = document.getElementById('submit-picks');
+    const banner = document.getElementById('unsaved-changes-banner');
+    
+    if (hasUnsavedChanges) {
+      // Enable button and change style
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.add('btn-warning');
+        submitBtn.classList.remove('btn-primary');
+      }
+      // Show banner
+      if (banner) {
+        banner.classList.remove('d-none');
+        if (!banner.classList.contains('show')) {
+          banner.classList.add('show');
+        }
+      }
+    } else {
+      // Disable button and change style
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.classList.remove('btn-warning');
+        submitBtn.classList.add('btn-primary');
+      }
+      // Hide banner
+      if (banner) {
+        banner.classList.add('d-none');
+        banner.classList.remove('show');
+      }
+    }
   }
 
   function updateProgress() {
@@ -260,6 +336,10 @@
       }
       
       const data = await res.json();
+      // Update saved state after successful save
+      savedPicks = { ...myPicks };
+      hasUnsavedChanges = false;
+      updateUnsavedChangesIndicator();
       showAlert('Vos choix ont été enregistrés avec succès!', 'success');
     } catch (err) {
       console.error('Error submitting picks:', err);
@@ -485,11 +565,25 @@
     if (!container) return;
 
     // Filter out scores for removed users (Unknown users or null userId)
-    const validScores = scores.filter(score => 
+    let validScores = scores.filter(score => 
       score.userName && 
       score.userName !== 'Unknown' && 
       score.userId
     );
+
+    // Calculate actual scores and sort by them
+    validScores = validScores.map(score => {
+      // Always calculate actual score from pickDetails if available (more accurate than stored score)
+      let actualScore;
+      if (score.pickDetails && Array.isArray(score.pickDetails) && score.pickDetails.length > 0) {
+        // Calculate from pickDetails - this is the source of truth
+        actualScore = score.pickDetails.filter(p => p.isCorrect === true).length;
+      } else {
+        // Fallback to stored score only if pickDetails not available
+        actualScore = score.score || 0;
+      }
+      return { ...score, actualScore };
+    }).sort((a, b) => b.actualScore - a.actualScore);
 
     if (validScores.length === 0) {
       container.innerHTML = '<div class="text-muted">Aucun score disponible. Les utilisateurs doivent d\'abord soumettre leurs choix.</div>';
@@ -511,14 +605,16 @@
           </thead>
           <tbody>
             ${validScores.map((score, index) => {
-              const percentage = totalCategories > 0 ? Math.round((score.score / totalCategories) * 100) : 0;
+              // Use the pre-calculated actualScore (always use it, even if 0)
+              const actualScore = score.actualScore !== undefined ? score.actualScore : (score.score || 0);
+              const percentage = totalCategories > 0 ? Math.round((actualScore / totalCategories) * 100) : 0;
               const rank = index + 1;
               const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
               return `
                 <tr>
                   <td><strong>${rank}${medal ? ' ' + medal : ''}</strong></td>
                   <td>${score.userName}</td>
-                  <td class="text-center"><strong class="text-success">${score.score}</strong></td>
+                  <td class="text-center"><strong class="text-success">${actualScore}</strong></td>
                   <td class="text-center text-muted small">${totalCategories}</td>
                   <td class="text-center"><strong>${percentage}%</strong></td>
                   <td class="text-center">
@@ -563,6 +659,10 @@
     // Separate correct and incorrect picks
     const correctPicks = score.pickDetails.filter(p => p.isCorrect);
     const incorrectPicks = score.pickDetails.filter(p => !p.isCorrect);
+    
+    // Calculate actual score from pickDetails (more accurate than stored score)
+    const actualScore = correctPicks.length;
+    const totalCategories = score.totalCategories || score.pickDetails.length;
 
     modalContent.innerHTML = `
       <div class="mb-4">
@@ -576,8 +676,8 @@
             </div>
           </div>
           <div class="text-end">
-            <div class="h4 mb-0 text-success">${score.score} / ${score.totalCategories}</div>
-            <div class="text-muted small">${Math.round((score.score / score.totalCategories) * 100)}%</div>
+            <div class="h4 mb-0 text-success">${actualScore} / ${totalCategories}</div>
+            <div class="text-muted small">${totalCategories > 0 ? Math.round((actualScore / totalCategories) * 100) : 0}%</div>
           </div>
         </div>
       </div>
@@ -655,6 +755,14 @@
   // Load scores when scores tab is shown
   const scoresTab = document.getElementById('tab-scores');
   if (scoresTab) {
+    scoresTab.addEventListener('show.bs.tab', (e) => {
+      if (hasUnsavedChanges) {
+        if (!confirm('Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir changer d\'onglet? Vos modifications seront perdues.')) {
+          e.preventDefault();
+          return false;
+        }
+      }
+    });
     scoresTab.addEventListener('shown.bs.tab', async () => {
       await fetchScores();
     });
@@ -663,6 +771,14 @@
   // Load winners when admin tab is shown
   const winnersTab = document.getElementById('tab-winners');
   if (winnersTab) {
+    winnersTab.addEventListener('show.bs.tab', (e) => {
+      if (hasUnsavedChanges) {
+        if (!confirm('Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir changer d\'onglet? Vos modifications seront perdues.')) {
+          e.preventDefault();
+          return false;
+        }
+      }
+    });
     winnersTab.addEventListener('shown.bs.tab', async () => {
       await fetchWinnersCategories();
       // Auto-refresh scores when entering the winners tab (silent mode)
@@ -676,8 +792,44 @@
     showAlert('Scores rafraîchis', 'info');
   });
 
+  // Warn before leaving page with unsaved changes
+  window.addEventListener('beforeunload', (e) => {
+    if (hasUnsavedChanges) {
+      e.preventDefault();
+      e.returnValue = 'Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir quitter cette page?';
+      return e.returnValue;
+    }
+  });
+
+  // Intercept navigation links to warn about unsaved changes
+  document.addEventListener('click', (e) => {
+    // Check if clicking on a navigation link
+    const link = e.target.closest('a[href]');
+    if (!link) return;
+    
+    // Skip if it's the same page or a hash link
+    const href = link.getAttribute('href');
+    if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+    
+    // Skip if it's the submit button or other action buttons
+    if (link.closest('#pane-my-picks') || link.id === 'submit-picks') return;
+    
+    // Check for unsaved changes
+    if (hasUnsavedChanges) {
+      e.preventDefault();
+      const confirmed = confirm('Vous avez des modifications non enregistrées. Êtes-vous sûr de vouloir quitter cette page? Vos modifications seront perdues.');
+      if (confirmed) {
+        hasUnsavedChanges = false; // Allow navigation
+        window.location.href = href;
+      }
+    }
+  });
+
   // Initial load
   (async () => {
+    // Initialize button state (disabled by default)
+    updateUnsavedChangesIndicator();
+    
     currentYear = await fetchActiveYear();
     document.title = `Pool Oscars (${currentYear}) - Mes choix`;
     await fetchCategories();

@@ -29,10 +29,57 @@
     .nominee-option {
       cursor: pointer;
       transition: all 0.2s;
+      position: relative;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
     }
     .nominee-option:hover {
-      opacity: 0.8;
-      transform: scale(1.05);
+      transform: translateY(-2px);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .nominee-option.selected {
+      font-weight: 600;
+      box-shadow: 0 2px 6px rgba(13, 110, 253, 0.3);
+    }
+    .nominee-checkmark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background-color: rgba(255, 255, 255, 0.3);
+      font-size: 0.75rem;
+      font-weight: bold;
+    }
+    .nominee-option.selected .nominee-checkmark {
+      background-color: rgba(255, 255, 255, 0.9);
+      color: #0d6efd;
+    }
+    .picks-table {
+      border-collapse: separate;
+      border-spacing: 0;
+    }
+    .picks-table tbody tr {
+      transition: background-color 0.2s;
+    }
+    .picks-table tbody tr:hover {
+      background-color: rgba(13, 110, 253, 0.05);
+    }
+    .picks-table tbody tr.has-selection {
+      background-color: rgba(13, 110, 253, 0.08);
+      border-left: 3px solid #0d6efd;
+    }
+    .selected-choice-badge {
+      font-weight: 600;
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.375rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
     }
     .table-sm td {
       padding: 0.5rem;
@@ -123,6 +170,11 @@
           <button type="button" id="load-my-picks" class="btn btn-sm btn-outline-secondary">Recharger</button>
           <button type="button" id="submit-picks" class="btn btn-sm btn-primary">Enregistrer</button>
         </div>
+      </div>
+
+      <div id="unsaved-changes-banner" class="alert alert-warning alert-dismissible fade d-none" role="alert">
+        <strong>⚠️ Modifications en attente:</strong> Vous avez des modifications non enregistrées. N'oubliez pas d'enregistrer vos choix avant de quitter cette page.
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
       </div>
 
       <div id="categories-container">
