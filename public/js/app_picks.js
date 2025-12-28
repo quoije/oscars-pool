@@ -484,7 +484,14 @@
     const container = document.getElementById('scores-container');
     if (!container) return;
 
-    if (scores.length === 0) {
+    // Filter out scores for removed users (Unknown users or null userId)
+    const validScores = scores.filter(score => 
+      score.userName && 
+      score.userName !== 'Unknown' && 
+      score.userId
+    );
+
+    if (validScores.length === 0) {
       container.innerHTML = '<div class="text-muted">Aucun score disponible. Les utilisateurs doivent d\'abord soumettre leurs choix.</div>';
       return;
     }
@@ -503,7 +510,7 @@
             </tr>
           </thead>
           <tbody>
-            ${scores.map((score, index) => {
+            ${validScores.map((score, index) => {
               const percentage = totalCategories > 0 ? Math.round((score.score / totalCategories) * 100) : 0;
               const rank = index + 1;
               const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
@@ -527,14 +534,14 @@
       </div>
     `;
 
-    // Store scores data globally for modal access
-    window.scoresData = scores;
+    // Store valid scores data globally for modal access
+    window.scoresData = validScores;
 
     // Add event listeners for view picks buttons
     container.querySelectorAll('.view-picks-btn').forEach(btn => {
       btn.addEventListener('click', function() {
         const scoreIndex = parseInt(this.dataset.scoreIndex);
-        const score = scores[scoreIndex];
+        const score = validScores[scoreIndex];
         showUserPicksModal(score);
       });
     });
