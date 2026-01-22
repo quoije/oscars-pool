@@ -220,6 +220,10 @@ footer {
     z-index: 2;
   }
 
+  .cam-badge {
+    z-index: 2;
+  }
+
   /* Stats → "Films regardés" modal */
   .stats-movies-grid {
     display: grid;

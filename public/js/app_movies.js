@@ -448,6 +448,14 @@ window.addEventListener('DOMContentLoaded', async function () {
           }
         }
 
+        const camBadge = movie?.cam ? '<span class="badge bg-warning text-dark position-absolute top-0 end-0 m-2 cam-badge">CAM</span>' : '';
+        const posterBlock = `
+          <div class="text-center pt-3 px-3 position-relative movie-poster-wrap">
+            ${camBadge}
+            <img src="${movie.poster}" class="img-fluid rounded movie-poster" alt="${movie.title}">
+          </div>
+        `;
+
         const movieDiv = document.createElement('div');
         movieDiv.classList.add('col-12', 'col-sm-6', 'col-lg-4', 'movie-card');
         movieDiv.setAttribute('data-imdb-id', movie.imdb_id);
@@ -457,13 +465,9 @@ window.addEventListener('DOMContentLoaded', async function () {
             ${
               isClickable
                 ? `<a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none">
-                    <div class="text-center pt-3 px-3">
-                      <img src="${movie.poster}" class="img-fluid rounded movie-poster" alt="${movie.title}">
-                    </div>
+                    ${posterBlock}
                   </a>`
-                : `<div class="text-center pt-3 px-3">
-                    <img src="${movie.poster}" class="img-fluid rounded movie-poster" alt="${movie.title}">
-                  </div>`
+                : `${posterBlock}`
             }
             <div class="card-body d-flex flex-column">
               <div class="d-flex justify-content-between align-items-start gap-2">

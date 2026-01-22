@@ -118,6 +118,7 @@ window.onload = async function () {
   const editRatingEl = document.getElementById('edit_rating');
   const editPosterEl = document.getElementById('edit_poster');
   const editDescriptionEl = document.getElementById('edit_description');
+  const editCamFlagEl = document.getElementById('edit_cam_flag');
 
   let moviesById = new Map();
   let activeYear = null;
@@ -1921,6 +1922,7 @@ window.onload = async function () {
     const year = parseYear(yearInput.value);
     const imdb_id = document.getElementById('imdb_id').value.trim();
     const category = document.getElementById('category').value.trim();
+    const cam = !!document.getElementById('cam_flag')?.checked;
     const vod_link = document.getElementById('vod_link').value.trim();
     const player_mode = (document.getElementById('player_mode')?.value || 'auto').trim();
     const video_src = document.getElementById('video_src')?.value?.trim() || '';
@@ -1944,7 +1946,7 @@ window.onload = async function () {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ year, imdb_id, category, vod_link, player_mode, video_src, video_file, embed_src })
+        body: JSON.stringify({ year, imdb_id, category, vod_link, player_mode, video_src, video_file, embed_src, cam })
       });
 
       if (res.ok) {
@@ -2199,6 +2201,7 @@ window.onload = async function () {
     editRatingEl.value = movie.rating || '';
     editPosterEl.value = movie.poster || '';
     editDescriptionEl.value = movie.description || '';
+    if (editCamFlagEl) editCamFlagEl.checked = !!movie.cam;
 
     if (editMovieModalTitleEl) {
       const label = movie.title ? `Modifier: ${movie.title}` : 'Modifier le film';
@@ -2221,6 +2224,7 @@ window.onload = async function () {
     const video_file = (editVideoFileEl?.value || '').trim();
     const embed_src = (editEmbedSrcEl?.value || '').trim();
     const refreshOmdb = !!editRefreshOmdbEl.checked;
+    const cam = !!editCamFlagEl?.checked;
 
     const title = editTitleEl.value;
     const rating = editRatingEl.value;
@@ -2255,7 +2259,8 @@ window.onload = async function () {
       video_src,
       video_file,
       embed_src,
-      refreshOmdb
+      refreshOmdb,
+      cam
     };
 
     // Only send manual fields if we're not refreshing from OMDb
