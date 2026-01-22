@@ -148,7 +148,7 @@ router.get("/", async (req, res) => {
 
     const projection = isChecklist
       ? "imdb_id title"
-      : "imdb_id title description rating poster year category vod_link player_mode video_src embed_src video_file updatedAt createdAt";
+      : "imdb_id title description rating poster cam year category vod_link player_mode video_src embed_src video_file updatedAt createdAt";
 
     const cacheKey = `movies:list:${year || "all"}:${isChecklist ? "checklist" : "films"}`;
     const cached = cacheGet(cacheKey);
@@ -333,7 +333,7 @@ router.patch("/users/updateWatchedMovies", async (req, res) => {
 
 // Add movie
 router.post("/add", async (req, res) => {
-  const { imdb_id, category, vod_link, year, player_mode, video_src, embed_src, video_file } = req.body;
+  const { imdb_id, category, vod_link, year, player_mode, video_src, embed_src, video_file, cam } = req.body;
 
   try {
     // Get the token from the Authorization header
@@ -390,6 +390,7 @@ router.post("/add", async (req, res) => {
       description: movieDetails.description,
       rating: movieDetails.rating,
       poster: movieDetails.poster,
+      cam: !!cam,
       year: parsedYear,
       category,
       vod_link: normalizedVod || undefined,
@@ -491,6 +492,7 @@ router.put("/:id", async (req, res) => {
       embed_src,
       video_file,
       refreshOmdb,
+      cam,
     } = req.body || {};
 
     if (imdb_id !== undefined && imdb_id !== null && !isValidImdbId(imdb_id)) {
@@ -557,6 +559,8 @@ router.put("/:id", async (req, res) => {
     }
 
     // If refreshOmdb is true, overwrite OMDb-derived fields from the imdb_id
+    if (cam !== undefined) movie.cam = !!cam;
+
     if (refreshOmdb) {
       try {
         const details = await fetchMovieDetailsFromOmdb(movie.imdb_id);
