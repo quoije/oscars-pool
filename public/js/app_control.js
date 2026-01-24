@@ -112,6 +112,7 @@ window.onload = async function () {
   const editPlayerModeEl = document.getElementById('edit_player_mode');
   const editVideoSrcEl = document.getElementById('edit_video_src');
   const editVideoFileEl = document.getElementById('edit_video_file');
+  const editVideoFileLowEl = document.getElementById('edit_video_file_low');
   const editEmbedSrcEl = document.getElementById('edit_embed_src');
   const editRefreshOmdbEl = document.getElementById('edit_refresh_omdb');
   const editTitleEl = document.getElementById('edit_title');
@@ -1927,6 +1928,7 @@ window.onload = async function () {
     const player_mode = (document.getElementById('player_mode')?.value || 'auto').trim();
     const video_src = document.getElementById('video_src')?.value?.trim() || '';
     const video_file = document.getElementById('video_file')?.value?.trim() || '';
+    const video_file_low = document.getElementById('video_file_low')?.value?.trim() || '';
     const embed_src = document.getElementById('embed_src')?.value?.trim() || '';
 
     if (!year) {
@@ -1946,7 +1948,7 @@ window.onload = async function () {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ year, imdb_id, category, vod_link, player_mode, video_src, video_file, embed_src, cam })
+        body: JSON.stringify({ year, imdb_id, category, vod_link, player_mode, video_src, video_file, video_file_low, embed_src, cam })
       });
 
       if (res.ok) {
@@ -2194,6 +2196,7 @@ window.onload = async function () {
     if (editPlayerModeEl) editPlayerModeEl.value = movie.player_mode || 'auto';
     if (editVideoSrcEl) editVideoSrcEl.value = movie.video_src || '';
     if (editVideoFileEl) editVideoFileEl.value = movie.video_file || '';
+    if (editVideoFileLowEl) editVideoFileLowEl.value = movie.video_file_low || '';
     if (editEmbedSrcEl) editEmbedSrcEl.value = movie.embed_src || '';
     editRefreshOmdbEl.checked = false;
 
@@ -2222,6 +2225,7 @@ window.onload = async function () {
     const player_mode = (editPlayerModeEl?.value || 'auto').trim();
     const video_src = (editVideoSrcEl?.value || '').trim();
     const video_file = (editVideoFileEl?.value || '').trim();
+    const video_file_low = (editVideoFileLowEl?.value || '').trim();
     const embed_src = (editEmbedSrcEl?.value || '').trim();
     const refreshOmdb = !!editRefreshOmdbEl.checked;
     const cam = !!editCamFlagEl?.checked;
@@ -2258,6 +2262,7 @@ window.onload = async function () {
       player_mode,
       video_src,
       video_file,
+      video_file_low,
       embed_src,
       refreshOmdb,
       cam
@@ -2333,11 +2338,13 @@ window.onload = async function () {
         const badges = [];
         const hasVideo = !!(m && m.video_src);
         const hasFile = !!(m && m.video_file);
+        const hasLowFile = !!(m && m.video_file_low);
         const hasEmbed = !!(m && m.embed_src);
         const hasLegacy = !!(m && m.vod_link);
 
         if (hasVideo) badges.push({ text: 'Video', cls: 'bg-primary' });
         if (hasFile) badges.push({ text: 'Server file', cls: 'bg-dark' });
+        if (hasLowFile) badges.push({ text: 'Low file', cls: 'bg-secondary' });
         if (hasEmbed) badges.push({ text: 'Embed', cls: 'bg-info text-dark' });
         if (hasLegacy) badges.push({ text: 'Legacy', cls: 'bg-secondary' });
 

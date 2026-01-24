@@ -148,7 +148,7 @@ router.get("/", async (req, res) => {
 
     const projection = isChecklist
       ? "imdb_id title"
-      : "imdb_id title description rating poster cam year category vod_link player_mode video_src embed_src video_file updatedAt createdAt";
+      : "imdb_id title description rating poster cam year category vod_link player_mode video_src embed_src video_file video_file_low updatedAt createdAt";
 
     const cacheKey = `movies:list:${year || "all"}:${isChecklist ? "checklist" : "films"}`;
     const cached = cacheGet(cacheKey);
@@ -333,7 +333,7 @@ router.patch("/users/updateWatchedMovies", async (req, res) => {
 
 // Add movie
 router.post("/add", async (req, res) => {
-  const { imdb_id, category, vod_link, year, player_mode, video_src, embed_src, video_file, cam } = req.body;
+  const { imdb_id, category, vod_link, year, player_mode, video_src, embed_src, video_file, video_file_low, cam } = req.body;
 
   try {
     // Get the token from the Authorization header
@@ -360,6 +360,7 @@ router.post("/add", async (req, res) => {
     const normalizedVideo = normalizeOptionalString(video_src, 4096);
     const normalizedEmbed = normalizeOptionalString(embed_src, 20000);
     const normalizedFile = normalizeVideoFile(video_file);
+    const normalizedLowFile = normalizeVideoFile(video_file_low);
     const normalizedMode = normalizePlayerMode(player_mode);
     if (normalizedMode === null) {
       return res.status(400).json({ message: "player_mode invalide (auto|video|embed)" });
@@ -398,6 +399,7 @@ router.post("/add", async (req, res) => {
       video_src: normalizedVideo || undefined,
       embed_src: normalizedEmbed || undefined,
       video_file: normalizedFile || undefined,
+      video_file_low: normalizedLowFile || undefined,
     });
 
     await movie.save();
@@ -491,6 +493,7 @@ router.put("/:id", async (req, res) => {
       video_src,
       embed_src,
       video_file,
+      video_file_low,
       refreshOmdb,
       cam,
     } = req.body || {};
@@ -549,6 +552,10 @@ router.put("/:id", async (req, res) => {
       if (movie.video_file && !String(movie.video_src || "").trim()) {
         movie.video_src = `/api/video/${movie._id}`;
       }
+    }
+    if (video_file_low !== undefined) {
+      const v = normalizeVideoFile(video_file_low);
+      movie.video_file_low = v ? v : null;
     }
 
     if (year !== undefined && year !== null && year !== "") {

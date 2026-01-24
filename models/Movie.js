@@ -21,6 +21,9 @@ const movieSchema = new mongoose.Schema({
   // Server-hosted file (relative path under VIDEO_FILES_DIR, default public/video)
   // If set, the backend can stream it via /api/video/:movieId (Range/seek supported).
   video_file: { type: String, required: false },
+  // Optional low-quality server file (relative path under VIDEO_FILES_DIR, default public/video)
+  // Served when the player requests ?quality=low on /api/video/:movieId.
+  video_file_low: { type: String, required: false },
   watchedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 }, { timestamps: true });
 

@@ -152,19 +152,29 @@
             </div>
           </div>
 
-          <!-- Admin-only debug/status (Source + Progress) -->
-          <div id="player-admin-status" class="d-none d-flex flex-column gap-2">
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-              <span class="badge bg-secondary">Source</span>
-              <span id="source-label" class="badge bg-light text-dark badge-src">—</span>
+          <div class="d-flex flex-column gap-2 align-items-start align-items-lg-end">
+            <div id="quality-toggle" class="d-none d-flex align-items-center gap-2">
+              <span class="text-muted small">Qualité</span>
+              <div class="form-check form-switch m-0">
+                <input class="form-check-input" type="checkbox" id="quality-switch">
+                <label class="form-check-label small" for="quality-switch" id="quality-switch-label">Haute</label>
+              </div>
             </div>
 
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-              <span class="badge bg-secondary">Progress</span>
-              <span id="progress-status" class="text-muted small progress-indicator">
-                <span id="progress-status-icon" class="progress-icon" aria-hidden="true"></span>
-                <span id="progress-status-text" class="progress-text">—</span>
-              </span>
+            <!-- Admin-only debug/status (Source + Progress) -->
+            <div id="player-admin-status" class="d-none d-flex flex-column gap-2">
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="badge bg-secondary">Source</span>
+                <span id="source-label" class="badge bg-light text-dark badge-src">—</span>
+              </div>
+
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="badge bg-secondary">Progress</span>
+                <span id="progress-status" class="text-muted small progress-indicator">
+                  <span id="progress-status-icon" class="progress-icon" aria-hidden="true"></span>
+                  <span id="progress-status-text" class="progress-text">—</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>

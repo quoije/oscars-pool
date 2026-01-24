@@ -691,6 +691,11 @@
                               <div class="form-text">Chemin relatif sous <code>VIDEO_FILES_DIR</code> (défaut: <code>public/video</code>).</div>
                             </div>
                             <div class="col-12">
+                              <label for="video_file_low" class="form-label">Server video file (basse qualité, optionnel)</label>
+                              <input type="text" class="form-control font-monospace" id="video_file_low" placeholder="LOW/my_movie.LOW.mp4">
+                              <div class="form-text">Chemin relatif sous <code>VIDEO_FILES_DIR</code>. Ex: <code>LOW/123.LOW.mp4</code>.</div>
+                            </div>
+                            <div class="col-12">
                               <label for="embed_src" class="form-label">Embed URL ou iframe</label>
                               <textarea class="form-control font-monospace" id="embed_src" rows="3" placeholder="https://... OR <iframe src='...'></iframe>"></textarea>
                             </div>
@@ -723,6 +728,7 @@
                   <ul class="mb-0">
                     <li><strong>Auto</strong>: utilise <code>video_src</code> → <code>embed_src</code> → <code>vod_link</code>.</li>
                     <li><strong>Server file</strong>: mets <code>video_file</code> (chemin relatif sous <code>public/video</code>).</li>
+                    <li><strong>Low quality</strong>: mets <code>video_file_low</code> (ex: <code>LOW/mon_film.LOW.mp4</code>).</li>
                     <li><strong>Édition</strong>: le bouton “Éditer” ouvre une modale avec des onglets Info / Player.</li>
                   </ul>
                 </div>
@@ -1384,6 +1390,11 @@
                     <label for="edit_video_file" class="form-label">Server video file (optional)</label>
                     <input type="text" class="form-control font-monospace" id="edit_video_file" placeholder="my_movie.mp4 or 2026/my_movie.mp4">
                     <div class="form-text">Relative path under <code>VIDEO_FILES_DIR</code> (default: <code>public/video</code>).</div>
+                  </div>
+                  <div class="col-12">
+                    <label for="edit_video_file_low" class="form-label">Server video file (low quality, optional)</label>
+                    <input type="text" class="form-control font-monospace" id="edit_video_file_low" placeholder="LOW/my_movie.LOW.mp4">
+                    <div class="form-text">Relative path under <code>VIDEO_FILES_DIR</code>. Example: <code>LOW/123.LOW.mp4</code>.</div>
                   </div>
                   <div class="col-12">
                     <label for="edit_embed_src" class="form-label">Embed URL or iframe code</label>

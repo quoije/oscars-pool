@@ -753,6 +753,21 @@ async function probeApiVideoReadable(rawUrl) {
   }
 }
 
+async function probeApiVideoExists(rawUrl) {
+  try {
+    const res = await fetch(rawUrl, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+    return res.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
 async function ensurePlayableApiVideoUrl(rawUrl, token) {
   if (!isApiVideoUrl(rawUrl) || !token) return rawUrl;
   // IMPORTANT: Prefer query-token auth for media elements.
@@ -883,6 +898,109 @@ function resolveMovieSource(movie) {
   return { src: null, isLegacy: false };
 }
 
+function qualityStorageKey(movieId) {
+  return `player_quality:${String(movieId || '')}`;
+}
+
+function getStoredQuality(movieId) {
+  const raw = localStorage.getItem(qualityStorageKey(movieId));
+  return raw === 'low' ? 'low' : 'high';
+}
+
+function setStoredQuality(movieId, quality) {
+  const value = quality === 'low' ? 'low' : 'high';
+  try { localStorage.setItem(qualityStorageKey(movieId), value); } catch (_) {}
+}
+
+function addQualityParam(rawUrl, quality) {
+  if (!rawUrl) return rawUrl;
+  try {
+    const isRelative = String(rawUrl).trim().startsWith('/');
+    const u = new URL(String(rawUrl), window.location.origin);
+    if (quality) u.searchParams.set('quality', quality);
+    else u.searchParams.delete('quality');
+    return isRelative ? `${u.pathname}${u.search}${u.hash}` : u.toString();
+  } catch (_) {
+    return rawUrl;
+  }
+}
+
+function setQualityToggleUi({ visible, isLow }) {
+  const wrap = document.getElementById('quality-toggle');
+  const toggle = document.getElementById('quality-switch');
+  const label = document.getElementById('quality-switch-label');
+  if (!wrap || !toggle || !label) return;
+  if (visible) {
+    wrap.classList.remove('d-none');
+    toggle.checked = !!isLow;
+    label.textContent = isLow ? 'Basse' : 'Haute';
+  } else {
+    wrap.classList.add('d-none');
+    toggle.checked = false;
+    label.textContent = 'Haute';
+  }
+}
+
+async function switchVideoSource({ src, token, preserveTime }) {
+  const videoEl = document.getElementById('video');
+  if (!videoEl || !src) return;
+
+  const shouldPreserve = !!preserveTime && Number.isFinite(videoEl.currentTime) && videoEl.currentTime > 0;
+  const previousTime = shouldPreserve ? Number(videoEl.currentTime) : 0;
+  const wasPlaying = !videoEl.paused && !videoEl.ended;
+
+  const onLoaded = () => {
+    if (previousTime > 1) {
+      try { videoEl.currentTime = previousTime; } catch (_) {}
+    }
+    if (wasPlaying) {
+      const playPromise = videoEl.play();
+      if (playPromise && typeof playPromise.catch === 'function') playPromise.catch(() => {});
+    }
+  };
+  videoEl.addEventListener('loadedmetadata', onLoaded, { once: true });
+
+  await playVodLink(src, { token });
+}
+
+async function initQualityToggle({ movieId, token, fallbackSrc }) {
+  const wrap = document.getElementById('quality-toggle');
+  const toggle = document.getElementById('quality-switch');
+  if (!wrap || !toggle) return { src: fallbackSrc };
+
+  if (!isApiVideoUrl(fallbackSrc)) {
+    setQualityToggleUi({ visible: false, isLow: false });
+    return { src: fallbackSrc };
+  }
+
+  const lowSrcRaw = addQualityParam(fallbackSrc, 'low');
+  const playableLow = await ensurePlayableApiVideoUrl(lowSrcRaw, token);
+  const hasLow = await probeApiVideoExists(playableLow);
+  if (!hasLow) {
+    setQualityToggleUi({ visible: false, isLow: false });
+    return { src: fallbackSrc };
+  }
+
+  const preferred = getStoredQuality(movieId);
+  const shouldUseLow = preferred === 'low';
+  const pickedSrc = shouldUseLow ? lowSrcRaw : fallbackSrc;
+
+  setQualityToggleUi({ visible: true, isLow: shouldUseLow });
+
+  toggle.addEventListener('change', async () => {
+    const nextIsLow = !!toggle.checked;
+    setStoredQuality(movieId, nextIsLow ? 'low' : 'high');
+    setQualityToggleUi({ visible: true, isLow: nextIsLow });
+    await switchVideoSource({
+      src: nextIsLow ? lowSrcRaw : fallbackSrc,
+      token,
+      preserveTime: true,
+    });
+  });
+
+  return { src: pickedSrc };
+}
+
 window.onload = async function () {
   const pageLoader = createPageLoader({ title: 'Chargement du lecteur' });
 
@@ -987,7 +1105,9 @@ window.onload = async function () {
     }
 
     pageLoader.setProgress(70);
-    await playVodLink(resolved.src, { token });
+    const qualityChoice = await initQualityToggle({ movieId: id, token, fallbackSrc: resolved.src });
+    const selectedSrc = qualityChoice?.src || resolved.src;
+    await playVodLink(selectedSrc, { token });
     pageLoader.setProgress(82);
 
     // Only the <video> player supports reliable progress tracking (mp4/hls).
