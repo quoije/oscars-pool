@@ -546,6 +546,105 @@ function setHeader(movie, { activeYear } = {}) {
   document.title = movie?.title ? `${titlePrefix} - ${movie.title}` : titlePrefix;
 }
 
+function normalizeRatingValue(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  if (rounded < 1 || rounded > 5) return null;
+  return rounded;
+}
+
+function applyRatingState({ wrap, buttons, metaEl, averageRating, ratingsCount, userRating }) {
+  if (!wrap || !buttons?.length || !metaEl) return;
+  const avg = Number.isFinite(Number(averageRating)) ? Number(averageRating) : null;
+  const count = Number.isFinite(Number(ratingsCount)) ? Number(ratingsCount) : 0;
+  const user = Number.isFinite(Number(userRating)) ? Number(userRating) : null;
+
+  buttons.forEach((btn) => {
+    const value = Number(btn.getAttribute('data-value'));
+    const isActive = user && value <= user;
+    btn.classList.toggle('is-active', !!isActive);
+    btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+  });
+
+  const parts = [];
+  if (avg && count > 0) {
+    parts.push(`Note utilisateurs: ${avg.toFixed(1)} (${count})`);
+  } else {
+    parts.push('Note utilisateurs: —');
+  }
+  metaEl.textContent = parts.join(' • ');
+}
+
+async function saveUserRating(movieId, rating, token) {
+  try {
+    const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/ratings`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ rating }),
+    });
+    if (!res.ok) return null;
+    return await res.json().catch(() => null);
+  } catch (_) {
+    return null;
+  }
+}
+
+function initUserRating({ movieId, token, initial } = {}) {
+  const wrap = document.getElementById('user-rating');
+  const metaEl = document.getElementById('user-rating-meta');
+  if (!wrap || !metaEl) return;
+
+  const buttons = Array.from(wrap.querySelectorAll('.star-btn'));
+  const starting = {
+    averageRating: initial?.averageRating ?? null,
+    ratingsCount: initial?.ratingsCount ?? 0,
+    userRating: initial?.userRating ?? null,
+  };
+
+  applyRatingState({ wrap, buttons, metaEl, ...starting });
+
+  if (!token) {
+    metaEl.textContent = 'Connecte-toi pour noter.';
+    buttons.forEach((btn) => btn.setAttribute('disabled', 'disabled'));
+    return;
+  }
+
+  let isSaving = false;
+  buttons.forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (isSaving) return;
+      const value = normalizeRatingValue(btn.getAttribute('data-value'));
+      if (!value) return;
+
+      isSaving = true;
+      buttons.forEach((b) => b.setAttribute('disabled', 'disabled'));
+      metaEl.textContent = 'Enregistrement…';
+
+      const result = await saveUserRating(movieId, value, token);
+      if (result) {
+        applyRatingState({
+          wrap,
+          buttons,
+          metaEl,
+          averageRating: result?.averageRating,
+          ratingsCount: result?.ratingsCount,
+          userRating: result?.userRating,
+        });
+      } else {
+        applyRatingState({ wrap, buttons, metaEl, ...starting });
+        metaEl.textContent = 'Impossible d’enregistrer la note.';
+      }
+
+      buttons.forEach((b) => b.removeAttribute('disabled'));
+      isSaving = false;
+    });
+  });
+}
+
 function normalizeVodLink(raw) {
   const v = String(raw || '').trim();
   if (!v) return null;
@@ -1152,6 +1251,15 @@ window.onload = async function () {
 
     const [activeYear, playerUi] = await Promise.all([activeYearPromise, playerUiPromise]);
     setHeader(movie, { activeYear });
+    initUserRating({
+      movieId: id,
+      token,
+      initial: {
+        averageRating: movie?.user_rating_avg,
+        ratingsCount: movie?.user_rating_count,
+        userRating: movie?.user_rating,
+      },
+    });
     pageLoader.setProgress(58);
 
     // Admin-only status block (Source + Progress) can be globally disabled via settings.

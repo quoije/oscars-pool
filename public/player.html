@@ -106,6 +106,41 @@
       outline-offset: 2px;
     }
 
+    .user-rating {
+      display: flex;
+      flex-direction: column;
+      gap: .25rem;
+      align-items: center;
+      text-align: center;
+      width: 100%;
+    }
+    .rating-stars {
+      display: inline-flex;
+      align-items: center;
+      gap: .15rem;
+      justify-content: center;
+    }
+    .star-btn {
+      border: 0;
+      background: transparent;
+      color: rgba(0,0,0,0.25);
+      font-size: 1.1rem;
+      line-height: 1;
+      padding: .15rem .2rem;
+    }
+    .star-btn.is-active {
+      color: #f4b400;
+    }
+    .star-btn:focus-visible {
+      outline: 2px solid rgba(13,110,253,.35);
+      outline-offset: 2px;
+      border-radius: 4px;
+    }
+    #user-rating-meta {
+      color: rgba(0,0,0,0.6);
+      font-weight: 500;
+    }
+
     /* Progress indicator: icon-first, minimal text */
     .progress-indicator {
       display: inline-flex;
@@ -195,13 +230,24 @@
             </div>
           </div>
 
-          <div class="d-flex flex-column gap-2 align-items-start align-items-lg-end">
+          <div class="d-flex flex-column gap-2 align-items-center align-items-lg-center">
             <div id="quality-toggle" class="d-none quality-toggle">
               <span class="quality-label">Qualité</span>
               <div class="quality-pill" role="group" aria-label="Qualité">
                 <button type="button" class="quality-btn" data-quality="high" id="quality-btn-high" aria-pressed="true">Haute</button>
                 <button type="button" class="quality-btn" data-quality="low" id="quality-btn-low" aria-pressed="false">Basse</button>
               </div>
+            </div>
+
+            <div id="user-rating" class="user-rating">
+              <div class="rating-stars" role="group" aria-label="Noter ce film">
+                <button type="button" class="star-btn" data-value="1" aria-label="1 étoile" aria-pressed="false">★</button>
+                <button type="button" class="star-btn" data-value="2" aria-label="2 étoiles" aria-pressed="false">★</button>
+                <button type="button" class="star-btn" data-value="3" aria-label="3 étoiles" aria-pressed="false">★</button>
+                <button type="button" class="star-btn" data-value="4" aria-label="4 étoiles" aria-pressed="false">★</button>
+                <button type="button" class="star-btn" data-value="5" aria-label="5 étoiles" aria-pressed="false">★</button>
+              </div>
+              <div id="user-rating-meta" class="text-muted small">—</div>
             </div>
 
             <!-- Admin-only debug/status (Source + Progress) -->

@@ -403,6 +403,15 @@ window.addEventListener('DOMContentLoaded', async function () {
         const legacyUrl = cleanUrl(movie?.vod_link);
         const hasLegacy = !!legacyUrl;
         const movieId = movie && movie._id ? String(movie._id) : '';
+        const userRatingAvg = Number(movie?.user_rating_avg);
+        const userRatingCount = Number(movie?.user_rating_count) || 0;
+        const userRating = Number(movie?.user_rating);
+        const userRatingText =
+          Number.isFinite(userRatingAvg) && userRatingAvg > 0
+            ? `${userRatingAvg.toFixed(1)}${userRatingCount ? ` (${userRatingCount})` : ''}`
+            : '';
+        const userRatingOwn =
+          Number.isFinite(userRating) && userRating > 0 ? `${userRating}/5` : '';
 
         // Navigation:
         // - Prefer in-app player when we have a non-legacy source
@@ -470,26 +479,38 @@ window.addEventListener('DOMContentLoaded', async function () {
                 : `${posterBlock}`
             }
             <div class="card-body d-flex flex-column">
-              <div class="d-flex justify-content-between align-items-start gap-2">
-                <h5 class="card-title mb-1 flex-grow-1">
-                  ${
-                    isClickable
-                      ? `<a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none text-dark">${movie.title}</a>`
-                      : `<span class="text-dark">${movie.title}</span>`
-                  }
-                </h5>
-                <div class="text-nowrap small text-muted">
-                  ⭐ ${movie.rating}
-                  <a href="https://www.imdb.com/title/${movie.imdb_id}/" target="_blank" rel="noopener noreferrer" aria-label="Voir sur IMDb">
-                    <img src="/img/imdb.png" class="imdb-icon" alt="IMDb">
-                  </a>
+              <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div class="flex-grow-1">
+                    <h5 class="card-title mb-1">
+                      ${
+                        isClickable
+                          ? `<a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none text-dark">${movie.title}</a>`
+                          : `<span class="text-dark">${movie.title}</span>`
+                      }
+                    </h5>
+                    <div class="movie-rating-block mt-1">
+                      ${userRatingText ? `<div class="movie-rating-sub">Note utilisateurs ${userRatingText}</div>` : ''}
+                      ${userRatingOwn ? `<div class="movie-rating-sub">Votre note ${userRatingOwn}</div>` : ''}
+                    </div>
+                  </div>
+                  <div class="movie-imdb-block">
+                    ${movie.rating ? `<span>⭐ ${movie.rating}</span>` : ''}
+                    <a href="https://www.imdb.com/title/${movie.imdb_id}/" target="_blank" rel="noopener noreferrer" aria-label="Voir sur IMDb">
+                      <img src="/img/imdb.png" class="imdb-icon" alt="IMDb">
+                    </a>
+                  </div>
+                </div>
+                ${!isClickable ? '<div class="text-muted small mb-1">Aucune source</div>' : ''}
+                <div class="movie-info-box">
+                  <div class="movie-info-category">${movie.category}</div>
+                  <p class="movie-info-desc">${movie.description}</p>
                 </div>
               </div>
-              ${!isClickable ? '<div class="text-muted small mb-1">Aucune source</div>' : ''}
-              <div class="text-muted small fw-semibold fst-italic mb-2">${movie.category}</div>
-              <p class="card-text small flex-grow-1 mb-2">${movie.description}</p>
-              ${isChecked ? `<div class="text-muted small"><span class="fw-semibold text-dark">Regardé le:</span> ${watchedDate}</div>` : ''}
-              ${progressHtml}
+              <div class="mt-auto">
+                ${isChecked ? `<div class="text-muted small"><span class="fw-semibold text-dark">Regardé le:</span> ${watchedDate}</div>` : ''}
+                ${progressHtml}
+              </div>
             </div>
           </div>`;
         moviesList.appendChild(movieDiv);
