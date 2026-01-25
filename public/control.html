@@ -696,6 +696,25 @@
                               <div class="form-text">Chemin relatif sous <code>VIDEO_FILES_DIR</code>. Ex: <code>LOW/123.LOW.mp4</code>.</div>
                             </div>
                             <div class="col-12">
+                              <label for="subtitle_file" class="form-label">Sous-titres (SRT, optionnel)</label>
+                              <input type="file" class="form-control" id="subtitle_file" accept=".srt,.vtt,text/plain,text/vtt">
+                              <div class="form-text">Upload d'un fichier <code>.srt</code> (converti en VTT serveur, interne uniquement).</div>
+                            </div>
+                            <div class="col-12 col-lg-4">
+                              <label for="subtitle_lang" class="form-label">Langue (ex: fr, en)</label>
+                              <input type="text" class="form-control" id="subtitle_lang" placeholder="fr">
+                            </div>
+                            <div class="col-12 col-lg-4">
+                              <label for="subtitle_label" class="form-label">Label (affiché)</label>
+                              <input type="text" class="form-control" id="subtitle_label" placeholder="Français">
+                            </div>
+                            <div class="col-12 col-lg-4 d-flex align-items-end">
+                              <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="subtitle_default">
+                                <label class="form-check-label" for="subtitle_default">Par défaut</label>
+                              </div>
+                            </div>
+                            <div class="col-12">
                               <label for="embed_src" class="form-label">Embed URL ou iframe</label>
                               <textarea class="form-control font-monospace" id="embed_src" rows="3" placeholder="https://... OR <iframe src='...'></iframe>"></textarea>
                             </div>
@@ -1395,6 +1414,25 @@
                     <label for="edit_video_file_low" class="form-label">Server video file (low quality, optional)</label>
                     <input type="text" class="form-control font-monospace" id="edit_video_file_low" placeholder="LOW/my_movie.LOW.mp4">
                     <div class="form-text">Relative path under <code>VIDEO_FILES_DIR</code>. Example: <code>LOW/123.LOW.mp4</code>.</div>
+                  </div>
+                  <div class="col-12">
+                    <label for="edit_subtitle_file" class="form-label">Sous-titres (SRT, optionnel)</label>
+                    <input type="file" class="form-control" id="edit_subtitle_file" accept=".srt,.vtt,text/plain,text/vtt">
+                    <div class="form-text">Fichier actuel: <span id="edit_subtitle_current">—</span></div>
+                  </div>
+                  <div class="col-12 col-lg-4">
+                    <label for="edit_subtitle_lang" class="form-label">Langue (ex: fr, en)</label>
+                    <input type="text" class="form-control" id="edit_subtitle_lang" placeholder="fr">
+                  </div>
+                  <div class="col-12 col-lg-4">
+                    <label for="edit_subtitle_label" class="form-label">Label (affiché)</label>
+                    <input type="text" class="form-control" id="edit_subtitle_label" placeholder="Français">
+                  </div>
+                  <div class="col-12 col-lg-4 d-flex align-items-end">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="edit_subtitle_default">
+                      <label class="form-check-label" for="edit_subtitle_default">Par défaut</label>
+                    </div>
                   </div>
                   <div class="col-12">
                     <label for="edit_embed_src" class="form-label">Embed URL or iframe code</label>

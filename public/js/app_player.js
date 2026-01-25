@@ -687,6 +687,7 @@ function toVideoSessionUrl(videoSrc) {
 // Best-effort cache to avoid spamming /api/video/session.
 // Keyed by sessionUrl + token (token is already in-memory, not persisted here).
 const _videoSessionCache = new Map(); // key -> expiresAt ms
+let _currentMovie = null;
 
 async function ensureVideoSessionForSource(videoSrc, token) {
   // Only needed for our protected /api/video/* streams.
@@ -775,6 +776,50 @@ async function ensurePlayableApiVideoUrl(rawUrl, token) {
   // and causes intermittent 401s + preflight noise. Both Node + Python servers already
   // support ?token=... so we use it consistently.
   return addTokenToApiVideoUrl(rawUrl, token);
+}
+
+function addTokenToApiSubtitleUrl(rawUrl, token) {
+  if (!rawUrl || !token) return rawUrl;
+  try {
+    const isRelative = String(rawUrl).trim().startsWith('/');
+    const u = new URL(String(rawUrl), window.location.origin);
+    u.searchParams.set('token', token);
+    return isRelative ? `${u.pathname}${u.search}${u.hash}` : u.toString();
+  } catch (_) {
+    const s = String(rawUrl);
+    const join = s.includes('?') ? '&' : '?';
+    return `${s}${join}token=${encodeURIComponent(token)}`;
+  }
+}
+
+function clearVideoTracks(videoEl) {
+  if (!videoEl) return;
+  const tracks = Array.from(videoEl.querySelectorAll('track'));
+  tracks.forEach((t) => {
+    try { t.remove(); } catch (_) {}
+  });
+}
+
+function applySubtitleTrack({ videoEl, movie, token }) {
+  if (!videoEl) return;
+  clearVideoTracks(videoEl);
+  const movieId = String(movie?._id || '');
+  const subtitleFile = String(movie?.subtitle_file || '').trim();
+  if (!movieId || !subtitleFile) return;
+
+  const lang = String(movie?.subtitle_lang || 'en').trim() || 'en';
+  const label = String(movie?.subtitle_label || 'Subtitles').trim() || 'Subtitles';
+  const isDefault = movie?.subtitle_default === undefined ? true : !!movie.subtitle_default;
+  const rawUrl = `/api/subtitles/${encodeURIComponent(movieId)}`;
+  const src = addTokenToApiSubtitleUrl(rawUrl, token);
+
+  const track = document.createElement('track');
+  track.kind = 'subtitles';
+  track.label = label;
+  track.srclang = lang;
+  track.src = src;
+  track.default = isDefault;
+  videoEl.appendChild(track);
 }
 
 async function playVodLink(vodLink, { token } = {}) {
@@ -927,17 +972,22 @@ function addQualityParam(rawUrl, quality) {
 
 function setQualityToggleUi({ visible, isLow }) {
   const wrap = document.getElementById('quality-toggle');
-  const toggle = document.getElementById('quality-switch');
-  const label = document.getElementById('quality-switch-label');
-  if (!wrap || !toggle || !label) return;
+  const btnHigh = document.getElementById('quality-btn-high');
+  const btnLow = document.getElementById('quality-btn-low');
+  if (!wrap || !btnHigh || !btnLow) return;
   if (visible) {
     wrap.classList.remove('d-none');
-    toggle.checked = !!isLow;
-    label.textContent = isLow ? 'Basse' : 'Haute';
+    const useLow = !!isLow;
+    btnHigh.classList.toggle('is-active', !useLow);
+    btnLow.classList.toggle('is-active', useLow);
+    btnHigh.setAttribute('aria-pressed', useLow ? 'false' : 'true');
+    btnLow.setAttribute('aria-pressed', useLow ? 'true' : 'false');
   } else {
     wrap.classList.add('d-none');
-    toggle.checked = false;
-    label.textContent = 'Haute';
+    btnHigh.classList.remove('is-active');
+    btnLow.classList.remove('is-active');
+    btnHigh.setAttribute('aria-pressed', 'false');
+    btnLow.setAttribute('aria-pressed', 'false');
   }
 }
 
@@ -961,14 +1011,16 @@ async function switchVideoSource({ src, token, preserveTime }) {
   videoEl.addEventListener('loadedmetadata', onLoaded, { once: true });
 
   await playVodLink(src, { token });
+  applySubtitleTrack({ videoEl, movie: _currentMovie, token });
 }
 
-async function initQualityToggle({ movieId, token, fallbackSrc }) {
+async function initQualityToggle({ movieId, token, fallbackSrc, hasLowFile }) {
   const wrap = document.getElementById('quality-toggle');
-  const toggle = document.getElementById('quality-switch');
-  if (!wrap || !toggle) return { src: fallbackSrc };
+  const btnHigh = document.getElementById('quality-btn-high');
+  const btnLow = document.getElementById('quality-btn-low');
+  if (!wrap || !btnHigh || !btnLow) return { src: fallbackSrc };
 
-  if (!isApiVideoUrl(fallbackSrc)) {
+  if (!isApiVideoUrl(fallbackSrc) || !hasLowFile) {
     setQualityToggleUi({ visible: false, isLow: false });
     return { src: fallbackSrc };
   }
@@ -987,8 +1039,7 @@ async function initQualityToggle({ movieId, token, fallbackSrc }) {
 
   setQualityToggleUi({ visible: true, isLow: shouldUseLow });
 
-  toggle.addEventListener('change', async () => {
-    const nextIsLow = !!toggle.checked;
+  const onPickQuality = async (nextIsLow) => {
     setStoredQuality(movieId, nextIsLow ? 'low' : 'high');
     setQualityToggleUi({ visible: true, isLow: nextIsLow });
     await switchVideoSource({
@@ -996,7 +1047,10 @@ async function initQualityToggle({ movieId, token, fallbackSrc }) {
       token,
       preserveTime: true,
     });
-  });
+  };
+
+  btnHigh.addEventListener('click', () => { void onPickQuality(false); });
+  btnLow.addEventListener('click', () => { void onPickQuality(true); });
 
   return { src: pickedSrc };
 }
@@ -1069,6 +1123,7 @@ window.onload = async function () {
       pageLoader.fail();
       return;
     }
+    _currentMovie = movie;
 
     const [activeYear, playerUi] = await Promise.all([activeYearPromise, playerUiPromise]);
     setHeader(movie, { activeYear });
@@ -1105,7 +1160,8 @@ window.onload = async function () {
     }
 
     pageLoader.setProgress(70);
-    const qualityChoice = await initQualityToggle({ movieId: id, token, fallbackSrc: resolved.src });
+    const hasLowFile = !!(movie?.video_file_low);
+    const qualityChoice = await initQualityToggle({ movieId: id, token, fallbackSrc: resolved.src, hasLowFile });
     const selectedSrc = qualityChoice?.src || resolved.src;
     await playVodLink(selectedSrc, { token });
     pageLoader.setProgress(82);
@@ -1113,6 +1169,7 @@ window.onload = async function () {
     // Only the <video> player supports reliable progress tracking (mp4/hls).
     const videoEl = document.getElementById('video');
     if (videoEl && !videoEl.classList.contains('d-none')) {
+      applySubtitleTrack({ videoEl, movie, token });
       setProgressUi({ state: 'preparing', text: 'Reprise', showText: true, ariaText: 'Prépare la reprise…' });
       const userId = normalizeUserId(decoded);
       if (userId) {

@@ -1,4 +1,7 @@
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const multer = require("multer");
 const Movie = require("../models/Movie");
 const User = require("../models/User");
 const PlaybackProgress = require("../models/PlaybackProgress");
@@ -13,6 +16,8 @@ const router = express.Router();
 // This is safe because movie lists are identical for all users and change rarely.
 const MOVIES_CACHE_TTL_MS = Number(process.env.MOVIES_CACHE_TTL_MS || "30000"); // 30s
 const _cache = new Map(); // key -> { expiresAt:number, value:any }
+const SUBTITLE_FILES_DIR = path.resolve(process.env.SUBTITLE_FILES_DIR || path.join(process.cwd(), "subtitles"));
+const MAX_SUBTITLE_UPLOAD_BYTES = 10 * 1024 * 1024; // 10MB
 
 function cacheGet(key) {
   const hit = _cache.get(key);
@@ -60,6 +65,68 @@ function normalizeVideoFile(v) {
   const s = String(v).trim();
   if (!s) return "";
   return s.slice(0, 1024);
+}
+
+function normalizeSubtitleLang(v) {
+  return normalizeOptionalString(v, 24);
+}
+
+function normalizeSubtitleLabel(v) {
+  return normalizeOptionalString(v, 80);
+}
+
+function parseSubtitleDefault(v) {
+  if (v === undefined) return undefined;
+  if (typeof v === "boolean") return v;
+  const s = String(v).trim().toLowerCase();
+  if (!s) return undefined;
+  if (["true", "1", "yes", "on"].includes(s)) return true;
+  if (["false", "0", "no", "off"].includes(s)) return false;
+  return undefined;
+}
+
+async function ensureSubtitleDir() {
+  await fs.promises.mkdir(SUBTITLE_FILES_DIR, { recursive: true });
+}
+
+function safeFilenameBase(raw) {
+  return String(raw || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32) || "movie";
+}
+
+const subtitleUpload = multer({
+  storage: multer.diskStorage({
+    destination: async (_req, _file, cb) => {
+      try {
+        await ensureSubtitleDir();
+        cb(null, SUBTITLE_FILES_DIR);
+      } catch (err) {
+        cb(err);
+      }
+    },
+    filename: (req, file, cb) => {
+      const safeId = safeFilenameBase(req.params?.id);
+      const ext = path.extname(file.originalname || "").toLowerCase() || ".vtt";
+      const name = `${safeId}-${Date.now()}-${Math.random().toString(16).slice(2)}${ext}`;
+      cb(null, name);
+    },
+  }),
+  limits: { fileSize: MAX_SUBTITLE_UPLOAD_BYTES },
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    if (ext !== ".vtt" && ext !== ".srt") return cb(new Error("Only .srt or .vtt subtitle files are allowed"));
+    return cb(null, true);
+  },
+});
+
+async function convertSrtToVtt(filePath) {
+  const content = await fs.promises.readFile(filePath, "utf8");
+  const normalized = content.replace(/\r\n/g, "\n");
+  const body = normalized.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
+  const vtt = `WEBVTT\n\n${body.trim()}\n`;
+  const vttPath = filePath.replace(/\.srt$/i, ".vtt");
+  await fs.promises.writeFile(vttPath, vtt, "utf8");
+  try { await fs.promises.unlink(filePath); } catch (_) {}
+  return vttPath;
 }
 
 function normalizePlayerMode(v) {
@@ -148,7 +215,7 @@ router.get("/", async (req, res) => {
 
     const projection = isChecklist
       ? "imdb_id title"
-      : "imdb_id title description rating poster cam year category vod_link player_mode video_src embed_src video_file video_file_low updatedAt createdAt";
+      : "imdb_id title description rating poster cam year category vod_link player_mode video_src embed_src video_file video_file_low subtitle_file subtitle_lang subtitle_label subtitle_default updatedAt createdAt";
 
     const cacheKey = `movies:list:${year || "all"}:${isChecklist ? "checklist" : "films"}`;
     const cached = cacheGet(cacheKey);
@@ -333,7 +400,21 @@ router.patch("/users/updateWatchedMovies", async (req, res) => {
 
 // Add movie
 router.post("/add", async (req, res) => {
-  const { imdb_id, category, vod_link, year, player_mode, video_src, embed_src, video_file, video_file_low, cam } = req.body;
+  const {
+    imdb_id,
+    category,
+    vod_link,
+    year,
+    player_mode,
+    video_src,
+    embed_src,
+    video_file,
+    video_file_low,
+    subtitle_lang,
+    subtitle_label,
+    subtitle_default,
+    cam,
+  } = req.body;
 
   try {
     // Get the token from the Authorization header
@@ -365,6 +446,9 @@ router.post("/add", async (req, res) => {
     if (normalizedMode === null) {
       return res.status(400).json({ message: "player_mode invalide (auto|video|embed)" });
     }
+    const normalizedSubtitleLang = normalizeSubtitleLang(subtitle_lang);
+    const normalizedSubtitleLabel = normalizeSubtitleLabel(subtitle_label);
+    const normalizedSubtitleDefault = parseSubtitleDefault(subtitle_default) ?? false;
 
     // Fetch movie details from OMDb API
     let movieDetails;
@@ -400,6 +484,9 @@ router.post("/add", async (req, res) => {
       embed_src: normalizedEmbed || undefined,
       video_file: normalizedFile || undefined,
       video_file_low: normalizedLowFile || undefined,
+      subtitle_lang: normalizedSubtitleLang || undefined,
+      subtitle_label: normalizedSubtitleLabel || undefined,
+      subtitle_default: normalizedSubtitleDefault,
     });
 
     await movie.save();
@@ -411,13 +498,91 @@ router.post("/add", async (req, res) => {
     }
     cacheClear();
 
-    res.status(201).json({ message: "Movie added successfully!" });
+    res.status(201).json({ message: "Movie added successfully!", movie });
   } catch (err) {
     if (err instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Invalid or expired token" });
     }
     res.status(400).json({ error: err.message });
   }
+});
+
+// Admin: upload subtitles for a movie (VTT)
+router.post("/:id/subtitles", (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+
+  subtitleUpload.single("subtitle")(req, res, async (err) => {
+    if (err) {
+      const isSize = err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE";
+      return res.status(isSize ? 413 : 400).json({ message: err.message || "Upload failed" });
+    }
+
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      if (req.file?.path) {
+        try { await fs.promises.unlink(req.file.path); } catch (_) {}
+      }
+      return res.status(400).json({ message: "Invalid movie id" });
+    }
+
+    const movie = await Movie.findById(id);
+    if (!movie) {
+      if (req.file?.path) {
+        try { await fs.promises.unlink(req.file.path); } catch (_) {}
+      }
+      return res.status(404).json({ message: "Movie not found" });
+    }
+
+    if (!req.file?.path) {
+      return res.status(400).json({ message: "No subtitle file uploaded" });
+    }
+
+    let storedPath = req.file.path;
+    if (storedPath.toLowerCase().endsWith(".srt")) {
+      try {
+        storedPath = await convertSrtToVtt(storedPath);
+      } catch (e) {
+        return res.status(400).json({ message: "Failed to convert .srt to .vtt" });
+      }
+    }
+
+    const existing = typeof movie.subtitle_file === "string" ? movie.subtitle_file.trim() : "";
+    if (existing) {
+      const oldPath = path.resolve(SUBTITLE_FILES_DIR, existing);
+      if (oldPath.startsWith(SUBTITLE_FILES_DIR + path.sep)) {
+        try { await fs.promises.unlink(oldPath); } catch (_) {}
+      }
+    }
+
+    const rel = path.relative(SUBTITLE_FILES_DIR, storedPath).replace(/\\/g, "/");
+    movie.subtitle_file = rel;
+
+    const incomingLang = normalizeSubtitleLang(req.body?.subtitle_lang);
+    if (incomingLang !== undefined) movie.subtitle_lang = incomingLang || null;
+
+    const incomingLabel = normalizeSubtitleLabel(req.body?.subtitle_label);
+    if (incomingLabel !== undefined) movie.subtitle_label = incomingLabel || null;
+
+    const incomingDefault = parseSubtitleDefault(req.body?.subtitle_default);
+    if (incomingDefault !== undefined) movie.subtitle_default = incomingDefault;
+
+    await movie.save();
+    cacheClear();
+    return res.status(200).json(movie);
+  });
 });
 
 // Admin: delete one or more movies (by Mongo _id or imdb_id)
@@ -494,6 +659,9 @@ router.put("/:id", async (req, res) => {
       embed_src,
       video_file,
       video_file_low,
+      subtitle_lang,
+      subtitle_label,
+      subtitle_default,
       refreshOmdb,
       cam,
     } = req.body || {};
@@ -556,6 +724,21 @@ router.put("/:id", async (req, res) => {
     if (video_file_low !== undefined) {
       const v = normalizeVideoFile(video_file_low);
       movie.video_file_low = v ? v : null;
+    }
+
+    if (subtitle_lang !== undefined) {
+      const v = normalizeSubtitleLang(subtitle_lang);
+      movie.subtitle_lang = v ? v : null;
+    }
+
+    if (subtitle_label !== undefined) {
+      const v = normalizeSubtitleLabel(subtitle_label);
+      movie.subtitle_label = v ? v : null;
+    }
+
+    if (subtitle_default !== undefined) {
+      const v = parseSubtitleDefault(subtitle_default);
+      if (v !== undefined) movie.subtitle_default = v;
     }
 
     if (year !== undefined && year !== null && year !== "") {
