@@ -2442,12 +2442,14 @@ window.onload = async function () {
         const hasLowFile = !!(m && m.video_file_low);
         const hasEmbed = !!(m && m.embed_src);
         const hasLegacy = !!(m && m.vod_link);
+        const hasSubtitle = !!(m && m.subtitle_file);
 
         if (hasVideo) badges.push({ text: 'Video', cls: 'bg-primary' });
         if (hasFile) badges.push({ text: 'Server file', cls: 'bg-dark' });
         if (hasLowFile) badges.push({ text: 'Low file', cls: 'bg-secondary' });
         if (hasEmbed) badges.push({ text: 'Embed', cls: 'bg-info text-dark' });
         if (hasLegacy) badges.push({ text: 'Legacy', cls: 'bg-secondary' });
+        if (hasSubtitle) badges.push({ text: 'Subtitles', cls: 'bg-warning text-dark' });
 
         const modeRaw = String(m?.player_mode || 'auto').toLowerCase();
         const mode = (modeRaw === 'video' || modeRaw === 'embed' || modeRaw === 'auto') ? modeRaw : 'auto';

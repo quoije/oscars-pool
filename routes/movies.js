@@ -122,7 +122,15 @@ async function convertSrtToVtt(filePath) {
   const content = await fs.promises.readFile(filePath, "utf8");
   const normalized = content.replace(/\r\n/g, "\n");
   const body = normalized.replace(/(\d{2}:\d{2}:\d{2}),(\d{3})/g, "$1.$2");
-  const vtt = `WEBVTT\n\n${body.trim()}\n`;
+  const positioned = body.replace(
+    /^(\d{2}:\d{2}:\d{2}\.\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}\.\d{3})(.*)$/gm,
+    (_match, timing, settings) => {
+      const tail = String(settings || "");
+      if (/\bline:/i.test(tail)) return `${timing}${tail}`;
+      return `${timing}${tail} line:90%`;
+    },
+  );
+  const vtt = `WEBVTT\n\n${positioned.trim()}\n`;
   const vttPath = filePath.replace(/\.srt$/i, ".vtt");
   await fs.promises.writeFile(vttPath, vtt, "utf8");
   try { await fs.promises.unlink(filePath); } catch (_) {}
