@@ -112,6 +112,13 @@ window.onload = async function () {
   const editPlayerModeEl = document.getElementById('edit_player_mode');
   const editVideoSrcEl = document.getElementById('edit_video_src');
   const editVideoFileEl = document.getElementById('edit_video_file');
+  const editVideoFileLowEl = document.getElementById('edit_video_file_low');
+  const editSubtitleFileEl = document.getElementById('edit_subtitle_file');
+  const editSubtitleRemoveEl = document.getElementById('edit_subtitle_remove');
+  const editSubtitleLangEl = document.getElementById('edit_subtitle_lang');
+  const editSubtitleLabelEl = document.getElementById('edit_subtitle_label');
+  const editSubtitleDefaultEl = document.getElementById('edit_subtitle_default');
+  const editSubtitleListEl = document.getElementById('edit_subtitle_list');
   const editEmbedSrcEl = document.getElementById('edit_embed_src');
   const editRefreshOmdbEl = document.getElementById('edit_refresh_omdb');
   const editTitleEl = document.getElementById('edit_title');
@@ -156,6 +163,67 @@ window.onload = async function () {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;');
+  }
+
+  function normalizeSubtitleText(v, maxLen = 80) {
+    if (v === undefined || v === null) return '';
+    const s = String(v).trim();
+    if (!s) return '';
+    return s.slice(0, maxLen);
+  }
+
+  function getMovieSubtitles(movie) {
+    const subs = Array.isArray(movie?.subtitles) ? movie.subtitles.filter(Boolean) : [];
+    if (subs.length > 0) return subs;
+    const legacyFile = typeof movie?.subtitle_file === 'string' ? movie.subtitle_file.trim() : '';
+    if (!legacyFile) return [];
+    return [{
+      _id: 'legacy',
+      file: legacyFile,
+      lang: movie?.subtitle_lang || '',
+      label: movie?.subtitle_label || '',
+      default: !!movie?.subtitle_default,
+    }];
+  }
+
+  async function uploadMovieSubtitle({ movieId, file, lang, label, isDefault }) {
+    if (!movieId || !file) return null;
+    const formData = new FormData();
+    formData.append('subtitle', file);
+    if (lang) formData.append('subtitle_lang', lang);
+    if (label) formData.append('subtitle_label', label);
+    formData.append('subtitle_default', isDefault ? 'true' : 'false');
+
+    const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/subtitles`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  async function removeMovieSubtitle({ movieId, subtitleId }) {
+    if (!movieId || !subtitleId) return null;
+    const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/subtitles/${encodeURIComponent(subtitleId)}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const msg = data.message || data.error || `Erreur (${res.status})`;
+      throw new Error(msg);
+    }
+    return data;
   }
 
   function normalizePlayerUi(value) {
@@ -1927,7 +1995,13 @@ window.onload = async function () {
     const player_mode = (document.getElementById('player_mode')?.value || 'auto').trim();
     const video_src = document.getElementById('video_src')?.value?.trim() || '';
     const video_file = document.getElementById('video_file')?.value?.trim() || '';
+    const video_file_low = document.getElementById('video_file_low')?.value?.trim() || '';
     const embed_src = document.getElementById('embed_src')?.value?.trim() || '';
+    const subtitleFileInput = document.getElementById('subtitle_file');
+    const subtitleFile = subtitleFileInput?.files?.[0] || null;
+    const subtitle_lang = normalizeSubtitleText(document.getElementById('subtitle_lang')?.value, 24);
+    const subtitle_label = normalizeSubtitleText(document.getElementById('subtitle_label')?.value, 80);
+    const subtitle_default = !!document.getElementById('subtitle_default')?.checked;
 
     if (!year) {
       showResponse('warning', 'Année invalide. Exemple attendu: 2026');
@@ -1946,12 +2020,44 @@ window.onload = async function () {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ year, imdb_id, category, vod_link, player_mode, video_src, video_file, embed_src, cam })
+        body: JSON.stringify({
+          year,
+          imdb_id,
+          category,
+          vod_link,
+          player_mode,
+          video_src,
+          video_file,
+          video_file_low,
+          embed_src,
+          subtitle_lang,
+          subtitle_label,
+          subtitle_default,
+          cam,
+        })
       });
 
       if (res.ok) {
-        showResponse('success', 'Film ajouté avec succès.');
+        const payload = await res.json().catch(() => ({}));
+        const movieId = payload?.movie?._id;
+        if (subtitleFile && movieId) {
+          try {
+            await uploadMovieSubtitle({
+              movieId,
+              file: subtitleFile,
+              lang: subtitle_lang,
+              label: subtitle_label,
+              isDefault: subtitle_default,
+            });
+            showResponse('success', 'Film ajouté avec sous-titres.');
+          } catch (err) {
+            showResponse('warning', `Film ajouté, mais sous-titres non uploadés: ${err.message || 'Erreur'}`);
+          }
+        } else {
+          showResponse('success', 'Film ajouté avec succès.');
+        }
         form.reset();
+        if (subtitleFileInput) subtitleFileInput.value = '';
         await refreshYears();
         await loadMoviesForManagement();
         return;
@@ -2180,6 +2286,59 @@ window.onload = async function () {
     selectAllBox.checked = allBoxes.length > 0 && checked === allBoxes.length;
   }
 
+  function renderSubtitleList(movie) {
+    if (!editSubtitleListEl) return;
+    const subs = getMovieSubtitles(movie);
+    if (!subs.length) {
+      editSubtitleListEl.innerHTML = '<span class="text-muted">—</span>';
+      return;
+    }
+
+    editSubtitleListEl.innerHTML = subs.map((s) => {
+      const id = escapeHtml(String(s?._id || ''));
+      const lang = escapeHtml(String(s?.lang || ''));
+      const label = escapeHtml(String(s?.label || ''));
+      const file = escapeHtml(String(s?.file || ''));
+      const title = label || lang || file || 'Sous-titres';
+      const meta = [lang, label].filter(Boolean).join(' · ');
+      const isDefault = s?.default ? '<span class="badge bg-success ms-2">Par défaut</span>' : '';
+
+      return `
+        <div class="d-flex align-items-center justify-content-between gap-2">
+          <div class="small">
+            <span class="fw-semibold">${title}</span>
+            ${meta ? `<span class="text-muted ms-2">${meta}</span>` : ''}
+            ${isDefault}
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-danger" data-remove-subtitle-id="${id}">
+            Supprimer
+          </button>
+        </div>
+      `;
+    }).join('');
+
+    editSubtitleListEl.querySelectorAll('[data-remove-subtitle-id]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const subtitleId = btn.getAttribute('data-remove-subtitle-id');
+        const movieId = String(editMovieIdEl?.value || '');
+        if (!movieId || !subtitleId) return;
+        if (!confirm('Supprimer ce sous-titre ?')) return;
+        try {
+          btn.disabled = true;
+          const updated = await removeMovieSubtitle({ movieId, subtitleId });
+          moviesById.set(updated._id, updated);
+          renderSubtitleList(updated);
+          showResponse('success', 'Sous-titre supprimé.');
+          await loadMoviesForManagement();
+        } catch (err) {
+          showResponse('danger', err.message || 'Erreur réseau');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
+  }
+
   function openEditModal(movieId) {
     if (!editMovieModal) return;
     const movie = moviesById.get(movieId);
@@ -2194,6 +2353,13 @@ window.onload = async function () {
     if (editPlayerModeEl) editPlayerModeEl.value = movie.player_mode || 'auto';
     if (editVideoSrcEl) editVideoSrcEl.value = movie.video_src || '';
     if (editVideoFileEl) editVideoFileEl.value = movie.video_file || '';
+    if (editVideoFileLowEl) editVideoFileLowEl.value = movie.video_file_low || '';
+    if (editSubtitleLangEl) editSubtitleLangEl.value = movie.subtitle_lang || '';
+    if (editSubtitleLabelEl) editSubtitleLabelEl.value = movie.subtitle_label || '';
+    if (editSubtitleDefaultEl) editSubtitleDefaultEl.checked = !!movie.subtitle_default;
+    renderSubtitleList(movie);
+    if (editSubtitleRemoveEl) editSubtitleRemoveEl.checked = false;
+    if (editSubtitleFileEl) editSubtitleFileEl.value = '';
     if (editEmbedSrcEl) editEmbedSrcEl.value = movie.embed_src || '';
     editRefreshOmdbEl.checked = false;
 
@@ -2222,7 +2388,13 @@ window.onload = async function () {
     const player_mode = (editPlayerModeEl?.value || 'auto').trim();
     const video_src = (editVideoSrcEl?.value || '').trim();
     const video_file = (editVideoFileEl?.value || '').trim();
+    const video_file_low = (editVideoFileLowEl?.value || '').trim();
     const embed_src = (editEmbedSrcEl?.value || '').trim();
+    const subtitle_lang = normalizeSubtitleText(editSubtitleLangEl?.value, 24);
+    const subtitle_label = normalizeSubtitleText(editSubtitleLabelEl?.value, 80);
+    const subtitle_default = !!editSubtitleDefaultEl?.checked;
+    const subtitle_remove = !!editSubtitleRemoveEl?.checked;
+    const subtitleFile = subtitle_remove ? null : (editSubtitleFileEl?.files?.[0] || null);
     const refreshOmdb = !!editRefreshOmdbEl.checked;
     const cam = !!editCamFlagEl?.checked;
 
@@ -2258,10 +2430,18 @@ window.onload = async function () {
       player_mode,
       video_src,
       video_file,
+      video_file_low,
       embed_src,
+      subtitle_remove,
       refreshOmdb,
       cam
     };
+
+    if (!subtitle_remove && !subtitleFile) {
+      body.subtitle_lang = subtitle_lang;
+      body.subtitle_label = subtitle_label;
+      body.subtitle_default = subtitle_default;
+    }
 
     // Only send manual fields if we're not refreshing from OMDb
     if (!refreshOmdb) {
@@ -2295,6 +2475,20 @@ window.onload = async function () {
       }
 
       const updated = await res.json();
+      if (subtitleFile) {
+        try {
+          const uploaded = await uploadMovieSubtitle({
+            movieId,
+            file: subtitleFile,
+            lang: subtitle_lang,
+            label: subtitle_label,
+            isDefault: subtitle_default,
+          });
+          if (uploaded) moviesById.set(uploaded._id, uploaded);
+        } catch (err) {
+          showResponse('warning', `Film mis à jour, mais sous-titres non uploadés: ${err.message || 'Erreur'}`);
+        }
+      }
       moviesById.set(updated._id, updated);
       showResponse('success', 'Film mis à jour avec succès.');
       editMovieModal.hide();
@@ -2333,13 +2527,17 @@ window.onload = async function () {
         const badges = [];
         const hasVideo = !!(m && m.video_src);
         const hasFile = !!(m && m.video_file);
+        const hasLowFile = !!(m && m.video_file_low);
         const hasEmbed = !!(m && m.embed_src);
         const hasLegacy = !!(m && m.vod_link);
+        const hasSubtitle = Array.isArray(m?.subtitles) ? m.subtitles.length > 0 : !!(m && m.subtitle_file);
 
         if (hasVideo) badges.push({ text: 'Video', cls: 'bg-primary' });
         if (hasFile) badges.push({ text: 'Server file', cls: 'bg-dark' });
+        if (hasLowFile) badges.push({ text: 'Low file', cls: 'bg-secondary' });
         if (hasEmbed) badges.push({ text: 'Embed', cls: 'bg-info text-dark' });
         if (hasLegacy) badges.push({ text: 'Legacy', cls: 'bg-secondary' });
+        if (hasSubtitle) badges.push({ text: 'Subtitles', cls: 'bg-warning text-dark' });
 
         const modeRaw = String(m?.player_mode || 'auto').toLowerCase();
         const mode = (modeRaw === 'video' || modeRaw === 'embed' || modeRaw === 'auto') ? modeRaw : 'auto';

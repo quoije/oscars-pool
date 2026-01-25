@@ -119,17 +119,23 @@ async function streamMovieFile(req, res) {
     return res.status(400).json({ message: "Invalid movie id" });
   }
 
-  const movie = await Movie.findById(id).select("video_file").lean();
+  const qualityRaw = typeof req.query?.quality === "string" ? req.query.quality.trim().toLowerCase() : "";
+  const wantsLow = qualityRaw === "low";
+
+  const movie = await Movie.findById(id).select("video_file video_file_low").lean();
   const videoFile = typeof movie?.video_file === "string" ? movie.video_file.trim() : "";
-  if (!videoFile) {
-    return res.status(404).json({ message: "No server video file configured for this movie" });
+  const videoFileLow = typeof movie?.video_file_low === "string" ? movie.video_file_low.trim() : "";
+
+  const chosen = wantsLow ? videoFileLow : videoFile;
+  if (!chosen) {
+    return res.status(404).json({ message: wantsLow ? "No low-quality server video file configured for this movie" : "No server video file configured for this movie" });
   }
-  if (!isSafeRelativeFile(videoFile)) {
+  if (!isSafeRelativeFile(chosen)) {
     return res.status(400).json({ message: "Invalid video_file path" });
   }
 
   const baseDir = getVideoBaseDir();
-  const fullPath = path.resolve(baseDir, videoFile);
+  const fullPath = path.resolve(baseDir, chosen);
   if (!fullPath.startsWith(baseDir + path.sep) && fullPath !== baseDir) {
     return res.status(400).json({ message: "Invalid video_file path" });
   }

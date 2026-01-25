@@ -63,6 +63,49 @@
       white-space: nowrap;
     }
 
+    .quality-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: .6rem;
+      background: #f8f9fa;
+      border: 1px solid rgba(0, 0, 0, 0.08);
+      border-radius: 999px;
+      padding: .25rem .4rem .25rem .6rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    .quality-label {
+      font-size: .8rem;
+      color: rgba(0,0,0,0.6);
+      font-weight: 600;
+    }
+    .quality-pill {
+      display: inline-flex;
+      background: #fff;
+      border-radius: 999px;
+      border: 1px solid rgba(0,0,0,0.08);
+      padding: 2px;
+      gap: 2px;
+    }
+    .quality-btn {
+      border: 0;
+      background: transparent;
+      color: rgba(0,0,0,0.65);
+      font-size: .78rem;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: .25rem .6rem;
+      line-height: 1.1;
+      transition: background .2s ease, color .2s ease;
+    }
+    .quality-btn.is-active {
+      background: #111;
+      color: #fff;
+    }
+    .quality-btn:focus-visible {
+      outline: 2px solid rgba(13,110,253,.35);
+      outline-offset: 2px;
+    }
+
     /* Progress indicator: icon-first, minimal text */
     .progress-indicator {
       display: inline-flex;
@@ -152,19 +195,29 @@
             </div>
           </div>
 
-          <!-- Admin-only debug/status (Source + Progress) -->
-          <div id="player-admin-status" class="d-none d-flex flex-column gap-2">
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-              <span class="badge bg-secondary">Source</span>
-              <span id="source-label" class="badge bg-light text-dark badge-src">—</span>
+          <div class="d-flex flex-column gap-2 align-items-start align-items-lg-end">
+            <div id="quality-toggle" class="d-none quality-toggle">
+              <span class="quality-label">Qualité</span>
+              <div class="quality-pill" role="group" aria-label="Qualité">
+                <button type="button" class="quality-btn" data-quality="high" id="quality-btn-high" aria-pressed="true">Haute</button>
+                <button type="button" class="quality-btn" data-quality="low" id="quality-btn-low" aria-pressed="false">Basse</button>
+              </div>
             </div>
 
-            <div class="d-flex flex-wrap gap-2 align-items-center">
-              <span class="badge bg-secondary">Progress</span>
-              <span id="progress-status" class="text-muted small progress-indicator">
-                <span id="progress-status-icon" class="progress-icon" aria-hidden="true"></span>
-                <span id="progress-status-text" class="progress-text">—</span>
-              </span>
+            <!-- Admin-only debug/status (Source + Progress) -->
+            <div id="player-admin-status" class="d-none d-flex flex-column gap-2">
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="badge bg-secondary">Source</span>
+                <span id="source-label" class="badge bg-light text-dark badge-src">—</span>
+              </div>
+
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <span class="badge bg-secondary">Progress</span>
+                <span id="progress-status" class="text-muted small progress-indicator">
+                  <span id="progress-status-icon" class="progress-icon" aria-hidden="true"></span>
+                  <span id="progress-status-text" class="progress-text">—</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>

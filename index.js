@@ -25,6 +25,7 @@ const versionRoutes = require("./routes/version");
 const settingsRoutes = require("./routes/settings");
 const adminDbRoutes = require("./routes/adminDb");
 const videoRoutes = require("./routes/video");
+const subtitlesRoutes = require("./routes/subtitles");
 const picksRoutes = require("./routes/picks");
 const categoriesRoutes = require("./routes/categories");
 
@@ -35,6 +36,7 @@ app.use("/api/version", versionRoutes);
 app.use("/api/settings", settingsRoutes);
 app.use("/api/admin", adminDbRoutes);
 app.use("/api/video", videoRoutes);
+app.use("/api/subtitles", subtitlesRoutes);
 app.use("/api/picks", picksRoutes);
 app.use("/api/categories", categoriesRoutes);
 

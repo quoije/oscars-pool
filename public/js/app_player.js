@@ -687,6 +687,7 @@ function toVideoSessionUrl(videoSrc) {
 // Best-effort cache to avoid spamming /api/video/session.
 // Keyed by sessionUrl + token (token is already in-memory, not persisted here).
 const _videoSessionCache = new Map(); // key -> expiresAt ms
+let _currentMovie = null;
 
 async function ensureVideoSessionForSource(videoSrc, token) {
   // Only needed for our protected /api/video/* streams.
@@ -753,6 +754,21 @@ async function probeApiVideoReadable(rawUrl) {
   }
 }
 
+async function probeApiVideoExists(rawUrl) {
+  try {
+    const res = await fetch(rawUrl, {
+      method: 'GET',
+      headers: { Range: 'bytes=0-0' },
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    if (res.status === 401 || res.status === 403 || res.status === 404) return false;
+    return res.ok;
+  } catch (_) {
+    return false;
+  }
+}
+
 async function ensurePlayableApiVideoUrl(rawUrl, token) {
   if (!isApiVideoUrl(rawUrl) || !token) return rawUrl;
   // IMPORTANT: Prefer query-token auth for media elements.
@@ -760,6 +776,75 @@ async function ensurePlayableApiVideoUrl(rawUrl, token) {
   // and causes intermittent 401s + preflight noise. Both Node + Python servers already
   // support ?token=... so we use it consistently.
   return addTokenToApiVideoUrl(rawUrl, token);
+}
+
+function addTokenToApiSubtitleUrl(rawUrl, token) {
+  if (!rawUrl || !token) return rawUrl;
+  try {
+    const isRelative = String(rawUrl).trim().startsWith('/');
+    const u = new URL(String(rawUrl), window.location.origin);
+    u.searchParams.set('token', token);
+    return isRelative ? `${u.pathname}${u.search}${u.hash}` : u.toString();
+  } catch (_) {
+    const s = String(rawUrl);
+    const join = s.includes('?') ? '&' : '?';
+    return `${s}${join}token=${encodeURIComponent(token)}`;
+  }
+}
+
+function clearVideoTracks(videoEl) {
+  if (!videoEl) return;
+  const tracks = Array.from(videoEl.querySelectorAll('track'));
+  tracks.forEach((t) => {
+    try { t.remove(); } catch (_) {}
+  });
+}
+
+function applySubtitleTrack({ videoEl, movie, token }) {
+  if (!videoEl) return;
+  clearVideoTracks(videoEl);
+  const movieId = String(movie?._id || '');
+  if (!movieId) return;
+
+  const subtitles = Array.isArray(movie?.subtitles) ? movie.subtitles : [];
+  if (subtitles.length > 0) {
+    const hasDefault = subtitles.some((s) => s?.default);
+    subtitles.forEach((s, idx) => {
+      const lang = String(s?.lang || 'en').trim() || 'en';
+      const label = String(s?.label || 'Subtitles').trim() || 'Subtitles';
+      const isDefault = s?.default === undefined ? (!hasDefault && idx === 0) : !!s.default;
+      const subId = String(s?._id || '').trim();
+      const rawUrl = subId && subId !== 'legacy'
+        ? `/api/subtitles/${encodeURIComponent(movieId)}/${encodeURIComponent(subId)}`
+        : `/api/subtitles/${encodeURIComponent(movieId)}`;
+      const src = addTokenToApiSubtitleUrl(rawUrl, token);
+
+      const track = document.createElement('track');
+      track.kind = 'subtitles';
+      track.label = label;
+      track.srclang = lang;
+      track.src = src;
+      track.default = isDefault;
+      videoEl.appendChild(track);
+    });
+    return;
+  }
+
+  const subtitleFile = String(movie?.subtitle_file || '').trim();
+  if (!subtitleFile) return;
+  const lang = String(movie?.subtitle_lang || 'en').trim() || 'en';
+  const label = String(movie?.subtitle_label || 'Subtitles').trim() || 'Subtitles';
+  const isDefault = movie?.subtitle_default === undefined ? true : !!movie.subtitle_default;
+  const rawUrl = `/api/subtitles/${encodeURIComponent(movieId)}`;
+  const src = addTokenToApiSubtitleUrl(rawUrl, token);
+
+  const track = document.createElement('track');
+  track.kind = 'subtitles';
+  track.label = label;
+  track.srclang = lang;
+  track.src = src;
+  track.default = isDefault;
+  videoEl.appendChild(track);
 }
 
 async function playVodLink(vodLink, { token } = {}) {
@@ -883,6 +968,118 @@ function resolveMovieSource(movie) {
   return { src: null, isLegacy: false };
 }
 
+function qualityStorageKey(movieId) {
+  return `player_quality:${String(movieId || '')}`;
+}
+
+function getStoredQuality(movieId) {
+  const raw = localStorage.getItem(qualityStorageKey(movieId));
+  return raw === 'low' ? 'low' : 'high';
+}
+
+function setStoredQuality(movieId, quality) {
+  const value = quality === 'low' ? 'low' : 'high';
+  try { localStorage.setItem(qualityStorageKey(movieId), value); } catch (_) {}
+}
+
+function addQualityParam(rawUrl, quality) {
+  if (!rawUrl) return rawUrl;
+  try {
+    const isRelative = String(rawUrl).trim().startsWith('/');
+    const u = new URL(String(rawUrl), window.location.origin);
+    if (quality) u.searchParams.set('quality', quality);
+    else u.searchParams.delete('quality');
+    return isRelative ? `${u.pathname}${u.search}${u.hash}` : u.toString();
+  } catch (_) {
+    return rawUrl;
+  }
+}
+
+function setQualityToggleUi({ visible, isLow }) {
+  const wrap = document.getElementById('quality-toggle');
+  const btnHigh = document.getElementById('quality-btn-high');
+  const btnLow = document.getElementById('quality-btn-low');
+  if (!wrap || !btnHigh || !btnLow) return;
+  if (visible) {
+    wrap.classList.remove('d-none');
+    const useLow = !!isLow;
+    btnHigh.classList.toggle('is-active', !useLow);
+    btnLow.classList.toggle('is-active', useLow);
+    btnHigh.setAttribute('aria-pressed', useLow ? 'false' : 'true');
+    btnLow.setAttribute('aria-pressed', useLow ? 'true' : 'false');
+  } else {
+    wrap.classList.add('d-none');
+    btnHigh.classList.remove('is-active');
+    btnLow.classList.remove('is-active');
+    btnHigh.setAttribute('aria-pressed', 'false');
+    btnLow.setAttribute('aria-pressed', 'false');
+  }
+}
+
+async function switchVideoSource({ src, token, preserveTime }) {
+  const videoEl = document.getElementById('video');
+  if (!videoEl || !src) return;
+
+  const shouldPreserve = !!preserveTime && Number.isFinite(videoEl.currentTime) && videoEl.currentTime > 0;
+  const previousTime = shouldPreserve ? Number(videoEl.currentTime) : 0;
+  const wasPlaying = !videoEl.paused && !videoEl.ended;
+
+  const onLoaded = () => {
+    if (previousTime > 1) {
+      try { videoEl.currentTime = previousTime; } catch (_) {}
+    }
+    if (wasPlaying) {
+      const playPromise = videoEl.play();
+      if (playPromise && typeof playPromise.catch === 'function') playPromise.catch(() => {});
+    }
+  };
+  videoEl.addEventListener('loadedmetadata', onLoaded, { once: true });
+
+  await playVodLink(src, { token });
+  applySubtitleTrack({ videoEl, movie: _currentMovie, token });
+}
+
+async function initQualityToggle({ movieId, token, fallbackSrc, hasLowFile }) {
+  const wrap = document.getElementById('quality-toggle');
+  const btnHigh = document.getElementById('quality-btn-high');
+  const btnLow = document.getElementById('quality-btn-low');
+  if (!wrap || !btnHigh || !btnLow) return { src: fallbackSrc };
+
+  if (!isApiVideoUrl(fallbackSrc) || !hasLowFile) {
+    setQualityToggleUi({ visible: false, isLow: false });
+    return { src: fallbackSrc };
+  }
+
+  const lowSrcRaw = addQualityParam(fallbackSrc, 'low');
+  const playableLow = await ensurePlayableApiVideoUrl(lowSrcRaw, token);
+  const hasLow = await probeApiVideoExists(playableLow);
+  if (!hasLow) {
+    setQualityToggleUi({ visible: false, isLow: false });
+    return { src: fallbackSrc };
+  }
+
+  const preferred = getStoredQuality(movieId);
+  const shouldUseLow = preferred === 'low';
+  const pickedSrc = shouldUseLow ? lowSrcRaw : fallbackSrc;
+
+  setQualityToggleUi({ visible: true, isLow: shouldUseLow });
+
+  const onPickQuality = async (nextIsLow) => {
+    setStoredQuality(movieId, nextIsLow ? 'low' : 'high');
+    setQualityToggleUi({ visible: true, isLow: nextIsLow });
+    await switchVideoSource({
+      src: nextIsLow ? lowSrcRaw : fallbackSrc,
+      token,
+      preserveTime: true,
+    });
+  };
+
+  btnHigh.addEventListener('click', () => { void onPickQuality(false); });
+  btnLow.addEventListener('click', () => { void onPickQuality(true); });
+
+  return { src: pickedSrc };
+}
+
 window.onload = async function () {
   const pageLoader = createPageLoader({ title: 'Chargement du lecteur' });
 
@@ -951,6 +1148,7 @@ window.onload = async function () {
       pageLoader.fail();
       return;
     }
+    _currentMovie = movie;
 
     const [activeYear, playerUi] = await Promise.all([activeYearPromise, playerUiPromise]);
     setHeader(movie, { activeYear });
@@ -987,12 +1185,16 @@ window.onload = async function () {
     }
 
     pageLoader.setProgress(70);
-    await playVodLink(resolved.src, { token });
+    const hasLowFile = !!(movie?.video_file_low);
+    const qualityChoice = await initQualityToggle({ movieId: id, token, fallbackSrc: resolved.src, hasLowFile });
+    const selectedSrc = qualityChoice?.src || resolved.src;
+    await playVodLink(selectedSrc, { token });
     pageLoader.setProgress(82);
 
     // Only the <video> player supports reliable progress tracking (mp4/hls).
     const videoEl = document.getElementById('video');
     if (videoEl && !videoEl.classList.contains('d-none')) {
+      applySubtitleTrack({ videoEl, movie, token });
       setProgressUi({ state: 'preparing', text: 'Reprise', showText: true, ariaText: 'Prépare la reprise…' });
       const userId = normalizeUserId(decoded);
       if (userId) {

@@ -15,7 +15,10 @@ export MONGO_DB_NAME="..."                            # optional; required if MO
 export JWT_SECRET="..."
 export VIDEO_FILES_DIR="/absolute/path/to/public/video"  # optional (default: ./public/video)
 export VIDEO_SESSION_MAX_AGE_SECONDS="28800"             # optional (default: 8h)
+
 uvicorn python_video_server.server:app --host 0.0.0.0 --port 8000
+or
+python3 -m uvicorn python_video_server.server:app --host 0.0.0.0 --port 8000   --ssl-certfile python_video_server/certs/config/live/[site]/fullchain.pem   --ssl-keyfile  python_video_server/certs/config/live/[site]/privkey.pem
 ```
 
 ## Extra environment variables (optional)

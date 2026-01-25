@@ -274,7 +274,7 @@ def stream_video(
     try:
         client = _mongo_client_cached()
         db = client[db_name]
-        movie = db["movies"].find_one({"_id": oid}, {"video_file": 1})
+        movie = db["movies"].find_one({"_id": oid}, {"video_file": 1, "video_file_low": 1})
     except PyMongoError as e:
         raise HTTPException(
             status_code=502,
@@ -285,15 +285,23 @@ def stream_video(
             ),
         )
 
+    quality = (request.query_params.get("quality") or "").strip().lower()
+    wants_low = quality == "low"
+
     video_file = (movie or {}).get("video_file") or ""
-    if not isinstance(video_file, str) or not video_file.strip():
+    video_file_low = (movie or {}).get("video_file_low") or ""
+    chosen = video_file_low if wants_low else video_file
+
+    if not isinstance(chosen, str) or not chosen.strip():
+        if wants_low:
+            raise HTTPException(status_code=404, detail="No low-quality server video file configured for this movie")
         raise HTTPException(status_code=404, detail="No server video file configured for this movie")
-    video_file = video_file.strip()
-    if not _is_safe_relative_file(video_file):
+    chosen = chosen.strip()
+    if not _is_safe_relative_file(chosen):
         raise HTTPException(status_code=400, detail="Invalid video_file path")
 
     video_dir = _video_files_dir()
-    full_path = (video_dir / video_file).resolve()
+    full_path = (video_dir / chosen).resolve()
     if not str(full_path).startswith(str(video_dir) + os.sep) and full_path != video_dir:
         raise HTTPException(status_code=400, detail="Invalid video_file path")
     if not full_path.exists() or not full_path.is_file():
