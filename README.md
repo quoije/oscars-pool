@@ -5,30 +5,34 @@ Little nodejs + mongodb app that I hack together with ChatGPT and Cursor to keep
 
 **Disclaimer:** This was a fun, experimental project built with “AI slop” (Cursor), so it may have security issues. For example, `python_video_server` uses the default token‑in‑URL approach to serve video files, which can leave user tokens in logs or browser history. There are ways to improve this, but at this point I’m blinder than Ray Charles.
 
-![Oscars Pool 2026](https://raw.githubusercontent.com/quoije/oscars-pool/refs/heads/prod/img/preview.png)
+![Oscars Pool 2026](img/preview.png)
 
 ## Features
 
 ### User Features
 - **User accounts**: register, login, JWT authentication
 - **Optional registration verification**: via `DOG_NAMES` environment variable (if unset, verification is skipped)
-- **Movie tracking**: mark nominees/movies as watched (per user), with watched date
-- **Movie browsing**: browse movies by Oscar year + API for available years
+- **Multi-year support**: browse movies and stats by Oscar year (admin controls the active year)
+- **Checklist + progress**: mark movies as watched (with date), progress bar, countdown to Oscars date
 - **Movie details**: pulled from OMDb (title/plot/rating/poster) via IMDb ID (optional)
+- **Movie ratings**: 1–5 star user ratings + global average
 - **User statistics**: watched count, points from movies watched and Oscar picks, leaderboard
-- **Video player**: built-in player page with multiple source options (VOD link, direct video URL, embed, or server file)
+- **Video player**: direct video URL, server file (HD/low), embed, or legacy VOD link
+- **Subtitles**: per-movie subtitle tracks in the player (VTT/SRT)
 - **Resume playback**: per-user playback progress saving (time/duration)
 - **Oscar picks**: make picks for each category, auto-save on selection
 - **Scores**: view leaderboard with correct/incorrect pick counts, detailed breakdown per user
-- **View all picks**: see everyone's picks in a comparison view
 
 ### Admin Features
-- **Movie management**: add, edit (optionally refresh from OMDb), delete movies
-- **User management**: view users, reset passwords (temp password + forced change on next login)
+- **Movie management**: add, edit (optionally refresh from OMDb), delete movies, search/bulk delete
+- **Player source management**: configure video source, server files, low-quality fallback, subtitles
+- **User management**: view/create/delete users, reset passwords (temp password + forced change on next login)
 - **Oscar category management**: create, edit, delete categories with nominees, bulk delete
-- **Winner management**: mark winners for each category (can clear winners)
-- **Global settings**: active Oscar year, "completion" modal content for checklist
-- **Database backup/restore**: create backups and restore from backup files
+- **Winner management**: mark winners per category and overall winners by year (ties + optional points)
+- **View all picks**: see everyone's picks in a comparison view
+- **Global settings**: active Oscar year, Oscars date for countdown, points config, picks visibility
+- **Completion modal**: customize 100% completion reward (title/text/HTML/video)
+- **Database backup/restore**: create, download, and restore backups
 - **App version control**: manage app version display (footer) from admin panel (no GitHub dependency)
 - **Player UI settings**: control player page admin status display
 
