@@ -804,9 +804,34 @@ function applySubtitleTrack({ videoEl, movie, token }) {
   if (!videoEl) return;
   clearVideoTracks(videoEl);
   const movieId = String(movie?._id || '');
-  const subtitleFile = String(movie?.subtitle_file || '').trim();
-  if (!movieId || !subtitleFile) return;
+  if (!movieId) return;
 
+  const subtitles = Array.isArray(movie?.subtitles) ? movie.subtitles : [];
+  if (subtitles.length > 0) {
+    const hasDefault = subtitles.some((s) => s?.default);
+    subtitles.forEach((s, idx) => {
+      const lang = String(s?.lang || 'en').trim() || 'en';
+      const label = String(s?.label || 'Subtitles').trim() || 'Subtitles';
+      const isDefault = s?.default === undefined ? (!hasDefault && idx === 0) : !!s.default;
+      const subId = String(s?._id || '').trim();
+      const rawUrl = subId && subId !== 'legacy'
+        ? `/api/subtitles/${encodeURIComponent(movieId)}/${encodeURIComponent(subId)}`
+        : `/api/subtitles/${encodeURIComponent(movieId)}`;
+      const src = addTokenToApiSubtitleUrl(rawUrl, token);
+
+      const track = document.createElement('track');
+      track.kind = 'subtitles';
+      track.label = label;
+      track.srclang = lang;
+      track.src = src;
+      track.default = isDefault;
+      videoEl.appendChild(track);
+    });
+    return;
+  }
+
+  const subtitleFile = String(movie?.subtitle_file || '').trim();
+  if (!subtitleFile) return;
   const lang = String(movie?.subtitle_lang || 'en').trim() || 'en';
   const label = String(movie?.subtitle_label || 'Subtitles').trim() || 'Subtitles';
   const isDefault = movie?.subtitle_default === undefined ? true : !!movie.subtitle_default;

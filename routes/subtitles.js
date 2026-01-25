@@ -65,8 +65,26 @@ async function streamSubtitle(req, res) {
     return res.status(400).json({ message: "Invalid movie id" });
   }
 
-  const movie = await Movie.findById(id).select("subtitle_file").lean();
-  const subtitleFile = typeof movie?.subtitle_file === "string" ? movie.subtitle_file.trim() : "";
+  const movie = await Movie.findById(id).select("subtitles subtitle_file subtitle_lang subtitle_label subtitle_default").lean();
+  if (!movie) return res.status(404).json({ message: "Movie not found" });
+  let subtitleFile = "";
+  const subtitleId = req.params?.subtitleId;
+  const subs = Array.isArray(movie?.subtitles) ? movie.subtitles : [];
+
+  if (subtitleId) {
+    if (subtitleId === "legacy") {
+      subtitleFile = typeof movie?.subtitle_file === "string" ? movie.subtitle_file.trim() : "";
+    } else {
+      const match = subs.find((s) => String(s?._id || "") === String(subtitleId));
+      subtitleFile = typeof match?.file === "string" ? match.file.trim() : "";
+    }
+  } else if (subs.length > 0) {
+    const preferred = subs.find((s) => s?.default) || subs[0];
+    subtitleFile = typeof preferred?.file === "string" ? preferred.file.trim() : "";
+  } else {
+    subtitleFile = typeof movie?.subtitle_file === "string" ? movie.subtitle_file.trim() : "";
+  }
+
   if (!subtitleFile) return res.status(404).json({ message: "No subtitles configured for this movie" });
   if (!isSafeRelativeFile(subtitleFile)) return res.status(400).json({ message: "Invalid subtitle_file path" });
 
@@ -93,6 +111,18 @@ async function streamSubtitle(req, res) {
 
   return fs.createReadStream(fullPath).pipe(res);
 }
+
+router.get("/:id/:subtitleId", (req, res) => {
+  streamSubtitle(req, res).catch((err) => {
+    return res.status(500).json({ error: err?.message || "Subtitle streaming error" });
+  });
+});
+
+router.head("/:id/:subtitleId", (req, res) => {
+  streamSubtitle(req, res).catch((err) => {
+    return res.status(500).json({ error: err?.message || "Subtitle streaming error" });
+  });
+});
 
 router.get("/:id", (req, res) => {
   streamSubtitle(req, res).catch((err) => {

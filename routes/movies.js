@@ -85,6 +85,62 @@ function parseSubtitleDefault(v) {
   return undefined;
 }
 
+function parseBooleanFlag(v) {
+  if (v === undefined) return undefined;
+  if (typeof v === "boolean") return v;
+  const s = String(v).trim().toLowerCase();
+  if (!s) return undefined;
+  if (["true", "1", "yes", "on"].includes(s)) return true;
+  if (["false", "0", "no", "off"].includes(s)) return false;
+  return undefined;
+}
+
+function normalizeSubtitleEntry({ file, lang, label, isDefault } = {}) {
+  const safeFile = typeof file === "string" ? file.trim() : "";
+  if (!safeFile) return null;
+  return {
+    file: safeFile,
+    lang: normalizeSubtitleLang(lang) || null,
+    label: normalizeSubtitleLabel(label) || null,
+    default: !!isDefault,
+  };
+}
+
+function getLegacySubtitle(movie) {
+  const file = typeof movie?.subtitle_file === "string" ? movie.subtitle_file.trim() : "";
+  if (!file) return null;
+  return {
+    _id: "legacy",
+    file,
+    lang: typeof movie?.subtitle_lang === "string" ? movie.subtitle_lang : null,
+    label: typeof movie?.subtitle_label === "string" ? movie.subtitle_label : null,
+    default: !!movie?.subtitle_default,
+  };
+}
+
+function getSubtitlesForResponse(movie) {
+  const subs = Array.isArray(movie?.subtitles) ? movie.subtitles.filter(Boolean) : [];
+  if (subs.length > 0) return subs;
+  const legacy = getLegacySubtitle(movie);
+  return legacy ? [legacy] : [];
+}
+
+function syncLegacyFromSubtitles(movie) {
+  const subs = Array.isArray(movie?.subtitles) ? movie.subtitles : [];
+  if (!subs.length) {
+    movie.subtitle_file = null;
+    movie.subtitle_lang = null;
+    movie.subtitle_label = null;
+    movie.subtitle_default = false;
+    return;
+  }
+  const preferred = subs.find((s) => s?.default) || subs[0];
+  movie.subtitle_file = preferred?.file || null;
+  movie.subtitle_lang = preferred?.lang || null;
+  movie.subtitle_label = preferred?.label || null;
+  movie.subtitle_default = !!preferred?.default;
+}
+
 async function ensureSubtitleDir() {
   await fs.promises.mkdir(SUBTITLE_FILES_DIR, { recursive: true });
 }
@@ -223,7 +279,7 @@ router.get("/", async (req, res) => {
 
     const projection = isChecklist
       ? "imdb_id title"
-      : "imdb_id title description rating poster cam year category vod_link player_mode video_src embed_src video_file video_file_low subtitle_file subtitle_lang subtitle_label subtitle_default updatedAt createdAt";
+      : "imdb_id title description rating poster cam year category vod_link player_mode video_src embed_src video_file video_file_low subtitles subtitle_file subtitle_lang subtitle_label subtitle_default updatedAt createdAt";
 
     const cacheKey = `movies:list:${year || "all"}:${isChecklist ? "checklist" : "films"}`;
     const cached = cacheGet(cacheKey);
@@ -237,9 +293,10 @@ router.get("/", async (req, res) => {
       .sort({ title: 1 })
       .lean();
 
-    cacheSet(cacheKey, movies);
+    const payload = movies.map((m) => ({ ...m, subtitles: getSubtitlesForResponse(m) }));
+    cacheSet(cacheKey, payload);
     res.set("Cache-Control", "public, max-age=30");
-    res.status(200).json(movies);
+    res.status(200).json(payload);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -567,30 +624,110 @@ router.post("/:id/subtitles", (req, res) => {
       }
     }
 
-    const existing = typeof movie.subtitle_file === "string" ? movie.subtitle_file.trim() : "";
-    if (existing) {
-      const oldPath = path.resolve(SUBTITLE_FILES_DIR, existing);
-      if (oldPath.startsWith(SUBTITLE_FILES_DIR + path.sep)) {
-        try { await fs.promises.unlink(oldPath); } catch (_) {}
-      }
+    if (!Array.isArray(movie.subtitles)) movie.subtitles = [];
+    if (movie.subtitles.length === 0) {
+      const legacy = normalizeSubtitleEntry({
+        file: movie.subtitle_file,
+        lang: movie.subtitle_lang,
+        label: movie.subtitle_label,
+        isDefault: movie.subtitle_default,
+      });
+      if (legacy) movie.subtitles.push(legacy);
     }
 
     const rel = path.relative(SUBTITLE_FILES_DIR, storedPath).replace(/\\/g, "/");
-    movie.subtitle_file = rel;
-
     const incomingLang = normalizeSubtitleLang(req.body?.subtitle_lang);
-    if (incomingLang !== undefined) movie.subtitle_lang = incomingLang || null;
-
     const incomingLabel = normalizeSubtitleLabel(req.body?.subtitle_label);
-    if (incomingLabel !== undefined) movie.subtitle_label = incomingLabel || null;
-
     const incomingDefault = parseSubtitleDefault(req.body?.subtitle_default);
-    if (incomingDefault !== undefined) movie.subtitle_default = incomingDefault;
 
+    const shouldDefault = incomingDefault !== undefined
+      ? incomingDefault
+      : movie.subtitles.length === 0;
+
+    if (shouldDefault) {
+      movie.subtitles.forEach((s) => { s.default = false; });
+    }
+
+    const entry = normalizeSubtitleEntry({
+      file: rel,
+      lang: incomingLang,
+      label: incomingLabel,
+      isDefault: shouldDefault,
+    });
+    if (entry) movie.subtitles.push(entry);
+
+    syncLegacyFromSubtitles(movie);
     await movie.save();
     cacheClear();
     return res.status(200).json(movie);
   });
+});
+
+// Admin: delete one subtitle track from a movie
+router.delete("/:id/subtitles/:subtitleId", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+
+  const { id, subtitleId } = req.params;
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid movie id" });
+  }
+
+  const movie = await Movie.findById(id);
+  if (!movie) return res.status(404).json({ message: "Movie not found" });
+
+  if (subtitleId === "legacy") {
+    const existing = typeof movie.subtitle_file === "string" ? movie.subtitle_file.trim() : "";
+    if (!existing) return res.status(404).json({ message: "Subtitle not found" });
+    const oldPath = path.resolve(SUBTITLE_FILES_DIR, existing);
+    if (oldPath.startsWith(SUBTITLE_FILES_DIR + path.sep)) {
+      try { await fs.promises.unlink(oldPath); } catch (_) {}
+    }
+    movie.subtitle_file = null;
+    movie.subtitle_lang = null;
+    movie.subtitle_label = null;
+    movie.subtitle_default = false;
+    await movie.save();
+    cacheClear();
+    return res.status(200).json(movie);
+  }
+
+  const subs = Array.isArray(movie.subtitles) ? movie.subtitles : [];
+  const idx = subs.findIndex((s) => String(s?._id || "") === String(subtitleId));
+  if (idx < 0) {
+    return res.status(404).json({ message: "Subtitle not found" });
+  }
+
+  const removed = subs[idx];
+  if (removed?.file) {
+    const full = path.resolve(SUBTITLE_FILES_DIR, String(removed.file));
+    if (full.startsWith(SUBTITLE_FILES_DIR + path.sep)) {
+      try { await fs.promises.unlink(full); } catch (_) {}
+    }
+  }
+
+  subs.splice(idx, 1);
+  if (subs.length > 0 && !subs.some((s) => s?.default)) {
+    subs[0].default = true;
+  }
+  movie.subtitles = subs;
+  syncLegacyFromSubtitles(movie);
+
+  await movie.save();
+  cacheClear();
+  return res.status(200).json(movie);
 });
 
 // Admin: delete one or more movies (by Mongo _id or imdb_id)
@@ -670,6 +807,7 @@ router.put("/:id", async (req, res) => {
       subtitle_lang,
       subtitle_label,
       subtitle_default,
+      subtitle_remove,
       refreshOmdb,
       cam,
     } = req.body || {};
@@ -734,19 +872,67 @@ router.put("/:id", async (req, res) => {
       movie.video_file_low = v ? v : null;
     }
 
-    if (subtitle_lang !== undefined) {
-      const v = normalizeSubtitleLang(subtitle_lang);
-      movie.subtitle_lang = v ? v : null;
-    }
+    const removeSubtitles = parseBooleanFlag(subtitle_remove);
+    if (removeSubtitles) {
+      const entries = Array.isArray(movie.subtitles) ? movie.subtitles : [];
+      for (const entry of entries) {
+        const rel = typeof entry?.file === "string" ? entry.file.trim() : "";
+        if (!rel) continue;
+        const full = path.resolve(SUBTITLE_FILES_DIR, rel);
+        if (full.startsWith(SUBTITLE_FILES_DIR + path.sep)) {
+          try { await fs.promises.unlink(full); } catch (_) {}
+        }
+      }
 
-    if (subtitle_label !== undefined) {
-      const v = normalizeSubtitleLabel(subtitle_label);
-      movie.subtitle_label = v ? v : null;
-    }
+      const existing = typeof movie.subtitle_file === "string" ? movie.subtitle_file.trim() : "";
+      if (existing) {
+        const oldPath = path.resolve(SUBTITLE_FILES_DIR, existing);
+        if (oldPath.startsWith(SUBTITLE_FILES_DIR + path.sep)) {
+          try { await fs.promises.unlink(oldPath); } catch (_) {}
+        }
+      }
 
-    if (subtitle_default !== undefined) {
-      const v = parseSubtitleDefault(subtitle_default);
-      if (v !== undefined) movie.subtitle_default = v;
+      movie.subtitles = [];
+      movie.subtitle_file = null;
+      movie.subtitle_lang = null;
+      movie.subtitle_label = null;
+      movie.subtitle_default = false;
+    } else {
+      const subs = Array.isArray(movie.subtitles) ? movie.subtitles : [];
+      if (subs.length > 0) {
+        const target = subs.find((s) => s?.default) || subs[0];
+        if (subtitle_lang !== undefined) {
+          const v = normalizeSubtitleLang(subtitle_lang);
+          target.lang = v ? v : null;
+        }
+        if (subtitle_label !== undefined) {
+          const v = normalizeSubtitleLabel(subtitle_label);
+          target.label = v ? v : null;
+        }
+        if (subtitle_default !== undefined) {
+          const v = parseSubtitleDefault(subtitle_default);
+          if (v !== undefined) {
+            subs.forEach((s) => { s.default = false; });
+            target.default = !!v;
+          }
+        }
+        syncLegacyFromSubtitles(movie);
+      } else {
+        if (subtitle_lang !== undefined) {
+          const v = normalizeSubtitleLang(subtitle_lang);
+          movie.subtitle_lang = v ? v : null;
+        }
+
+        if (subtitle_label !== undefined) {
+          const v = normalizeSubtitleLabel(subtitle_label);
+          movie.subtitle_label = v ? v : null;
+        }
+
+        if (subtitle_default !== undefined) {
+          const v = parseSubtitleDefault(subtitle_default);
+          if (v !== undefined) movie.subtitle_default = v;
+        }
+      }
     }
 
     if (year !== undefined && year !== null && year !== "") {
@@ -972,7 +1158,7 @@ router.get("/:id", async (req, res) => {
 
     const movie = await Movie.findById(id).lean();
     if (!movie) return res.status(404).json({ message: "Movie not found" });
-    return res.status(200).json(movie);
+    return res.status(200).json({ ...movie, subtitles: getSubtitlesForResponse(movie) });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

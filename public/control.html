@@ -1418,7 +1418,16 @@
                   <div class="col-12">
                     <label for="edit_subtitle_file" class="form-label">Sous-titres (SRT, optionnel)</label>
                     <input type="file" class="form-control" id="edit_subtitle_file" accept=".srt,.vtt,text/plain,text/vtt">
-                    <div class="form-text">Fichier actuel: <span id="edit_subtitle_current">—</span></div>
+                    <div class="form-text">Sous-titres existants:</div>
+                    <div id="edit_subtitle_list" class="d-flex flex-column gap-2 mt-1"></div>
+                    <div class="form-text">Ajoute un fichier par langue; répète l’upload pour plusieurs sous-titres.</div>
+                  </div>
+                  <div class="col-12">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" id="edit_subtitle_remove">
+                      <label class="form-check-label" for="edit_subtitle_remove">Supprimer tous les sous-titres</label>
+                    </div>
+                    <div class="form-text">Efface les fichiers VTT/SRT et réinitialise les champs de langue/label.</div>
                   </div>
                   <div class="col-12 col-lg-4">
                     <label for="edit_subtitle_lang" class="form-label">Langue (ex: fr, en)</label>

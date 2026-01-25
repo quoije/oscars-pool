@@ -24,7 +24,14 @@ const movieSchema = new mongoose.Schema({
   // Optional low-quality server file (relative path under VIDEO_FILES_DIR, default public/video)
   // Served when the player requests ?quality=low on /api/video/:movieId.
   video_file_low: { type: String, required: false },
-  // Optional subtitles (server-hosted .vtt, streamed via /api/subtitles/:movieId)
+  // Optional subtitles (server-hosted .vtt, streamed via /api/subtitles/:movieId/:subtitleId)
+  subtitles: [{
+    file: { type: String, required: true },
+    lang: { type: String, required: false },
+    label: { type: String, required: false },
+    default: { type: Boolean, required: false, default: false },
+  }],
+  // Legacy single-subtitle fields (kept for backward compatibility)
   subtitle_file: { type: String, required: false },
   subtitle_lang: { type: String, required: false },
   subtitle_label: { type: String, required: false },
