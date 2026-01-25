@@ -195,6 +195,83 @@ window.addEventListener('DOMContentLoaded', async function () {
       `;
     }
 
+    function normalizeRatingValue(v) {
+      const n = Number(v);
+      if (!Number.isFinite(n)) return null;
+      const rounded = Math.round(n);
+      if (rounded < 1 || rounded > 5) return null;
+      return rounded;
+    }
+
+    async function saveUserRating(movieId, rating, token) {
+      try {
+        const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/ratings`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ rating }),
+        });
+        if (!res.ok) return null;
+        return await res.json().catch(() => null);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    async function deleteUserRating(movieId, token) {
+      try {
+        const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/ratings`, {
+          method: 'DELETE',
+          headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+        });
+        if (!res.ok) return null;
+        return await res.json().catch(() => null);
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function updateStarUi(wrap, rating) {
+      if (!wrap) return;
+      const value = Number(rating);
+      const user = Number.isFinite(value) ? value : null;
+      if (wrap?.dataset) {
+        wrap.dataset.currentRating = user ? String(user) : '';
+      }
+      wrap.querySelectorAll('.movie-star').forEach((btn) => {
+        const starValue = Number(btn.getAttribute('data-value'));
+        const isActive = user && starValue <= user;
+        btn.classList.toggle('is-active', !!isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+      });
+    }
+
+    function updateRatingTexts(cardEl, avgRating, ratingsCount, userRating) {
+      if (!cardEl) return;
+      const avgEl = cardEl.querySelector('[data-role="avg-rating"]');
+      const userEl = cardEl.querySelector('[data-role="user-rating"]');
+      const avg = Number.isFinite(Number(avgRating)) ? Number(avgRating) : null;
+      const count = Number.isFinite(Number(ratingsCount)) ? Number(ratingsCount) : 0;
+      const user = Number.isFinite(Number(userRating)) ? Number(userRating) : null;
+
+      if (avgEl) {
+        if (avg && count > 0) {
+          avgEl.textContent = `Note utilisateurs ${avg.toFixed(1)}${count ? ` (${count})` : ''}`;
+          avgEl.classList.remove('movie-rating-sub--empty');
+        } else {
+          avgEl.textContent = '';
+          avgEl.classList.add('movie-rating-sub--empty');
+        }
+      }
+
+      if (userEl) {
+        userEl.textContent = '';
+        userEl.classList.add('movie-rating-sub--empty');
+      }
+    }
+
     async function fetchActiveYear() {
       try {
         const res = await fetch('/api/settings/year', { method: 'GET', cache: 'no-cache' });
@@ -412,6 +489,11 @@ window.addEventListener('DOMContentLoaded', async function () {
             : '';
         const userRatingOwn =
           Number.isFinite(userRating) && userRating > 0 ? `${userRating}/5` : '';
+        const starsHtml = Array.from({ length: 5 }, (_, idx) => {
+          const value = idx + 1;
+          const isActive = Number.isFinite(userRating) && userRating >= value;
+          return `<button type="button" class="movie-star${isActive ? ' is-active' : ''}" data-value="${value}" aria-label="${value} étoile${value > 1 ? 's' : ''}" aria-pressed="${isActive ? 'true' : 'false'}">★</button>`;
+        }).join('');
 
         // Navigation:
         // - Prefer in-app player when we have a non-legacy source
@@ -490,20 +572,30 @@ window.addEventListener('DOMContentLoaded', async function () {
                       }
                     </h5>
                     <div class="movie-rating-block mt-1">
-                      ${userRatingText ? `<div class="movie-rating-sub">Note utilisateurs ${userRatingText}</div>` : ''}
-                      ${userRatingOwn ? `<div class="movie-rating-sub">Votre note ${userRatingOwn}</div>` : ''}
+                      <div class="movie-rating-sub movie-rating-avg${userRatingText ? '' : ' movie-rating-sub--empty'}" data-role="avg-rating">${userRatingText ? `Note utilisateurs ${userRatingText}` : ''}</div>
                     </div>
                   </div>
-                  <div class="movie-imdb-block">
-                    ${movie.rating ? `<span>⭐ ${movie.rating}</span>` : ''}
-                    <a href="https://www.imdb.com/title/${movie.imdb_id}/" target="_blank" rel="noopener noreferrer" aria-label="Voir sur IMDb">
-                      <img src="/img/imdb.png" class="imdb-icon" alt="IMDb">
-                    </a>
+                  <div class="movie-imdb-wrap">
+                    <div class="movie-imdb-block">
+                      ${movie.rating ? `<span>⭐ ${movie.rating}</span>` : ''}
+                      <a href="https://www.imdb.com/title/${movie.imdb_id}/" target="_blank" rel="noopener noreferrer" aria-label="Voir sur IMDb">
+                        <img src="/img/imdb.png" class="imdb-icon" alt="IMDb">
+                      </a>
+                    </div>
+                    <div class="movie-rating-stars" role="group" aria-label="Noter ce film" data-movie-id="${movieId}" data-current-rating="${Number.isFinite(userRating) ? userRating : ''}">
+                      ${starsHtml}
+                    </div>
                   </div>
                 </div>
                 ${!isClickable ? '<div class="text-muted small mb-1">Aucune source</div>' : ''}
                 <div class="movie-info-box">
-                  <div class="movie-info-category">${movie.category}</div>
+                  <details class="movie-info-categories">
+                    <summary class="movie-info-summary">
+                      <span class="movie-info-summary-title">Catégories nominés</span>
+                      <span class="movie-info-summary-arrow" aria-hidden="true">▾</span>
+                    </summary>
+                    <div class="movie-info-category">${movie.category}</div>
+                  </details>
                   <p class="movie-info-desc">${movie.description}</p>
                 </div>
               </div>
@@ -514,6 +606,32 @@ window.addEventListener('DOMContentLoaded', async function () {
             </div>
           </div>`;
         moviesList.appendChild(movieDiv);
+
+        const starsWrap = movieDiv.querySelector('.movie-rating-stars');
+        if (starsWrap) {
+          if (!token || !movieId) {
+            starsWrap.querySelectorAll('.movie-star').forEach((btn) => btn.setAttribute('disabled', 'disabled'));
+          } else {
+            starsWrap.addEventListener('click', async (event) => {
+              const target = event.target;
+              if (!target || !target.classList.contains('movie-star')) return;
+              const value = normalizeRatingValue(target.getAttribute('data-value'));
+              if (!value) return;
+
+              starsWrap.querySelectorAll('.movie-star').forEach((btn) => btn.setAttribute('disabled', 'disabled'));
+              const current = Number(starsWrap.dataset.currentRating || '');
+              const shouldClear = current && current === value;
+              const result = shouldClear
+                ? await deleteUserRating(movieId, token)
+                : await saveUserRating(movieId, value, token);
+              if (result) {
+                updateStarUi(starsWrap, result?.userRating);
+                updateRatingTexts(movieDiv, result?.averageRating, result?.ratingsCount, result?.userRating);
+              }
+              starsWrap.querySelectorAll('.movie-star').forEach((btn) => btn.removeAttribute('disabled'));
+            });
+          }
+        }
       });
 
       pageLoader.setSubtitle('Finalisation de l’affichage…');

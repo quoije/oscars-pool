@@ -234,27 +234,91 @@ footer {
     color: rgba(0,0,0,0.55);
   }
 
+  .movie-rating-avg {
+    margin-bottom: 5px;
+  }
+
+  .movie-rating-sub--empty {
+    display: none;
+  }
+
   .movie-rating-block .imdb-icon {
     width: 18px;
     height: 18px;
     margin-left: 4px;
   }
 
+  .movie-imdb-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0;
+  }
+
+  .movie-rating-stars {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 2px;
+  }
+
+  .movie-star {
+    border: 0;
+    background: transparent;
+    color: rgba(0,0,0,0.25);
+    font-size: 0.9rem;
+    line-height: 1;
+    padding: 0 1px;
+  }
+
+  .movie-star.is-active {
+    color: #f4b400;
+  }
+
   .movie-info-box {
-    margin-top: 10px;
+    margin-top: 6px;
     margin-bottom: 10px;
-    padding: 8px 10px;
+    padding: 2px 10px 8px;
     border-radius: 10px;
     background: rgba(0, 0, 0, 0.03);
     border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .movie-info-categories {
+    margin: 0 0 2px 0;
+  }
+
+  .movie-info-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    color: rgba(0, 0, 0, 0.65);
+    font-size: 0.78rem;
+    font-weight: 600;
+  }
+
+  .movie-info-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .movie-info-summary-arrow {
+    display: inline-block;
+    transition: transform 120ms ease;
+  }
+
+  .movie-info-categories[open] .movie-info-summary-arrow {
+    transform: rotate(180deg);
   }
 
   .movie-info-category {
     font-size: 0.78rem;
     color: rgba(0, 0, 0, 0.65);
     font-weight: 600;
-    font-style: italic;
     margin-bottom: 6px;
+    margin-top: 6px;
   }
 
   .movie-info-desc {
