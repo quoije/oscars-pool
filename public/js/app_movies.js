@@ -591,7 +591,7 @@ window.addEventListener('DOMContentLoaded', async function () {
                 <div class="movie-info-box">
                   <details class="movie-info-categories">
                     <summary class="movie-info-summary">
-                      <span class="movie-info-summary-title">Catégories nominés</span>
+                      <span class="movie-info-summary-title">Catégories nominées</span>
                       <span class="movie-info-summary-arrow" aria-hidden="true">▾</span>
                     </summary>
                     <div class="movie-info-category">${movie.category}</div>
