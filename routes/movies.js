@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const multer = require("multer");
 const Movie = require("../models/Movie");
+const MovieRating = require("../models/MovieRating");
 const User = require("../models/User");
 const PlaybackProgress = require("../models/PlaybackProgress");
 const axios = require("axios");
@@ -93,6 +94,15 @@ function parseBooleanFlag(v) {
   if (["true", "1", "yes", "on"].includes(s)) return true;
   if (["false", "0", "no", "off"].includes(s)) return false;
   return undefined;
+}
+
+function parseFiveStarRating(v) {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return null;
+  const rounded = Math.round(n);
+  if (rounded < 1 || rounded > 5) return null;
+  return rounded;
 }
 
 function normalizeSubtitleEntry({ file, lang, label, isDefault } = {}) {
@@ -283,18 +293,65 @@ router.get("/", async (req, res) => {
 
     const cacheKey = `movies:list:${year || "all"}:${isChecklist ? "checklist" : "films"}`;
     const cached = cacheGet(cacheKey);
-    if (cached) {
-      res.set("Cache-Control", "public, max-age=30");
-      return res.status(200).json(cached);
+
+    let basePayload = cached;
+    if (!basePayload) {
+      const movies = await Movie.find(filter)
+        .select(projection)
+        .sort({ title: 1 })
+        .lean();
+      basePayload = movies.map((m) => ({ ...m, subtitles: getSubtitlesForResponse(m) }));
+      cacheSet(cacheKey, basePayload);
     }
 
-    const movies = await Movie.find(filter)
-      .select(projection)
-      .sort({ title: 1 })
-      .lean();
+    if (isChecklist) {
+      res.set("Cache-Control", "public, max-age=30");
+      return res.status(200).json(basePayload);
+    }
 
-    const payload = movies.map((m) => ({ ...m, subtitles: getSubtitlesForResponse(m) }));
-    cacheSet(cacheKey, payload);
+    const movieIds = basePayload.map((m) => m?._id).filter(Boolean);
+    const ratingsAgg = movieIds.length
+      ? await MovieRating.aggregate([
+          { $match: { movieId: { $in: movieIds } } },
+          { $group: { _id: "$movieId", avgRating: { $avg: "$rating" }, count: { $sum: 1 } } },
+        ])
+      : [];
+
+    const ratingsByMovieId = new Map(
+      (ratingsAgg || []).map((r) => [String(r._id), { avgRating: r.avgRating, count: r.count }])
+    );
+
+    let userId = null;
+    const token = req.headers.authorization?.split(" ")[1];
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded?.id) userId = decoded.id;
+      } catch (_) {}
+    }
+
+    let userRatingsByMovieId = new Map();
+    if (userId && movieIds.length) {
+      const userRatings = await MovieRating.find({ userId, movieId: { $in: movieIds } })
+        .select("movieId rating")
+        .lean();
+      userRatingsByMovieId = new Map(
+        (userRatings || []).map((r) => [String(r.movieId), r.rating])
+      );
+    }
+
+    const payload = basePayload.map((m) => {
+      const key = String(m?._id || "");
+      const agg = ratingsByMovieId.get(key);
+      const userRating = userRatingsByMovieId.get(key);
+      return {
+        ...m,
+        user_rating_avg: agg && typeof agg.avgRating === "number" ? Number(agg.avgRating.toFixed(2)) : null,
+        user_rating_count: agg && typeof agg.count === "number" ? agg.count : 0,
+        user_rating: typeof userRating === "number" ? userRating : null,
+      };
+    });
+
     res.set("Cache-Control", "public, max-age=30");
     res.status(200).json(payload);
   } catch (err) {
@@ -1148,6 +1205,85 @@ router.get("/progress", authenticate, async (req, res) => {
   }
 });
 
+// Get rating info for a movie (user-specific + global average)
+router.get("/:id/ratings", authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid movie id" });
+    }
+    const movieId = new mongoose.Types.ObjectId(id);
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: "User not found" });
+
+    const [agg, userRow] = await Promise.all([
+      MovieRating.aggregate([
+        { $match: { movieId } },
+        { $group: { _id: "$movieId", avgRating: { $avg: "$rating" }, count: { $sum: 1 } } },
+      ]),
+      MovieRating.findOne({ movieId, userId }).select("rating").lean(),
+    ]);
+
+    const avg = agg?.[0]?.avgRating;
+    const count = agg?.[0]?.count;
+
+    res.set("Cache-Control", "private, no-store, must-revalidate");
+    res.set("Vary", "Authorization");
+    return res.status(200).json({
+      averageRating: typeof avg === "number" ? Number(avg.toFixed(2)) : null,
+      ratingsCount: typeof count === "number" ? count : 0,
+      userRating: typeof userRow?.rating === "number" ? userRow.rating : null,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Save/update a user rating (1-5)
+router.put("/:id/ratings", authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid movie id" });
+    }
+    const movieId = new mongoose.Types.ObjectId(id);
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: "User not found" });
+
+    const rating = parseFiveStarRating(req.body?.rating);
+    if (!rating) {
+      return res.status(400).json({ message: "Invalid rating (expected 1-5)" });
+    }
+
+    await MovieRating.findOneAndUpdate(
+      { movieId, userId },
+      { $set: { rating } },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    );
+
+    const agg = await MovieRating.aggregate([
+      { $match: { movieId } },
+      { $group: { _id: "$movieId", avgRating: { $avg: "$rating" }, count: { $sum: 1 } } },
+    ]);
+
+    const avg = agg?.[0]?.avgRating;
+    const count = agg?.[0]?.count;
+
+    res.set("Cache-Control", "private, no-store, must-revalidate");
+    res.set("Vary", "Authorization");
+    return res.status(200).json({
+      averageRating: typeof avg === "number" ? Number(avg.toFixed(2)) : null,
+      ratingsCount: typeof count === "number" ? count : 0,
+      userRating: rating,
+    });
+  } catch (err) {
+    if (err && err.code === 11000) {
+      return res.status(409).json({ message: "Rating already exists, retry." });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Get one movie by Mongo _id (used by the custom player page)
 router.get("/:id", async (req, res) => {
   try {
@@ -1158,7 +1294,36 @@ router.get("/:id", async (req, res) => {
 
     const movie = await Movie.findById(id).lean();
     if (!movie) return res.status(404).json({ message: "Movie not found" });
-    return res.status(200).json({ ...movie, subtitles: getSubtitlesForResponse(movie) });
+
+    let userId = null;
+    const token = req.headers.authorization?.split(" ")[1];
+    if (token) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded?.id) userId = decoded.id;
+      } catch (_) {}
+    }
+
+    let userRating = null;
+    if (userId) {
+      const row = await MovieRating.findOne({ movieId: movie._id, userId }).select("rating").lean();
+      userRating = typeof row?.rating === "number" ? row.rating : null;
+    }
+
+    const agg = await MovieRating.aggregate([
+      { $match: { movieId: movie._id } },
+      { $group: { _id: "$movieId", avgRating: { $avg: "$rating" }, count: { $sum: 1 } } },
+    ]);
+    const avg = agg?.[0]?.avgRating;
+    const count = agg?.[0]?.count;
+
+    return res.status(200).json({
+      ...movie,
+      subtitles: getSubtitlesForResponse(movie),
+      user_rating_avg: typeof avg === "number" ? Number(avg.toFixed(2)) : null,
+      user_rating_count: typeof count === "number" ? count : 0,
+      user_rating: userRating,
+    });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }

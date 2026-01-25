@@ -208,6 +208,62 @@ footer {
     object-fit: contain;
   }
 
+  .movie-rating-block {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+    gap: 2px;
+    font-size: 0.72rem;
+    line-height: 1.15;
+    color: rgba(0,0,0,0.6);
+  }
+
+  .movie-imdb-block {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.75rem;
+    line-height: 1.1;
+    color: rgba(0,0,0,0.7);
+    white-space: nowrap;
+  }
+
+  .movie-rating-sub {
+    font-size: 0.7rem;
+    color: rgba(0,0,0,0.55);
+  }
+
+  .movie-rating-block .imdb-icon {
+    width: 18px;
+    height: 18px;
+    margin-left: 4px;
+  }
+
+  .movie-info-box {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .movie-info-category {
+    font-size: 0.78rem;
+    color: rgba(0, 0, 0, 0.65);
+    font-weight: 600;
+    font-style: italic;
+    margin-bottom: 6px;
+  }
+
+  .movie-info-desc {
+    margin: 0;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    color: rgba(0, 0, 0, 0.75);
+  }
+
   .imdb-icon {
     width: 26px;
     height: 26px;
