@@ -235,11 +235,13 @@ footer {
   }
 
   .movie-rating-avg {
+    display: block;
+    min-height: 0.9rem;
     margin-bottom: 5px;
   }
 
   .movie-rating-sub--empty {
-    display: none;
+    visibility: hidden;
   }
 
   .movie-rating-block .imdb-icon {
