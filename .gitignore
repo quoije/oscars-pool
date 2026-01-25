@@ -147,6 +147,9 @@ backups/
 # Video files in public/video/
 public/video/*
 
+# Subtitles
+subtitles/*
+
 # Uploads directory (temporary files)
 uploads/
 
