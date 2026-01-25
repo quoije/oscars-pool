@@ -593,6 +593,19 @@ async function saveUserRating(movieId, rating, token) {
   }
 }
 
+async function deleteUserRating(movieId, token) {
+  try {
+    const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}/ratings`, {
+      method: 'DELETE',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+    });
+    if (!res.ok) return null;
+    return await res.json().catch(() => null);
+  } catch (_) {
+    return null;
+  }
+}
+
 function initUserRating({ movieId, token, initial } = {}) {
   const wrap = document.getElementById('user-rating');
   const metaEl = document.getElementById('user-rating-meta');
@@ -613,6 +626,7 @@ function initUserRating({ movieId, token, initial } = {}) {
     return;
   }
 
+  let currentRating = Number.isFinite(Number(starting.userRating)) ? Number(starting.userRating) : null;
   let isSaving = false;
   buttons.forEach((btn) => {
     btn.addEventListener('click', async () => {
@@ -624,8 +638,12 @@ function initUserRating({ movieId, token, initial } = {}) {
       buttons.forEach((b) => b.setAttribute('disabled', 'disabled'));
       metaEl.textContent = 'Enregistrement…';
 
-      const result = await saveUserRating(movieId, value, token);
+      const shouldClear = currentRating && value === currentRating;
+      const result = shouldClear
+        ? await deleteUserRating(movieId, token)
+        : await saveUserRating(movieId, value, token);
       if (result) {
+        currentRating = typeof result?.userRating === 'number' ? result.userRating : null;
         applyRatingState({
           wrap,
           buttons,

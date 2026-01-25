@@ -1284,6 +1284,39 @@ router.put("/:id/ratings", authenticate, async (req, res) => {
   }
 });
 
+// Remove a user rating
+router.delete("/:id/ratings", authenticate, async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid movie id" });
+    }
+    const movieId = new mongoose.Types.ObjectId(id);
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ message: "User not found" });
+
+    await MovieRating.deleteOne({ movieId, userId });
+
+    const agg = await MovieRating.aggregate([
+      { $match: { movieId } },
+      { $group: { _id: "$movieId", avgRating: { $avg: "$rating" }, count: { $sum: 1 } } },
+    ]);
+
+    const avg = agg?.[0]?.avgRating;
+    const count = agg?.[0]?.count;
+
+    res.set("Cache-Control", "private, no-store, must-revalidate");
+    res.set("Vary", "Authorization");
+    return res.status(200).json({
+      averageRating: typeof avg === "number" ? Number(avg.toFixed(2)) : null,
+      ratingsCount: typeof count === "number" ? count : 0,
+      userRating: null,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Get one movie by Mongo _id (used by the custom player page)
 router.get("/:id", async (req, res) => {
   try {
