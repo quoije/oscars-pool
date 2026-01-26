@@ -5,7 +5,7 @@ Little nodejs + mongodb app that I hack together with ChatGPT and Cursor to keep
 
 **Disclaimer:** This was a fun, experimental project built with “AI slop” (Cursor), so it may have security issues. For example, `python_video_server` uses the default token‑in‑URL approach to serve video files, which can leave user tokens in logs or browser history. There are ways to improve this, but at this point I’m blinder than Ray Charles.
 
-![Oscars Pool 2026](img/preview.gif)
+![Oscars Pool 2026](img/preview.png)
 
 ## Features
 
