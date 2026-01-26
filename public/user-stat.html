@@ -101,10 +101,8 @@
 </nav>
 
 <div class="container mt-4">
-  <h2>Statistiques des utilisateurs</h2>
-
   <!-- Tabs -->
-  <ul class="nav nav-tabs stats-tabs mt-3" id="statsTabs" role="tablist">
+  <ul class="nav nav-tabs stats-tabs" id="statsTabs" role="tablist">
     <li class="nav-item" role="presentation">
       <button class="nav-link active" id="tab-ranking" data-bs-toggle="tab" data-bs-target="#pane-ranking" type="button" role="tab" aria-controls="pane-ranking" aria-selected="true">
         Classement
@@ -147,7 +145,6 @@
 
     <!-- Winners tab -->
     <div class="tab-pane fade" id="pane-winners" role="tabpanel" aria-labelledby="tab-winners" tabindex="0">
-      <h4 class="mb-2">Gagnants</h4>
       <div class="table-responsive mb-4">
         <table class="table table-sm table-striped align-middle mb-0">
           <thead>
@@ -167,7 +164,10 @@
 
     <!-- 100% completers tab -->
     <div class="tab-pane fade" id="pane-completion" role="tabpanel" aria-labelledby="tab-completion" tabindex="0">
-      <h4 class="mb-2">Utilisateurs ayant terminé 100% (par année)</h4>
+      <div class="small text-muted mb-2 d-flex align-items-center gap-2">
+        <span class="badge bg-light text-dark border" aria-hidden="true">i</span>
+        <span>Utilisateurs ayant terminé 100% (par année)</span>
+      </div>
       <div class="table-responsive mb-4">
         <table class="table table-sm table-striped align-middle mb-0">
           <thead>

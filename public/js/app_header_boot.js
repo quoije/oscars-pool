@@ -112,5 +112,22 @@
         // On error, keep current state (already set from cache or default)
       });
   }
+
+  // Highlight the active page in the navbar.
+  (function markActiveNavLink() {
+    const currentFile = (String(window.location.pathname || '').split('/').pop() || 'index.html').toLowerCase();
+    const links = document.querySelectorAll('nav.navbar .navbar-nav a.nav-link[href]');
+    links.forEach((a) => {
+      const rawHref = String(a.getAttribute('href') || '');
+      const hrefFile = rawHref.split('#')[0].split('?')[0].split('/').pop().toLowerCase();
+      const isCurrent = hrefFile && hrefFile === currentFile;
+      a.classList.toggle('is-current', isCurrent);
+      if (isCurrent) {
+        a.setAttribute('aria-current', 'page');
+      } else if (a.getAttribute('aria-current') === 'page') {
+        a.removeAttribute('aria-current');
+      }
+    });
+  })();
 })();
 

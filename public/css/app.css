@@ -703,6 +703,30 @@ footer {
     border-bottom: 1px solid var(--app-navbar-border);
   }
 
+  /* Navbar: show current page state */
+  .navbar-custom .navbar-nav .nav-link.btn.is-current {
+    background: rgba(255, 255, 255, 0.16);
+    border-color: rgba(255, 255, 255, 0.55);
+    color: #fff;
+  }
+
+  .navbar-custom .navbar-nav .nav-link.btn.is-current:hover {
+    background: rgba(255, 255, 255, 0.22);
+    border-color: rgba(255, 255, 255, 0.65);
+    color: #fff;
+  }
+
+  html[data-theme="dark"] .navbar-custom .navbar-nav .nav-link.btn.is-current {
+    background: rgba(79, 124, 255, 0.22);
+    border-color: rgba(79, 124, 255, 0.58);
+    color: #fff;
+  }
+
+  html[data-theme="dark"] .navbar-custom .navbar-nav .nav-link.btn.is-current:hover {
+    background: rgba(79, 124, 255, 0.28);
+    border-color: rgba(79, 124, 255, 0.7);
+  }
+
   /* The logo image has a bit of built-in left whitespace; nudge it back to align with page titles. */
   .navbar-custom .navbar-brand img {
     margin-left: -9px;
