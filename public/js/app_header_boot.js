@@ -41,9 +41,17 @@
     return;
   }
 
-  const nameEl = document.getElementById('user-name');
-  if (nameEl && !nameEl.textContent) {
-    nameEl.textContent = decoded.name || '';
+  const name = decoded.name || '';
+  const nameTargets = document.querySelectorAll('[data-user-name]');
+  if (nameTargets.length) {
+    nameTargets.forEach((el) => {
+      if (el && !el.textContent) el.textContent = name;
+    });
+  } else {
+    const nameEl = document.getElementById('user-name');
+    if (nameEl && !nameEl.textContent) {
+      nameEl.textContent = name;
+    }
   }
 
   const adminLink = document.getElementById('admin-control-link');

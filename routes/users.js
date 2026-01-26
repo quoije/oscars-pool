@@ -93,6 +93,13 @@ function signUserToken(user) {
   );
 }
 
+function normalizeThemePreference(value) {
+  if (value === null || value === undefined) return null;
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "light" || raw === "dark") return raw;
+  return null;
+}
+
 function generateTempPassword() {
   // 12 chars, URL-safe (no spaces/specials that break copy/paste)
   return crypto.randomBytes(9).toString("base64url");
@@ -416,6 +423,40 @@ router.post("/login", async (req, res) => {
     res.status(200).json({ token, mustChangePassword: !!user.mustChangePassword });
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// User: get theme preference
+router.get("/theme", verifyToken, async (req, res) => {
+  try {
+    res.set("Cache-Control", "private, no-store, must-revalidate");
+    res.set("Vary", "Authorization");
+
+    const user = await User.findById(req.user.id).select("themePreference").lean();
+    if (!user) return res.status(404).json({ message: "User not found" });
+    return res.status(200).json({ themePreference: user.themePreference || null });
+  } catch (err) {
+    return res.status(400).json({ message: err?.message || "Erreur interne" });
+  }
+});
+
+// User: update theme preference (light/dark or null for system)
+router.put("/theme", verifyToken, async (req, res) => {
+  try {
+    const preference = normalizeThemePreference(req.body?.themePreference);
+    const provided = req.body?.themePreference;
+    if (provided !== null && provided !== undefined && preference === null) {
+      return res.status(400).json({ message: "Préférence invalide (light/dark/null)." });
+    }
+
+    const update = preference ? { $set: { themePreference: preference } } : { $unset: { themePreference: 1 } };
+
+    const user = await User.findByIdAndUpdate(req.user.id, update, { new: true, select: "themePreference" }).lean();
+
+    if (!user) return res.status(404).json({ message: "User not found" });
+    return res.status(200).json({ themePreference: user.themePreference || null });
+  } catch (err) {
+    return res.status(400).json({ message: err?.message || "Erreur interne" });
   }
 });
 

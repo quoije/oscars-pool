@@ -171,3 +171,6 @@ __pycache__/
 *.pyo
 *.pyd
 .Python
+
+# Temporary scripts
+temp/

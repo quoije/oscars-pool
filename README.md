@@ -5,12 +5,17 @@ Little nodejs + mongodb app that I hack together with ChatGPT and Cursor to keep
 
 **Disclaimer:** This was a fun, experimental project built with “AI slop” (Cursor), so it may have security issues. For example, `python_video_server` uses the default token‑in‑URL approach to serve video files, which can leave user tokens in logs or browser history. There are ways to improve this, but at this point I’m blinder than Ray Charles.
 
-![Oscars Pool 2026](img/preview.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="img/preview_dark.png">
+  <img src="img/preview.png" alt="Oscars Pool 2026">
+</picture>
 
 ## Features
 
 ### User Features
 - **User accounts**: register, login, JWT authentication
+- **Dark mode**: follows system preference by default, with a user toggle (persisted per user)
+- **Mobile-friendly UI**: improved responsive navbar + controls for small screens
 - **Optional registration verification**: via `DOG_NAMES` environment variable (if unset, verification is skipped)
 - **Multi-year support**: browse movies and stats by Oscar year (admin controls the active year)
 - **Checklist + progress**: mark movies as watched (with date), progress bar, countdown to Oscars date
