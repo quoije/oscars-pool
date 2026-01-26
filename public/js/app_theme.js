@@ -1,6 +1,7 @@
 // Theme toggle with system preference fallback.
 (function () {
   const STORAGE_KEY = 'theme_preference';
+  const LAST_KEY = 'theme_last_applied';
   const THEME_ATTR = 'data-theme';
   const SOURCE_ATTR = 'data-theme-source';
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
@@ -17,6 +18,11 @@
   function setTheme(theme, source) {
     document.documentElement.setAttribute(THEME_ATTR, theme);
     document.documentElement.setAttribute(SOURCE_ATTR, source);
+    try {
+      sessionStorage.setItem(LAST_KEY, theme);
+    } catch (_) {
+      // Ignore storage errors.
+    }
     updateToggleUi(theme, source);
   }
 
@@ -56,12 +62,16 @@
       if (!res.ok) return;
       const data = await res.json();
       const pref = normalizeTheme(data?.themePreference);
-      if (pref) {
-        localStorage.setItem(STORAGE_KEY, pref);
-      } else {
-        localStorage.removeItem(STORAGE_KEY);
+      const currentPref = normalizeTheme(localStorage.getItem(STORAGE_KEY));
+      const changed = pref !== currentPref;
+      if (changed) {
+        if (pref) {
+          localStorage.setItem(STORAGE_KEY, pref);
+        } else {
+          localStorage.removeItem(STORAGE_KEY);
+        }
+        applyStoredOrSystem();
       }
-      applyStoredOrSystem();
     } catch (_) {
       // Ignore fetch errors.
     }
@@ -69,8 +79,14 @@
 
   function applyStoredOrSystem() {
     const stored = normalizeTheme(localStorage.getItem(STORAGE_KEY));
-    const theme = stored || getSystemTheme();
-    const source = stored ? 'user' : 'system';
+    let last = null;
+    try {
+      last = normalizeTheme(sessionStorage.getItem(LAST_KEY));
+    } catch (_) {
+      last = null;
+    }
+    const theme = stored || last || getSystemTheme();
+    const source = stored ? 'user' : (last ? 'session' : 'system');
     setTheme(theme, source);
   }
 
