@@ -515,16 +515,11 @@ window.addEventListener('DOMContentLoaded', async function () {
             imdbLink.rel = 'noopener noreferrer';
             imdbLink.setAttribute('aria-label', 'Voir sur IMDb');
 
-            const imdbText = document.createElement('span');
-            imdbText.className = 'small';
-            imdbText.textContent = 'IMDb';
-
-            const imdbIcon = document.createElement('img');
-            imdbIcon.src = '/img/imdb.png';
+            const imdbIcon = document.createElement('span');
             imdbIcon.className = 'imdb-icon';
-            imdbIcon.alt = 'IMDb';
+            imdbIcon.setAttribute('aria-hidden', 'true');
+            imdbIcon.textContent = 'IMDb';
 
-            imdbLink.appendChild(imdbText);
             imdbLink.appendChild(imdbIcon);
             right.appendChild(imdbLink);
           }

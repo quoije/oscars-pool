@@ -579,7 +579,7 @@ window.addEventListener('DOMContentLoaded', async function () {
                     <div class="movie-imdb-block">
                       ${movie.rating ? `<span>⭐ ${movie.rating}</span>` : ''}
                       <a href="https://www.imdb.com/title/${movie.imdb_id}/" target="_blank" rel="noopener noreferrer" aria-label="Voir sur IMDb">
-                        <img src="/img/imdb.png" class="imdb-icon" alt="IMDb">
+                        <span class="imdb-icon" aria-hidden="true">IMDb</span>
                       </a>
                     </div>
                     <div class="movie-rating-stars" role="group" aria-label="Noter ce film" data-movie-id="${movieId}" data-current-rating="${Number.isFinite(userRating) ? userRating : ''}">
