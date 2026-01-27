@@ -37,9 +37,42 @@
     }
     .stats-tabs {
       border-bottom: 0;
+      gap: 0.35rem;
     }
     .stats-tab-panel {
       padding-top: 0;
+      background-color: var(--app-surface);
+      padding: 0.75rem;
+      margin-top: -1px;
+      border: 1px solid var(--app-border);
+      border-top: 0;
+      border-radius: 0 0 12px 12px;
+    }
+    .stats-tab-panel {
+      border-top: 1px solid var(--app-border);
+    }
+    #statsTabs .nav-link.active {
+      position: relative;
+      z-index: 2;
+      top: 1px;
+      border-bottom-color: transparent;
+    }
+    #statsTabsContent > .tab-pane.active {
+      position: relative;
+    }
+    #statsTabsContent > .tab-pane.active::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 2px;
+      width: calc(100% + 2px);
+      margin-left: -1px;
+      background: var(--app-surface);
+      pointer-events: none;
+    }
+    #statsTabsContent > .tab-pane.fade::before {
+      background: transparent;
     }
     .stats-tab-panel > .tab-pane:not(#pane-ranking) {
       padding-top: 1rem;
@@ -51,6 +84,9 @@
     .stats-tab-panel .table th,
     .stats-tab-panel .table td {
       font-size: 0.9rem;
+    }
+    html[data-theme="dark"] .stats-tabs .nav-link.active {
+      border-bottom-color: transparent;
     }
   </style>
 </head>
