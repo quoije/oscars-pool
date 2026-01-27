@@ -35,8 +35,22 @@
     .stats-tabs .nav-link {
       font-weight: 400;
     }
+    .stats-tabs {
+      border-bottom: 0;
+    }
     .stats-tab-panel {
+      padding-top: 0;
+    }
+    .stats-tab-panel > .tab-pane:not(#pane-ranking) {
       padding-top: 1rem;
+    }
+    #pane-ranking .user-table {
+      margin-top: 0.25rem;
+    }
+    .stats-tab-panel .table,
+    .stats-tab-panel .table th,
+    .stats-tab-panel .table td {
+      font-size: 0.9rem;
     }
   </style>
 </head>
@@ -111,7 +125,7 @@
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link" id="tab-winners" data-bs-toggle="tab" data-bs-target="#pane-winners" type="button" role="tab" aria-controls="pane-winners" aria-selected="false">
-        Gagnants
+        Gagnants 🏆
       </button>
     </li>
     <li class="nav-item" role="presentation">
