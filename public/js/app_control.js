@@ -1,5 +1,6 @@
 window.onload = async function () {
   const token = localStorage.getItem('auth_token');
+
   if (!token) {
     window.location.href = '/';
     return;
@@ -38,7 +39,7 @@ window.onload = async function () {
   const form = document.getElementById('add-movie-form');
   const yearInput = document.getElementById('oscar_year');
 
-  const activeYearInput = document.getElementById('active_oscar_year');
+  const activeYearInput = document.getElementById('active_oscar_year') || document.getElementById('oscar_date_year');
   const saveActiveYearBtn = document.getElementById('save-active-year');
 
   // Player UI (settings tab): show/hide admin status blocks in player.html
@@ -49,9 +50,6 @@ window.onload = async function () {
   // Version control tab elements
   const adminVersionTabBtn = document.getElementById('admin-version-tab');
   const appVersionAlertEl = document.getElementById('app_version_alert');
-  const appVersionActiveSelectEl = document.getElementById('app_version_active_select');
-  const appVersionReloadBtn = document.getElementById('app_version_reload');
-  const appVersionSetActiveBtn = document.getElementById('app_version_set_active');
   const appVersionPreviewEl = document.getElementById('app_version_preview');
   const appVersionNewVersionEl = document.getElementById('app_version_new_version');
   const appVersionNewMessageEl = document.getElementById('app_version_new_message');
@@ -419,39 +417,9 @@ window.onload = async function () {
   }
 
   function renderAppVersionUI() {
-    if (!appVersionActiveSelectEl || !appVersionListEl) return;
+    if (!appVersionListEl) return;
     const versions = Array.isArray(appVersionState.versions) ? appVersionState.versions : [];
     const activeId = appVersionState?.active?.id ? String(appVersionState.active.id) : '';
-
-    const previous = String(appVersionActiveSelectEl.value || '');
-    appVersionActiveSelectEl.innerHTML = '';
-
-    if (!versions.length) {
-      const opt = document.createElement('option');
-      opt.value = '';
-      opt.textContent = 'Aucune version (crée-en une)';
-      opt.disabled = true;
-      opt.selected = true;
-      appVersionActiveSelectEl.appendChild(opt);
-      appVersionActiveSelectEl.disabled = true;
-      if (appVersionSetActiveBtn) appVersionSetActiveBtn.disabled = true;
-    } else {
-      versions.forEach((v) => {
-        const opt = document.createElement('option');
-        opt.value = String(v?.id || '');
-        const dateLabel = v?.dateISO ? formatDateTime(v.dateISO) : '—';
-        const msg = String(v?.message || '').trim();
-        const shortMsg = msg.length > 80 ? `${msg.slice(0, 77)}...` : msg;
-        opt.textContent = `${v?.version || '—'} — ${dateLabel}${shortMsg ? ` — ${shortMsg}` : ''}`;
-        appVersionActiveSelectEl.appendChild(opt);
-      });
-
-      const stillExists = versions.map((v) => String(v?.id || '')).includes(previous);
-      const desired = activeId || (stillExists ? previous : String(versions[0]?.id || ''));
-      appVersionActiveSelectEl.value = desired;
-      appVersionActiveSelectEl.disabled = false;
-      if (appVersionSetActiveBtn) appVersionSetActiveBtn.disabled = false;
-    }
 
     if (!versions.length) {
       appVersionListEl.textContent = '—';
@@ -465,6 +433,9 @@ window.onload = async function () {
       const msg = escapeHtml(String(v?.message || '').trim());
       const versionLabel = escapeHtml(String(v?.version || '—'));
       const activeBadge = isActive ? '<span class="badge bg-warning text-dark">Active</span>' : '';
+      const activateBtn = isActive
+        ? ''
+        : `<button type="button" class="btn btn-sm btn-outline-secondary btn-compact btn-check-compact" data-app-version-activate="${escapeHtml(id)}" aria-label="Activer">✓</button>`;
 
       // IMPORTANT: keep markup compact (no preserved whitespace surprises).
       return (
@@ -476,14 +447,38 @@ window.onload = async function () {
             `</div>` +
             `<div class="small text-muted text-break">${escapeHtml(dateLabel)}${msg ? ` — ${msg}` : ''}</div>` +
           `</div>` +
-          `<div class="flex-shrink-0">` +
-            `<button type="button" class="btn btn-sm btn-outline-danger" data-app-version-delete="${escapeHtml(id)}">Supprimer</button>` +
+          `<div class="flex-shrink-0 d-flex gap-2">` +
+            `${activateBtn}` +
+            `<button type="button" class="btn btn-sm btn-outline-danger btn-compact" data-app-version-delete="${escapeHtml(id)}">Supprimer</button>` +
           `</div>` +
         `</div>`
       );
     }).join('');
 
     appVersionListEl.innerHTML = `<div class="list-group list-group-flush">${rows}</div>`;
+
+    appVersionListEl.querySelectorAll('button[data-app-version-activate]').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-app-version-activate');
+        if (!id) return;
+        btn.disabled = true;
+        const old = btn.textContent;
+        btn.textContent = '...';
+        try {
+          hideAppVersionAlert();
+          appVersionState = await setActiveAppVersion(id);
+          appVersionLoadedOnce = true;
+          renderAppVersionUI();
+          await refreshAppVersionPreview();
+          setAppVersionAlert('success', 'Version active mise à jour.');
+        } catch (err) {
+          setAppVersionAlert('danger', err.message || 'Erreur réseau');
+        } finally {
+          btn.disabled = false;
+          btn.textContent = old;
+        }
+      });
+    });
 
     appVersionListEl.querySelectorAll('button[data-app-version-delete]').forEach((btn) => {
       btn.addEventListener('click', async () => {
@@ -513,7 +508,7 @@ window.onload = async function () {
 
   async function loadAppVersionTab(options = {}) {
     const force = !!options.force;
-    if (!appVersionActiveSelectEl || !appVersionListEl) return;
+    if (!appVersionListEl) return;
     if (appVersionLoadedOnce && !force) return;
     try {
       hideAppVersionAlert();
@@ -1103,7 +1098,7 @@ window.onload = async function () {
         return (
           `<div class="d-flex justify-content-between align-items-center border rounded px-2 py-1 mb-2 bg-white">` +
             `<div class="me-2 min-width-0"><strong class="text-break">${name}</strong>${ptsLabel}</div>` +
-            `<button type="button" class="btn btn-sm btn-outline-danger flex-shrink-0" data-winner-remove-year="${escapeHtml(String(y))}" data-winner-remove-user="${uid}">Retirer</button>` +
+            `<button type="button" class="btn btn-sm btn-outline-danger btn-compact flex-shrink-0" data-winner-remove-year="${escapeHtml(String(y))}" data-winner-remove-user="${uid}">Retirer</button>` +
           `</div>`
         );
       }).join('');
@@ -1235,7 +1230,7 @@ window.onload = async function () {
     return /^tt\d{5,}$/.test(String(value || '').trim());
   }
 
-  document.getElementById('reset-form').addEventListener('click', function () {
+  document.getElementById('reset-form')?.addEventListener('click', function () {
     form.reset();
     responseEl.classList.add('d-none');
   });
@@ -1632,8 +1627,8 @@ window.onload = async function () {
         <td class="text-nowrap">${formatBytes(b?.sizeBytes)}</td>
         <td class="text-nowrap">${formatDateTime(b?.mtime)}</td>
         <td class="text-end text-nowrap">
-          <button type="button" class="btn btn-sm btn-outline-secondary me-1" data-backup-download="${name}">Télécharger</button>
-          <button type="button" class="btn btn-sm btn-outline-danger" data-backup-delete="${name}">Supprimer</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-compact me-1" data-backup-download="${name}">Télécharger</button>
+          <button type="button" class="btn btn-sm btn-outline-danger btn-compact" data-backup-delete="${name}">Supprimer</button>
         </td>
       `;
       dbBackupListBody.appendChild(tr);
@@ -1802,42 +1797,7 @@ window.onload = async function () {
   if (adminVersionTabBtn) {
     adminVersionTabBtn.addEventListener('shown.bs.tab', () => loadAppVersionTab({ force: false }));
   }
-  if (appVersionReloadBtn) {
-    appVersionReloadBtn.addEventListener('click', async () => {
-      appVersionReloadBtn.disabled = true;
-      const old = appVersionReloadBtn.textContent;
-      appVersionReloadBtn.textContent = 'Chargement...';
-      try {
-        await loadAppVersionTab({ force: true });
-        setAppVersionAlert('success', 'Rechargé.');
-      } finally {
-        appVersionReloadBtn.disabled = false;
-        appVersionReloadBtn.textContent = old;
-      }
-    });
-  }
-  if (appVersionSetActiveBtn && appVersionActiveSelectEl) {
-    appVersionSetActiveBtn.addEventListener('click', async () => {
-      const id = String(appVersionActiveSelectEl.value || '').trim();
-      if (!id) return;
-      appVersionSetActiveBtn.disabled = true;
-      const old = appVersionSetActiveBtn.textContent;
-      appVersionSetActiveBtn.textContent = '...';
-      try {
-        hideAppVersionAlert();
-        appVersionState = await setActiveAppVersion(id);
-        appVersionLoadedOnce = true;
-        renderAppVersionUI();
-        await refreshAppVersionPreview();
-        setAppVersionAlert('success', 'Version active mise à jour.');
-      } catch (err) {
-        setAppVersionAlert('danger', err.message || 'Erreur réseau');
-      } finally {
-        appVersionSetActiveBtn.disabled = false;
-        appVersionSetActiveBtn.textContent = old;
-      }
-    });
-  }
+  // Active version is handled inside the history list (✓).
 
   async function handleCreateAppVersion(activate) {
     const version = String(appVersionNewVersionEl?.value || '').trim();
@@ -1990,18 +1950,17 @@ window.onload = async function () {
     const year = parseYear(yearInput.value);
     const imdb_id = document.getElementById('imdb_id').value.trim();
     const category = document.getElementById('category').value.trim();
-    const cam = !!document.getElementById('cam_flag')?.checked;
-    const vod_link = document.getElementById('vod_link').value.trim();
-    const player_mode = (document.getElementById('player_mode')?.value || 'auto').trim();
-    const video_src = document.getElementById('video_src')?.value?.trim() || '';
-    const video_file = document.getElementById('video_file')?.value?.trim() || '';
-    const video_file_low = document.getElementById('video_file_low')?.value?.trim() || '';
-    const embed_src = document.getElementById('embed_src')?.value?.trim() || '';
-    const subtitleFileInput = document.getElementById('subtitle_file');
-    const subtitleFile = subtitleFileInput?.files?.[0] || null;
-    const subtitle_lang = normalizeSubtitleText(document.getElementById('subtitle_lang')?.value, 24);
-    const subtitle_label = normalizeSubtitleText(document.getElementById('subtitle_label')?.value, 80);
-    const subtitle_default = !!document.getElementById('subtitle_default')?.checked;
+    const cam = false;
+    const vod_link = '';
+    const player_mode = 'auto';
+    const video_src = '';
+    const video_file = '';
+    const video_file_low = '';
+    const embed_src = '';
+    const subtitleFile = null;
+    const subtitle_lang = '';
+    const subtitle_label = '';
+    const subtitle_default = false;
 
     if (!year) {
       showResponse('warning', 'Année invalide. Exemple attendu: 2026');
@@ -2158,7 +2117,7 @@ window.onload = async function () {
       }
 
       // Oscar date year dropdown (settings tab)
-      if (oscarDateYearSelect && oscarDateValueInput && saveOscarDateBtn && clearOscarDateBtn) {
+      if (oscarDateYearSelect && oscarDateValueInput && saveOscarDateBtn) {
         const previousOscarYearSelection = String(oscarDateYearSelect.value || '');
         oscarDateYearSelect.innerHTML = '';
 
@@ -2172,7 +2131,7 @@ window.onload = async function () {
           oscarDateYearSelect.disabled = true;
           oscarDateValueInput.disabled = true;
           saveOscarDateBtn.disabled = true;
-          clearOscarDateBtn.disabled = true;
+          if (clearOscarDateBtn) clearOscarDateBtn.disabled = true;
         } else {
           cleanedYears.forEach((y) => {
             const opt = document.createElement('option');
@@ -2191,7 +2150,7 @@ window.onload = async function () {
           oscarDateYearSelect.disabled = false;
           oscarDateValueInput.disabled = false;
           saveOscarDateBtn.disabled = false;
-          clearOscarDateBtn.disabled = false;
+          if (clearOscarDateBtn) clearOscarDateBtn.disabled = false;
           oscarDateYearSelect.value = desired;
         }
       }

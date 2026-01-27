@@ -27,6 +27,185 @@
     .navbar-toggler-icon {
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3E%3Cpath stroke='white' stroke-width='2' stroke-linecap='round' stroke-miterlimit='10' d='M4 7h22M4 15h22M4 23h22'/%3E%3C/svg%3E");
     }
+
+    .admin-tabs-content {
+      font-size: 0.95rem;
+    }
+
+    .admin-tabs-content .info-line {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      line-height: 1;
+      align-self: center;
+      transform: translateY(-2px);
+    }
+
+    .admin-tabs-content .info-line .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1;
+      width: 1.2em;
+      height: 1.2em;
+      padding: 0;
+    }
+
+    .admin-tabs-content .info-line .info-text {
+      display: inline-flex;
+      align-items: center;
+      line-height: 1;
+    }
+
+    .admin-tabs-content .btn-compact {
+      padding: 0.2rem 0.5rem;
+      font-size: 0.85rem;
+      line-height: 1.2;
+    }
+
+    .admin-tabs-content .btn-check-compact {
+      padding-left: 0.35rem;
+      padding-right: 0.35rem;
+    }
+
+    .admin-tabs-content .app-version-create {
+      font-size: 0.95rem;
+    }
+
+    .admin-tabs-content .app-version-create .fw-semibold {
+      font-size: 0.95rem;
+    }
+
+    .admin-tabs-content .backup-restore-panel {
+      font-size: 0.95rem;
+    }
+
+    .admin-tabs-content .backup-restore-panel .form-label,
+    .admin-tabs-content .backup-restore-panel .form-check-label {
+      font-size: 0.95rem;
+    }
+
+    .admin-tabs-content .backup-restore-panel .alert {
+      font-size: 0.9rem;
+      padding: 0.5rem 0.75rem;
+    }
+
+    .admin-tabs-content .btn-check-small {
+      height: 1.9rem;
+    }
+
+    .admin-tabs-content .oscar-date-year-select {
+      max-width: 220px;
+      width: 220px;
+      margin-right: 0;
+    }
+
+    .admin-tabs-content .manage-year-select {
+      max-width: 110px;
+      width: 110px;
+    }
+
+    .admin-tabs-content .oscar-date-input {
+      max-width: 220px;
+      width: 220px;
+    }
+
+    .admin-tabs-content .points-input-half {
+      max-width: 110px;
+      width: 110px;
+    }
+
+    .admin-tabs-content .oscar-date-layout {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+    }
+
+    .admin-tabs-content .oscar-date-fields {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .admin-tabs-content .oscar-date-fields .form-text {
+      margin-top: 0.2rem;
+    }
+
+    .admin-tabs-content .oscar-date-current {
+      display: inline-block;
+      width: fit-content;
+      max-width: 100%;
+      padding: 0.4rem 0.65rem;
+      min-width: 220px;
+    }
+
+    .admin-tabs-content .btn-check-wide {
+      padding-left: 0.55rem;
+      padding-right: 0.55rem;
+    }
+
+    .admin-tabs-content h4,
+    .admin-tabs-content h5 {
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.01em;
+    }
+
+    .admin-subtabs .nav-link {
+      padding: 0.3rem 0.7rem;
+      font-size: 0.9rem;
+      line-height: 1.2;
+    }
+
+
+    html[data-theme="dark"] #adminAddMovieAccordion .accordion-item {
+      background-color: var(--app-surface-alt);
+      border-color: var(--app-border);
+    }
+
+    html[data-theme="dark"] #adminAddMovieAccordion .accordion-button {
+      background-color: var(--app-surface-alt);
+      color: var(--app-text);
+      box-shadow: none;
+    }
+
+    html[data-theme="dark"] #adminAddMovieAccordion .accordion-button::after {
+      filter: invert(1);
+    }
+
+    html[data-theme="dark"] #adminAddMovieAccordion .accordion-button:not(.collapsed) {
+      background-color: var(--app-surface);
+      color: var(--app-text);
+      box-shadow: none;
+    }
+
+    html[data-theme="dark"] #adminAddMovieAccordion .accordion-body {
+      background-color: var(--app-surface);
+      color: var(--app-text);
+    }
+
+    .admin-movies-add {
+      margin-top: 0.5rem;
+    }
+
+    .admin-movies-separator {
+      border-top: 1px solid var(--app-border);
+      margin: 0.75rem 0;
+    }
+
+    .admin-movies-meta {
+      margin: 0 0 0.5rem;
+    }
+
+    .admin-subtabs-tight {
+      margin-top: 0;
+    }
+
+    .admin-tabs-content .table,
+    .admin-tabs-content .table th,
+    .admin-tabs-content .table td {
+      font-size: 0.95rem;
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -46,7 +225,7 @@
         <a href="checklist.html" class="nav-link btn btn-outline-light me-2">Checklist</a>
         <a href="user-stat.html" class="nav-link btn btn-outline-light me-2">Statistiques</a>
         <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;">Mes picks</a>
-        <a href="control.html" class="nav-link btn btn-warning me-2">Admin</a>
+        <a href="control.html" class="nav-link btn btn-outline-light me-2 active">Admin</a>
       </div>
       <div class="d-flex ms-auto mt-2 mt-lg-0 align-items-center gap-2 navbar-user">
         <span id="user-name" class="navbar-text" data-user-name></span>
@@ -77,7 +256,7 @@
   </div>
 </nav>
 
-<div class="container mt-4">
+<div class="container mt-4 pb-5">
   <div id="response" class="alert d-none" role="alert"></div>
 
   <ul class="nav nav-tabs" id="adminTabs" role="tablist">
@@ -123,30 +302,20 @@
     </li>
   </ul>
 
-  <div class="tab-content pt-3">
+  <div class="tab-content pt-3 admin-tabs-content">
     <div class="tab-pane fade show active" id="admin-settings" role="tabpanel" aria-labelledby="admin-settings-tab">
       <div class="card p-3">
         <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
-          <div>
-            <h4 class="mb-1">Réglages</h4>
-            <div class="text-muted">Paramètres globaux du site (année, dates, options du lecteur).</div>
+          <div class="info-line small text-muted">
+            <span class="badge bg-light text-dark border" aria-hidden="true">i</span>
+            <span class="info-text">Paramètres globaux du site (année, dates, options du lecteur).</span>
           </div>
         </div>
 
         <ul class="nav nav-pills admin-subtabs mt-3" id="adminSettingsSubTabs" role="tablist">
           <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="admin-settings-subtab-year" data-bs-toggle="tab" data-bs-target="#admin-settings-pane-year" type="button" role="tab" aria-controls="admin-settings-pane-year" aria-selected="true">
-              Année active
-            </button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="admin-settings-subtab-oscar-date" data-bs-toggle="tab" data-bs-target="#admin-settings-pane-oscar-date" type="button" role="tab" aria-controls="admin-settings-pane-oscar-date" aria-selected="false">
+            <button class="nav-link active" id="admin-settings-subtab-oscar-date" data-bs-toggle="tab" data-bs-target="#admin-settings-pane-oscar-date" type="button" role="tab" aria-controls="admin-settings-pane-oscar-date" aria-selected="true">
               Date Oscars
-            </button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="admin-settings-subtab-points" data-bs-toggle="tab" data-bs-target="#admin-settings-pane-points" type="button" role="tab" aria-controls="admin-settings-pane-points" aria-selected="false">
-              Points
             </button>
           </li>
           <li class="nav-item" role="presentation">
@@ -157,88 +326,78 @@
         </ul>
 
         <div class="tab-content pt-3">
-          <!-- Active year -->
-          <div class="tab-pane fade show active" id="admin-settings-pane-year" role="tabpanel" aria-labelledby="admin-settings-subtab-year" tabindex="0">
-            <div class="border rounded p-3 bg-light">
-              <div class="text-muted small mb-3">
-                Pilote tout le site (films, checklist, statistiques).
-              </div>
-              <label for="active_oscar_year" class="form-label">Année active</label>
-              <div class="admin-settings-narrow">
-                <div class="input-group">
-                  <select class="form-select" id="active_oscar_year"></select>
-                  <button type="button" id="save-active-year" class="btn btn-warning">Appliquer</button>
-                </div>
-              </div>
-              <div class="form-text">Basé sur les années présentes dans les films.</div>
-            </div>
-          </div>
+          <!-- Oscar date + points -->
+          <div class="tab-pane fade show active" id="admin-settings-pane-oscar-date" role="tabpanel" aria-labelledby="admin-settings-subtab-oscar-date" tabindex="0">
+            <div class="row g-3">
+              <div class="col-12 col-xxl-6">
+                <div class="border rounded p-3 bg-light h-100">
+                  <div class="text-muted small mb-3">
+                    Configure la date de cérémonie pour le compte à rebours (Films &amp; Checklist). Défaut: <code>15 mars</code>.
+                  </div>
 
-          <!-- Oscar date -->
-          <div class="tab-pane fade" id="admin-settings-pane-oscar-date" role="tabpanel" aria-labelledby="admin-settings-subtab-oscar-date" tabindex="0">
-            <div class="border rounded p-3 bg-light">
-              <div class="text-muted small mb-3">
-                Configure la date de cérémonie pour le compte à rebours (Films &amp; Checklist). Défaut: <code>15 mars</code>.
-              </div>
+                  <div class="oscar-date-layout">
+                    <div class="oscar-date-fields">
+                      <div>
+                        <label for="oscar_date_year" class="form-label visually-hidden">Année</label>
+                        <div class="input-group align-items-center">
+                          <select class="form-select oscar-date-year-select" id="oscar_date_year"></select>
+                          <button type="button" id="save-active-year" class="btn btn-warning btn-compact btn-check-compact btn-check-small btn-check-wide rounded-3 ms-1" aria-label="Appliquer l'année active">✓</button>
+                        </div>
+                        <div class="form-text">Basé sur les années présentes dans les films.</div>
+                      </div>
+                      <div>
+                        <label for="oscar_date_value" class="form-label visually-hidden">Date</label>
+                        <div class="input-group align-items-center">
+                          <input type="date" class="form-control oscar-date-input" id="oscar_date_value">
+                          <button type="button" id="save-oscar-date" class="btn btn-warning btn-compact btn-check-compact btn-check-small btn-check-wide rounded-3 ms-1" aria-label="Enregistrer">✓</button>
+                        </div>
+                        <div class="form-text">Format: YYYY-MM-DD.</div>
+                      </div>
+                    </div>
+                  </div>
 
-              <div class="row g-3 align-items-end">
-                <div class="col-12 col-md-4">
-                  <label for="oscar_date_year" class="form-label">Année</label>
-                  <select class="form-select" id="oscar_date_year"></select>
-                  <div class="form-text">Basé sur les années présentes dans les films.</div>
-                </div>
-                <div class="col-12 col-md-4">
-                  <label for="oscar_date_value" class="form-label">Date</label>
-                  <input type="date" class="form-control" id="oscar_date_value">
-                  <div class="form-text">Format: YYYY-MM-DD.</div>
-                </div>
-                <div class="col-12 col-md-4 d-flex gap-2 justify-content-end">
-                  <button type="button" id="clear-oscar-date" class="btn btn-outline-danger w-100">Effacer</button>
-                  <button type="button" id="save-oscar-date" class="btn btn-warning w-100">Enregistrer</button>
+                  <div class="mt-3">
+                    <div class="text-muted small mb-1">Dates configurées</div>
+                    <div id="oscar-date-current" class="border rounded bg-white oscar-date-current">—</div>
+                  </div>
                 </div>
               </div>
 
-              <div class="mt-3">
-                <div class="text-muted small mb-1">Dates configurées</div>
-                <div id="oscar-date-current" class="border rounded p-2 bg-white">—</div>
-              </div>
-            </div>
-          </div>
+              <div class="col-12 col-xxl-6">
+                <div class="border rounded p-3 bg-light h-100">
+                  <div class="text-muted small mb-3">
+                    Configure les points attribués pour les films regardés et les bonnes réponses aux Oscars.
+                  </div>
 
-          <!-- Points configuration -->
-          <div class="tab-pane fade" id="admin-settings-pane-points" role="tabpanel" aria-labelledby="admin-settings-subtab-points" tabindex="0">
-            <div class="border rounded p-3 bg-light">
-              <div class="text-muted small mb-3">
-                Configure les points attribués pour les films regardés et les bonnes réponses aux Oscars.
-              </div>
+                  <div id="points-config-alert" class="alert d-none" role="alert"></div>
 
-              <div id="points-config-alert" class="alert d-none" role="alert"></div>
+                  <div class="row g-3">
+                    <div class="col-12">
+                      <label for="points-per-movie" class="form-label">Points par film regardé</label>
+                      <input type="number" class="form-control points-input-half" id="points-per-movie" min="0" step="1" value="1">
+                      <div class="form-text">Points attribués pour chaque film complété.</div>
+                    </div>
+                    <div class="col-12">
+                      <label for="points-per-correct-pick" class="form-label">Points par bonne réponse</label>
+                      <input type="number" class="form-control points-input-half" id="points-per-correct-pick" min="0" step="1" value="1">
+                      <div class="form-text">Points attribués pour chaque bonne réponse aux Oscars.</div>
+                    </div>
+                  </div>
 
-              <div class="row g-3">
-                <div class="col-12 col-md-6">
-                  <label for="points-per-movie" class="form-label">Points par film regardé</label>
-                  <input type="number" class="form-control" id="points-per-movie" min="0" step="1" value="1">
-                  <div class="form-text">Points attribués pour chaque film complété.</div>
-                </div>
-                <div class="col-12 col-md-6">
-                  <label for="points-per-correct-pick" class="form-label">Points par bonne réponse</label>
-                  <input type="number" class="form-control" id="points-per-correct-pick" min="0" step="1" value="1">
-                  <div class="form-text">Points attribués pour chaque bonne réponse aux Oscars.</div>
-                </div>
-              </div>
+                  <div class="mt-3">
+                    <div class="d-flex gap-2">
+                      <button type="button" id="points-config-reload" class="btn btn-outline-secondary btn-compact">Recharger</button>
+                      <button type="button" id="points-config-save" class="btn btn-warning btn-compact">Enregistrer</button>
+                    </div>
+                  </div>
 
-              <div class="mt-3">
-                <div class="d-flex gap-2">
-                  <button type="button" id="points-config-reload" class="btn btn-outline-secondary">Recharger</button>
-                  <button type="button" id="points-config-save" class="btn btn-warning">Enregistrer</button>
-                </div>
-              </div>
-
-              <div class="mt-3">
-                <div class="text-muted small mb-1">Calcul des points</div>
-                <div class="border rounded p-2 bg-white">
-                  <div class="small">
-                    <strong>Total =</strong> (Films regardés × <span id="points-per-movie-preview">1</span>) + (Bonnes réponses × <span id="points-per-correct-pick-preview">1</span>)
+                  <div class="mt-3">
+                    <div class="text-muted small mb-1">Calcul des points</div>
+                    <div class="border rounded p-2 bg-white">
+                      <div class="small">
+                        <strong>Total =</strong> (Films regardés × <span id="points-per-movie-preview">1</span>) + (Bonnes réponses × <span id="points-per-correct-pick-preview">1</span>)
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -267,8 +426,7 @@
               </div>
 
               <div class="d-flex gap-2">
-                <button type="button" id="visibility-config-reload" class="btn btn-outline-secondary">Recharger</button>
-                <button type="button" id="visibility-config-save" class="btn btn-warning">Enregistrer</button>
+                <button type="button" id="visibility-config-save" class="btn btn-warning btn-compact">Enregistrer</button>
               </div>
             </div>
           </div>
@@ -279,125 +437,46 @@
     <div class="tab-pane fade" id="admin-version" role="tabpanel" aria-labelledby="admin-version-tab">
       <div class="card p-3">
         <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
-          <div>
-            <h4 class="mb-1">Version</h4>
-            <div class="text-muted">Contrôle la version affichée dans le footer (stockée en DB).</div>
+          <div class="info-line small text-muted">
+            <span class="badge bg-light text-dark border" aria-hidden="true">i</span>
+            <span class="info-text">Contrôle la version affichée dans le footer (stockée en DB). Clique sur ✓ pour activer une version, puis vérifie l’aperçu.</span>
           </div>
         </div>
 
         <div id="app_version_alert" class="alert d-none mt-3 mb-0" role="alert"></div>
 
-        <ul class="nav nav-pills admin-subtabs mt-3" id="adminVersionSubTabs" role="tablist">
-          <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="admin-version-subtab-active" data-bs-toggle="tab" data-bs-target="#admin-version-pane-active" type="button" role="tab" aria-controls="admin-version-pane-active" aria-selected="true">
-              Active
-            </button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="admin-version-subtab-history" data-bs-toggle="tab" data-bs-target="#admin-version-pane-history" type="button" role="tab" aria-controls="admin-version-pane-history" aria-selected="false">
-              Historique
-            </button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="admin-version-subtab-create" data-bs-toggle="tab" data-bs-target="#admin-version-pane-create" type="button" role="tab" aria-controls="admin-version-pane-create" aria-selected="false">
-              Nouvelle version
-            </button>
-          </li>
-        </ul>
-
-        <div class="tab-content pt-3">
-          <!-- Active -->
-          <div class="tab-pane fade show active" id="admin-version-pane-active" role="tabpanel" aria-labelledby="admin-version-subtab-active" tabindex="0">
+        <div class="pt-3">
             <div class="row g-3">
               <div class="col-12 col-xxl-7">
-                <div class="border rounded p-3 bg-light">
-                  <div class="fw-semibold mb-1">Version active</div>
-                  <div class="text-muted small mb-3">
-                    Met à jour ce que les utilisateurs voient dans le footer.
-                  </div>
-
-                  <label for="app_version_active_select" class="form-label">Choisir une version</label>
-                  <div class="row g-2 align-items-end">
-                    <div class="col-12 col-lg-8">
-                      <select id="app_version_active_select" class="form-select"></select>
-                      <div class="form-text">La liste vient de l’historique stocké en DB.</div>
-                    </div>
-                    <div class="col-12 col-lg-4 d-flex gap-2">
-                      <button type="button" id="app_version_reload" class="btn btn-outline-secondary w-100">Recharger</button>
-                      <button type="button" id="app_version_set_active" class="btn btn-warning w-100">Activer</button>
-                    </div>
-                  </div>
-
-                  <div class="mt-3">
-                    <div class="text-muted small mb-1">Aperçu (footer)</div>
-                    <div id="app_version_preview" class="border rounded p-2 bg-white app-version-preview">—</div>
-                  </div>
-                </div>
+                <div id="app_version_list" class="border rounded bg-white app-version-list">—</div>
               </div>
 
               <div class="col-12 col-xxl-5">
-                <div class="border rounded p-3 bg-white">
-                  <div class="fw-semibold mb-2">Bon à savoir</div>
-                  <ul class="mb-0 text-muted">
-                    <li>“Recharger” relit l’historique depuis l’API.</li>
-                    <li>“Activer” change la version active en DB.</li>
-                    <li>Le footer lit ensuite la version via <code>/api/version</code>.</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- History -->
-          <div class="tab-pane fade" id="admin-version-pane-history" role="tabpanel" aria-labelledby="admin-version-subtab-history" tabindex="0">
-            <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
-              <div>
-                <div class="fw-semibold">Historique</div>
-                <div class="text-muted small">Supprime les entrées obsolètes si besoin.</div>
-              </div>
-            </div>
-            <div id="app_version_list" class="border rounded bg-white app-version-list">—</div>
-          </div>
-
-          <!-- Create -->
-          <div class="tab-pane fade" id="admin-version-pane-create" role="tabpanel" aria-labelledby="admin-version-subtab-create" tabindex="0">
-            <div class="row g-3">
-              <div class="col-12 col-xxl-7">
-                <div class="border rounded p-3 bg-light">
+                <div class="border rounded p-3 bg-light app-version-create">
                   <div class="fw-semibold mb-1">Créer une nouvelle version</div>
                   <div class="text-muted small mb-3">
                     Ajoute une entrée dans l’historique (tu peux l’activer immédiatement).
                   </div>
 
                   <div class="row g-3">
-                    <div class="col-12 col-md-4">
+                    <div class="col-12 col-md-5">
                       <label for="app_version_new_version" class="form-label">Version</label>
                       <input id="app_version_new_version" type="text" class="form-control" placeholder="ex: 1.0.1" maxlength="80">
                       <div class="form-text">Ex: <code>1.2.3</code></div>
                     </div>
-                    <div class="col-12 col-md-8">
+                    <div class="col-12 col-md-7">
                       <label for="app_version_new_message" class="form-label">Message (optionnel)</label>
                       <input id="app_version_new_message" type="text" class="form-control" placeholder="ex: Hotfix login" maxlength="500">
                       <div class="form-text">Court &amp; lisible (affiché dans le footer).</div>
                     </div>
                     <div class="col-12 d-flex flex-wrap justify-content-end gap-2">
-                      <button type="button" id="app_version_create" class="btn btn-primary">Créer</button>
-                      <button type="button" id="app_version_create_and_activate" class="btn btn-warning">Créer &amp; activer</button>
+                      <button type="button" id="app_version_create" class="btn btn-primary btn-compact">Créer</button>
+                      <button type="button" id="app_version_create_and_activate" class="btn btn-warning btn-compact">Créer &amp; activer</button>
                     </div>
                   </div>
                 </div>
               </div>
-
-              <div class="col-12 col-xxl-5">
-                <div class="border rounded p-3 bg-white">
-                  <div class="fw-semibold mb-2">Astuce</div>
-                  <div class="text-muted">
-                    Après création, va dans l’onglet “Active” pour vérifier l’aperçu du footer.
-                  </div>
-                </div>
-              </div>
             </div>
-          </div>
         </div>
       </div>
     </div>
@@ -405,28 +484,15 @@
     <div class="tab-pane fade" id="admin-modal-100" role="tabpanel" aria-labelledby="admin-modal-100-tab">
       <div class="card p-3">
         <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
-          <div>
-            <h4 class="mb-1">Modal 100%</h4>
-            <div class="text-muted">Contenu affiché quand un utilisateur a vu 100% des films.</div>
+          <div class="info-line small text-muted">
+            <span class="badge bg-light text-dark border" aria-hidden="true">i</span>
+            <span class="info-text">Contenu affiché quand un utilisateur a vu 100% des films.</span>
           </div>
         </div>
 
-        <ul class="nav nav-pills admin-subtabs mt-3" id="adminCompletionModalSubTabs" role="tablist">
-          <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="admin-modal-100-subtab-edit" data-bs-toggle="tab" data-bs-target="#admin-modal-100-pane-edit" type="button" role="tab" aria-controls="admin-modal-100-pane-edit" aria-selected="true">
-              Éditer
-            </button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="admin-modal-100-subtab-help" data-bs-toggle="tab" data-bs-target="#admin-modal-100-pane-help" type="button" role="tab" aria-controls="admin-modal-100-pane-help" aria-selected="false">
-              Aide
-            </button>
-          </li>
-        </ul>
-
-        <div class="tab-content pt-3">
+        <div class="pt-3">
           <!-- Edit + Live preview side-by-side -->
-          <div class="tab-pane fade show active" id="admin-modal-100-pane-edit" role="tabpanel" aria-labelledby="admin-modal-100-subtab-edit" tabindex="0">
+          <div>
             <div class="row g-3">
               <div class="col-12 col-xxl-7">
                 <div class="border rounded p-3 bg-light h-100">
@@ -461,56 +527,32 @@
                   </div>
 
                   <div class="d-flex flex-wrap justify-content-end gap-2">
-                    <button type="button" id="completion_modal_reload" class="btn btn-outline-secondary">Recharger</button>
-                    <button type="button" id="completion_modal_save" class="btn btn-warning">Enregistrer</button>
+                    <button type="button" id="completion_modal_save" class="btn btn-warning btn-compact">Enregistrer</button>
                   </div>
                 </div>
               </div>
 
               <div class="col-12 col-xxl-5">
-                <div class="border rounded p-3 bg-white h-100">
-                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                    <div class="fw-semibold">Aperçu</div>
-                  </div>
-                  <div class="text-muted small mb-3">Aperçu live (non sauvegardé).</div>
-
-                  <div class="border rounded p-3 bg-light">
-                    <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
-                      <div class="fw-semibold" id="completion_modal_preview_title">—</div>
-                    </div>
-                    <div id="completion_modal_preview_custom" class="text-start d-none"></div>
-                    <div id="completion_modal_preview_text" class="text-start" style="white-space: pre-wrap;"></div>
-
-                    <div class="mt-3">
-                      <video id="completion_modal_preview_video" width="75%" controls class="d-none">
-                        <source id="completion_modal_preview_video_source" src="" type="video/mp4">
-                        Votre navigateur ne supporte pas la vidéo.
-                      </video>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Help -->
-          <div class="tab-pane fade" id="admin-modal-100-pane-help" role="tabpanel" aria-labelledby="admin-modal-100-subtab-help" tabindex="0">
-            <div class="row g-3">
-              <div class="col-12 col-xxl-8">
-                <div class="border rounded p-3 bg-white">
-                  <div class="fw-semibold mb-2">Règles</div>
-                  <ul class="mb-0 text-muted">
-                    <li><strong>Texte</strong>: affiché tel quel (safe), retours à la ligne conservés.</li>
-                    <li><strong>HTML</strong>: le serveur retire les <code>&lt;script&gt;</code> et les attributs <code>on*</code>.</li>
-                    <li><strong>Vidéo</strong>: accepte un chemin relatif (ex: <code>video/reward.mp4</code>) ou une URL complète.</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="col-12 col-xxl-4">
                 <div class="border rounded p-3 bg-light">
-                  <div class="fw-semibold mb-2">Astuce</div>
-                  <div class="text-muted">
-                    Si tu utilises du HTML, préfère des tags simples (<code>&lt;p&gt;</code>, <code>&lt;a&gt;</code>, <code>&lt;strong&gt;</code>) pour éviter des surprises d’affichage.
+                  <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
+                    <div class="fw-semibold" id="completion_modal_preview_title">—</div>
+                  </div>
+                  <div id="completion_modal_preview_custom" class="text-start d-none"></div>
+                  <div id="completion_modal_preview_text" class="text-start" style="white-space: pre-wrap;"></div>
+
+                  <div class="mt-3">
+                    <video id="completion_modal_preview_video" width="55%" controls class="d-none">
+                      <source id="completion_modal_preview_video_source" src="" type="video/mp4">
+                      Votre navigateur ne supporte pas la vidéo.
+                    </video>
+                  </div>
+
+                  <div class="border rounded p-3 bg-white mt-3">
+                    <ul class="mb-0 text-muted">
+                      <li><strong>Texte</strong>: affiché tel quel (safe), retours à la ligne conservés.</li>
+                      <li><strong>HTML</strong>: le serveur retire les <code>&lt;script&gt;</code> et les attributs <code>on*</code>.</li>
+                      <li><strong>Vidéo</strong>: accepte un chemin relatif (ex: <code>video/reward.mp4</code>) ou une URL complète.</li>
+                    </ul>
                   </div>
                 </div>
               </div>
@@ -525,15 +567,13 @@
         <div class="col-12">
           <div class="card p-3">
             <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
-              <div>
-                <h4 class="mb-1">Liste des utilisateurs</h4>
-                <div class="text-muted">
-                  <span id="admin-users-count">—</span> utilisateur(s)
-                </div>
+              <div class="info-line small text-muted">
+                <span class="badge bg-light text-dark border" aria-hidden="true">i</span>
+                <span class="info-text"><span id="admin-users-count">—</span> utilisateur(s)</span>
               </div>
               <div class="d-flex gap-2">
-                <button type="button" id="open-add-user-modal" class="btn btn-warning btn-sm">Ajouter un utilisateur</button>
-                <button type="button" id="refresh-users" class="btn btn-outline-primary btn-sm">Rafraîchir</button>
+                <button type="button" id="open-add-user-modal" class="btn btn-warning btn-sm btn-compact">Ajouter un utilisateur</button>
+                <button type="button" id="refresh-users" class="btn btn-outline-primary btn-sm btn-compact">Rafraîchir</button>
               </div>
             </div>
 
@@ -559,63 +599,53 @@
 
     <div class="tab-pane fade" id="admin-movies" role="tabpanel" aria-labelledby="admin-movies-tab">
       <div class="card p-3">
-        <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
-          <div>
-            <h4 class="mb-1">Films</h4>
-            <div class="text-muted">Gestion et ajout des films (par année).</div>
+        <div class="admin-movies-add">
+          <div class="info-line small text-muted mb-3">
+            <span class="badge bg-light text-dark border" aria-hidden="true">i</span>
+            <span class="info-text">Ajout de films : cette section récupère automatiquement les infos du film via l’<code>imdb_id</code> (OMDb).</span>
+          </div>
+
+          <form id="add-movie-form">
+            <div class="row g-3">
+              <div class="col-12 col-md-4">
+                <label for="oscar_year" class="form-label">Oscar year</label>
+                <input type="number" class="form-control" id="oscar_year" placeholder="2026" min="1900" max="3000" required>
+                <div class="form-text">Sépare films &amp; stats par année.</div>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="imdb_id" class="form-label">IMDB ID</label>
+                <input type="text" class="form-control" id="imdb_id" placeholder="tt1234567" required>
+              </div>
+              <div class="col-12 col-md-4">
+                <label for="category" class="form-label">Catégorie</label>
+                <input type="text" class="form-control" id="category" placeholder="Best Picture, etc." required>
+              </div>
+              <div class="col-12 d-flex flex-wrap justify-content-end gap-2">
+                <button type="submit" class="btn btn-primary btn-compact">Ajouter</button>
+              </div>
+            </div>
+          </form>
+        </div>
+
+        <div class="admin-movies-separator"></div>
+
+        <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 admin-movies-meta">
+          <div class="text-muted small">
+            <span id="admin-movies-table-count"></span>
           </div>
         </div>
 
-        <ul class="nav nav-pills admin-subtabs mt-3" id="adminMoviesSubTabs" role="tablist">
-          <li class="nav-item" role="presentation">
-            <button class="nav-link active" id="admin-movies-subtab-manage" data-bs-toggle="tab" data-bs-target="#admin-movies-pane-manage" type="button" role="tab" aria-controls="admin-movies-pane-manage" aria-selected="true">
-              Gérer
-            </button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="admin-movies-subtab-add" data-bs-toggle="tab" data-bs-target="#admin-movies-pane-add" type="button" role="tab" aria-controls="admin-movies-pane-add" aria-selected="false">
-              Ajouter
-            </button>
-          </li>
-          <li class="nav-item" role="presentation">
-            <button class="nav-link" id="admin-movies-subtab-help" data-bs-toggle="tab" data-bs-target="#admin-movies-pane-help" type="button" role="tab" aria-controls="admin-movies-pane-help" aria-selected="false">
-              Aide
-            </button>
-          </li>
-        </ul>
-
-        <div class="tab-content pt-3">
-          <!-- Manage -->
-          <div class="tab-pane fade show active" id="admin-movies-pane-manage" role="tabpanel" aria-labelledby="admin-movies-subtab-manage" tabindex="0">
-            <div class="d-flex flex-wrap align-items-end justify-content-between gap-2 mb-2">
-              <div>
-                <h5 class="mb-1">Gérer les films</h5>
-                <div class="text-muted">Filtre, sélection et suppression en lot.</div>
-              </div>
-              <div class="text-muted small">
-                <span id="admin-movies-table-count">—</span>
-              </div>
-            </div>
-
-            <div class="row g-2 align-items-end">
+        <div class="row g-2 align-items-end">
               <div class="col-12 col-md-4 col-xl-3">
-                <label for="manage_year" class="form-label">Oscar year</label>
-                <select id="manage_year" class="form-select">
+                <label for="manage_year" class="form-label visually-hidden">Oscar year</label>
+                <select id="manage_year" class="form-select manage-year-select">
                   <option value="">Toutes</option>
                 </select>
               </div>
 
-              <div class="col-12 col-md-8 col-xl-5">
-                <label for="admin_movies_search" class="form-label">Recherche</label>
-                <div class="input-group">
-                  <input type="text" class="form-control" id="admin_movies_search" placeholder="Titre, IMDB ID, catégorie…" autocomplete="off">
-                  <button type="button" class="btn btn-outline-secondary" id="admin_movies_clear_search">Effacer</button>
-                </div>
-              </div>
-
-              <div class="col-12 col-xl-4 d-flex gap-2">
-                <button type="button" id="refresh-movies" class="btn btn-outline-primary w-100">Rafraîchir</button>
-                <button type="button" id="delete-selected" class="btn btn-danger w-100" disabled>Supprimer</button>
+              <div class="col-12 col-md-8 col-xl-9 d-flex gap-2 justify-content-end">
+                <button type="button" id="refresh-movies" class="btn btn-outline-primary btn-compact">Rafraîchir</button>
+                <button type="button" id="delete-selected" class="btn btn-danger btn-compact" disabled>Supprimer</button>
               </div>
 
               <div class="col-12">
@@ -647,149 +677,15 @@
                 </tbody>
               </table>
             </div>
-          </div>
-
-          <!-- Add -->
-          <div class="tab-pane fade" id="admin-movies-pane-add" role="tabpanel" aria-labelledby="admin-movies-subtab-add" tabindex="0">
-            <h5 class="mb-2">Ajouter un film</h5>
-            <div class="text-muted mb-3">
-              Le serveur récupère automatiquement titre/plot/poster via OMDb avec l’<code>imdb_id</code>.
-            </div>
-
-            <form id="add-movie-form">
-              <div class="row g-3">
-                <div class="col-12 col-md-4">
-                  <label for="oscar_year" class="form-label">Oscar year</label>
-                  <input type="number" class="form-control" id="oscar_year" placeholder="2026" min="1900" max="3000" required>
-                  <div class="form-text">Sépare films &amp; stats par année.</div>
-                </div>
-                <div class="col-12 col-md-4">
-                  <label for="imdb_id" class="form-label">IMDB ID</label>
-                  <input type="text" class="form-control" id="imdb_id" placeholder="tt1234567" required>
-                </div>
-                <div class="col-12 col-md-4">
-                  <label for="category" class="form-label">Catégorie</label>
-                  <input type="text" class="form-control" id="category" placeholder="Best Picture, etc." required>
-                </div>
-                <div class="col-12 col-md-4 d-flex align-items-end">
-                  <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="cam_flag">
-                    <label class="form-check-label" for="cam_flag">Tag CAM</label>
-                  </div>
-                </div>
-
-                <div class="col-12">
-                  <div class="accordion" id="adminAddMovieAccordion">
-                    <div class="accordion-item">
-                      <h2 class="accordion-header" id="adminAddMovieHeadingPlayer">
-                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#adminAddMovieCollapsePlayer" aria-expanded="true" aria-controls="adminAddMovieCollapsePlayer">
-                          Source vidéo / Player
-                        </button>
-                      </h2>
-                      <div id="adminAddMovieCollapsePlayer" class="accordion-collapse collapse show" aria-labelledby="adminAddMovieHeadingPlayer" data-bs-parent="#adminAddMovieAccordion">
-                        <div class="accordion-body">
-                          <div class="row g-2">
-                            <div class="col-12 col-lg-4">
-                              <label for="player_mode" class="form-label">Mode</label>
-                              <select id="player_mode" class="form-select">
-                                <option value="auto" selected>Auto</option>
-                                <option value="video">Video</option>
-                                <option value="embed">Embed</option>
-                              </select>
-                              <div class="form-text">Auto = video_src → embed_src → vod_link.</div>
-                            </div>
-                            <div class="col-12 col-lg-8">
-                              <label for="video_src" class="form-label">Video URL (mp4/webm/m3u8)</label>
-                              <input type="text" class="form-control" id="video_src" placeholder="https://.../movie.mp4 or .../playlist.m3u8">
-                              <div class="form-text">Si <code>video_file</code> est fourni et que ce champ est vide, la lecture utilisera <code>/api/video/&lt;movieId&gt;</code>.</div>
-                            </div>
-                            <div class="col-12">
-                              <label for="video_file" class="form-label">Server video file (optionnel)</label>
-                              <input type="text" class="form-control font-monospace" id="video_file" placeholder="my_movie.mp4 or 2026/my_movie.mp4">
-                              <div class="form-text">Chemin relatif sous <code>VIDEO_FILES_DIR</code> (défaut: <code>public/video</code>).</div>
-                            </div>
-                            <div class="col-12">
-                              <label for="video_file_low" class="form-label">Server video file (basse qualité, optionnel)</label>
-                              <input type="text" class="form-control font-monospace" id="video_file_low" placeholder="LOW/my_movie.LOW.mp4">
-                              <div class="form-text">Chemin relatif sous <code>VIDEO_FILES_DIR</code>. Ex: <code>LOW/123.LOW.mp4</code>.</div>
-                            </div>
-                            <div class="col-12">
-                              <label for="subtitle_file" class="form-label">Sous-titres (SRT, optionnel)</label>
-                              <input type="file" class="form-control" id="subtitle_file" accept=".srt,.vtt,text/plain,text/vtt">
-                              <div class="form-text">Upload d'un fichier <code>.srt</code> (converti en VTT serveur, interne uniquement).</div>
-                            </div>
-                            <div class="col-12 col-lg-4">
-                              <label for="subtitle_lang" class="form-label">Langue (ex: fr, en)</label>
-                              <input type="text" class="form-control" id="subtitle_lang" placeholder="fr">
-                            </div>
-                            <div class="col-12 col-lg-4">
-                              <label for="subtitle_label" class="form-label">Label (affiché)</label>
-                              <input type="text" class="form-control" id="subtitle_label" placeholder="Français">
-                            </div>
-                            <div class="col-12 col-lg-4 d-flex align-items-end">
-                              <div class="form-check">
-                                <input class="form-check-input" type="checkbox" id="subtitle_default">
-                                <label class="form-check-label" for="subtitle_default">Par défaut</label>
-                              </div>
-                            </div>
-                            <div class="col-12">
-                              <label for="embed_src" class="form-label">Embed URL ou iframe</label>
-                              <textarea class="form-control font-monospace" id="embed_src" rows="3" placeholder="https://... OR <iframe src='...'></iframe>"></textarea>
-                            </div>
-                            <div class="col-12">
-                              <label for="vod_link" class="form-label">Legacy VOD link (optionnel)</label>
-                              <input type="text" class="form-control" id="vod_link" placeholder="https://...">
-                              <div class="form-text">Compat. Préfère <code>video_src</code> / <code>embed_src</code>.</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="col-12 d-flex flex-wrap justify-content-end gap-2">
-                  <button type="button" id="reset-form" class="btn btn-outline-secondary">Reset</button>
-                  <button type="submit" class="btn btn-primary">Ajouter</button>
-                </div>
-              </div>
-            </form>
-          </div>
-
-          <!-- Help -->
-          <div class="tab-pane fade" id="admin-movies-pane-help" role="tabpanel" aria-labelledby="admin-movies-subtab-help" tabindex="0">
-            <div class="row g-3">
-              <div class="col-12 col-xxl-8">
-                <div class="border rounded p-3 bg-light">
-                  <div class="fw-semibold mb-2">Notes rapides</div>
-                  <ul class="mb-0">
-                    <li><strong>Auto</strong>: utilise <code>video_src</code> → <code>embed_src</code> → <code>vod_link</code>.</li>
-                    <li><strong>Server file</strong>: mets <code>video_file</code> (chemin relatif sous <code>public/video</code>).</li>
-                    <li><strong>Low quality</strong>: mets <code>video_file_low</code> (ex: <code>LOW/mon_film.LOW.mp4</code>).</li>
-                    <li><strong>Édition</strong>: le bouton “Éditer” ouvre une modale avec des onglets Info / Player.</li>
-                  </ul>
-                </div>
-              </div>
-              <div class="col-12 col-xxl-4">
-                <div class="border rounded p-3 bg-white">
-                  <div class="fw-semibold mb-2">Astuce</div>
-                  <div class="text-muted">
-                    Dans “Gérer”, la recherche filtre la table localement (sans requête API). Le “Tout sélectionner” ne coche que les lignes visibles.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
     </div>
 
     <div class="tab-pane fade" id="admin-backup" role="tabpanel" aria-labelledby="admin-backup-tab">
       <div class="card p-3">
         <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
-          <div>
-            <h4 class="mb-1">Backup / Restore</h4>
-            <div class="text-muted">Sauvegarde et restauration de la base MongoDB.</div>
+          <div class="info-line small text-muted">
+            <span class="badge bg-light text-dark border" aria-hidden="true">i</span>
+            <span class="info-text">Sauvegarde et restauration de la base MongoDB.</span>
           </div>
         </div>
 
@@ -820,8 +716,8 @@
                 <div class="text-muted small">Format <code>.ndjson.gz</code>, stocké sur le serveur.</div>
               </div>
               <div class="d-flex flex-wrap gap-2">
-                <button type="button" id="db-backup-create" class="btn btn-warning">Créer une sauvegarde</button>
-                <button type="button" id="db-backup-refresh" class="btn btn-outline-secondary">Rafraîchir</button>
+                <button type="button" id="db-backup-create" class="btn btn-warning btn-compact">Créer une sauvegarde</button>
+                <button type="button" id="db-backup-refresh" class="btn btn-outline-secondary btn-compact">Rafraîchir</button>
               </div>
             </div>
 
@@ -869,7 +765,7 @@
                   </div>
 
                   <div class="d-flex flex-wrap justify-content-end gap-2">
-                    <button type="button" id="db-restore-run" class="btn btn-danger">Restaurer</button>
+                    <button type="button" id="db-restore-run" class="btn btn-danger btn-compact">Restaurer</button>
                   </div>
 
                   <div id="db-restore-result" class="small text-muted mt-3"></div>
@@ -917,9 +813,9 @@
     <div class="tab-pane fade" id="admin-categories" role="tabpanel" aria-labelledby="admin-categories-tab">
       <div class="card p-3">
         <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
-          <div>
-            <h4 class="mb-1">Catégories Oscars</h4>
-            <div class="text-muted">Créez et gérez les catégories manuellement.</div>
+          <div class="info-line small text-muted">
+            <span class="badge bg-light text-dark border" aria-hidden="true">i</span>
+            <span class="info-text">Créez et gérez les catégories manuellement.</span>
           </div>
         </div>
 
@@ -1024,9 +920,9 @@
     <div class="tab-pane fade" id="admin-winners" role="tabpanel" aria-labelledby="admin-winners-tab">
       <div class="card p-3">
         <div class="d-flex flex-wrap align-items-end justify-content-between gap-2">
-          <div>
-            <h4 class="mb-1">Gagnants</h4>
-            <div class="text-muted">Définis un ou plusieurs gagnants par année (égalité possible).</div>
+          <div class="info-line small text-muted">
+            <span class="badge bg-light text-dark border" aria-hidden="true">i</span>
+            <span class="info-text">Définis un ou plusieurs gagnants par année (égalité possible).</span>
           </div>
         </div>
 
@@ -1075,9 +971,9 @@
                   </div>
 
                   <div class="d-flex flex-wrap justify-content-end gap-2 mt-3">
-                    <button type="button" id="winner_reload" class="btn btn-outline-secondary">Recharger</button>
-                    <button type="button" id="winner_clear" class="btn btn-outline-danger">Tout supprimer</button>
-                    <button type="button" id="winner_save" class="btn btn-warning">Ajouter</button>
+                    <button type="button" id="winner_reload" class="btn btn-outline-secondary btn-compact">Recharger</button>
+                    <button type="button" id="winner_clear" class="btn btn-outline-danger btn-compact">Tout supprimer</button>
+                    <button type="button" id="winner_save" class="btn btn-warning btn-compact">Ajouter</button>
                   </div>
                 </div>
               </div>
@@ -1156,8 +1052,8 @@
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
-        <button type="button" class="btn btn-danger" id="confirm-reset-user-password">Générer</button>
+        <button type="button" class="btn btn-outline-secondary btn-compact" data-bs-dismiss="modal">Fermer</button>
+        <button type="button" class="btn btn-danger btn-compact" id="confirm-reset-user-password">Générer</button>
       </div>
     </div>
   </div>
@@ -1193,8 +1089,8 @@
         <div id="delete-user-modal-response" class="alert d-none mt-3" role="alert"></div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
-        <button type="button" class="btn btn-danger" id="confirm-delete-user" disabled>Supprimer</button>
+        <button type="button" class="btn btn-outline-secondary btn-compact" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-danger btn-compact" id="confirm-delete-user" disabled>Supprimer</button>
       </div>
     </div>
   </div>
