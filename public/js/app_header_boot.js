@@ -42,10 +42,7 @@
   }
 
   const name = decoded.name || '';
-  const maxNameLength = 15;
-  const displayName = name.length > maxNameLength
-    ? name.slice(0, Math.max(0, maxNameLength - 3)) + '...'
-    : name;
+  const displayName = name;
   const nameTargets = document.querySelectorAll('[data-user-name]');
   if (nameTargets.length) {
     nameTargets.forEach((el) => {

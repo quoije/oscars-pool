@@ -750,27 +750,46 @@ footer {
       padding-top: 0.85rem;
       /* Mobile divider between nav buttons and user row */
       border-top: 1px solid rgba(255, 255, 255, 0.18);
-      flex-wrap: wrap;
-      justify-content: space-between;
     }
 
     .navbar-custom .navbar-user-name-mobile {
-      max-width: 42vw;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      padding-right: 0.75rem;
-      margin-right: 0.75rem !important; /* extra gap before hamburger */
-      border-right: 1px solid rgba(255, 255, 255, 0.18);
+      display: none;
     }
 
-    /* Avoid showing the username twice when the menu is open */
+    .navbar-custom .navbar-user {
+      display: grid !important;
+      grid-template-columns: auto 1fr auto;
+      grid-template-areas: "toggle name logout";
+      align-items: center;
+      align-content: center;
+      justify-content: stretch;
+      justify-items: stretch;
+      column-gap: 0.5rem;
+    }
+
     .navbar-custom .navbar-user #user-name {
-      display: none;
+      display: inline-flex;
+      min-width: 0;
+      width: 100%;
+      max-width: 45vw;
+      font-size: clamp(0.75rem, 3.2vw, 0.95rem);
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      justify-self: stretch;
+      grid-area: name;
     }
 
     .navbar-custom .navbar-user .theme-toggle {
       margin-right: 0 !important;
+      justify-self: start;
+      grid-area: toggle;
+    }
+
+    .navbar-custom .navbar-user #log-off {
+      justify-self: end;
+      grid-area: logout;
     }
   }
 
