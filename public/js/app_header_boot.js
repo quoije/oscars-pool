@@ -42,15 +42,19 @@
   }
 
   const name = decoded.name || '';
+  const maxNameLength = 15;
+  const displayName = name.length > maxNameLength
+    ? name.slice(0, Math.max(0, maxNameLength - 3)) + '...'
+    : name;
   const nameTargets = document.querySelectorAll('[data-user-name]');
   if (nameTargets.length) {
     nameTargets.forEach((el) => {
-      if (el && !el.textContent) el.textContent = name;
+      if (el && !el.textContent) el.textContent = displayName;
     });
   } else {
     const nameEl = document.getElementById('user-name');
     if (nameEl && !nameEl.textContent) {
-      nameEl.textContent = name;
+      nameEl.textContent = displayName;
     }
   }
 
