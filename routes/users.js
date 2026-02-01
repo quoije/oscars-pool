@@ -128,6 +128,90 @@ async function getOrInitActiveYear() {
   return year;
 }
 
+// ============================================================================
+// FIRST-TIME SETUP ENDPOINTS
+// These allow creating the first admin user when the database is empty/new
+// ============================================================================
+
+// Check if the app needs initial setup (no admin users exist)
+router.get("/setup/status", async (req, res) => {
+  try {
+    const totalUsers = await User.countDocuments({});
+    const adminCount = await User.countDocuments({ role: 69 });
+
+    res.set("Cache-Control", "no-store");
+    return res.status(200).json({
+      needsSetup: adminCount === 0,
+      hasUsers: totalUsers > 0,
+      hasAdmin: adminCount > 0,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Create the first admin user (only works if no admin exists)
+router.post("/setup/admin", async (req, res) => {
+  try {
+    // Check if an admin already exists
+    const adminCount = await User.countDocuments({ role: 69 });
+    if (adminCount > 0) {
+      return res.status(403).json({
+        message: "Un administrateur existe déjà. Cette fonctionnalité est désactivée.",
+      });
+    }
+
+    const { name, email, password } = req.body;
+
+    // Validate input
+    const nameNorm = typeof name === "string" ? name.trim() : "";
+    const emailNorm = typeof email === "string" ? email.trim().toLowerCase() : "";
+
+    if (!nameNorm) {
+      return res.status(400).json({ message: "Le nom est obligatoire" });
+    }
+    if (!emailNorm) {
+      return res.status(400).json({ message: "L'email est obligatoire" });
+    }
+    if (!/^\S+@\S+\.\S+$/.test(emailNorm)) {
+      return res.status(400).json({ message: "Email invalide" });
+    }
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: "Le mot de passe doit contenir au moins 6 caractères" });
+    }
+
+    // Check if email is already taken
+    const existing = await User.findOne({ email: emailNorm });
+    if (existing) {
+      return res.status(409).json({ message: "Cet email est déjà utilisé" });
+    }
+
+    // Create the admin user
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const adminUser = new User({
+      name: nameNorm,
+      email: emailNorm,
+      password: hashedPassword,
+      role: 69, // Admin role
+      mustChangePassword: false,
+    });
+
+    await adminUser.save();
+
+    console.log(`[setup] First admin user created: ${emailNorm}`);
+
+    // Return a token so the admin is logged in immediately
+    const token = signUserToken(adminUser);
+
+    return res.status(201).json({
+      message: "Administrateur créé avec succès",
+      token,
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
 // Get user stats with watched movie titles and details from the movies collection
 router.get("/stats", verifyToken, async (req, res) => {
   try {

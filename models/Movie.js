@@ -5,6 +5,7 @@ const movieSchema = new mongoose.Schema({
   title: { type: String, required: false },
   description: { type: String, required: false },
   rating: { type: String, required: false },
+  runtime: { type: String, required: false },
   poster: { type: String, required: false },
   cam: { type: Boolean, required: false, default: false },
   // Oscar pool year / edition (used to segment movies + stats)

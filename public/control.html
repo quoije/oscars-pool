@@ -645,6 +645,7 @@
 
               <div class="col-12 col-md-8 col-xl-9 d-flex gap-2 justify-content-end">
                 <button type="button" id="refresh-movies" class="btn btn-outline-primary btn-compact">Rafraîchir</button>
+                <button type="button" id="update-omdb-selected" class="btn btn-outline-warning btn-compact" disabled>Refresh OMDb</button>
                 <button type="button" id="delete-selected" class="btn btn-danger btn-compact" disabled>Supprimer</button>
               </div>
 
@@ -1255,11 +1256,16 @@
                 <input type="text" class="form-control" id="edit_category" placeholder="Best Picture, etc." required>
               </div>
 
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <label for="edit_rating" class="form-label">Rating (imdbRating)</label>
                 <input type="text" class="form-control" id="edit_rating" placeholder="7.9">
               </div>
-              <div class="col-md-6 d-flex align-items-end">
+              <div class="col-md-4">
+                <label for="edit_runtime" class="form-label">Runtime</label>
+                <input type="text" class="form-control" id="edit_runtime" placeholder="142 min">
+                <div class="form-text">Ex: 142 min</div>
+              </div>
+              <div class="col-md-4 d-flex align-items-end">
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" id="edit_cam_flag">
                   <label class="form-check-label" for="edit_cam_flag">Tag CAM</label>
@@ -1270,7 +1276,7 @@
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" id="edit_refresh_omdb">
                   <label class="form-check-label" for="edit_refresh_omdb">
-                    Recharger depuis OMDb (écrase titre / plot / rating / poster)
+                    Recharger depuis OMDb (écrase titre / plot / rating / runtime / poster)
                   </label>
                 </div>
                 <div class="form-text">Si coché, le serveur refait un appel OMDb via l’IMDB ID au moment de l’enregistrement.</div>

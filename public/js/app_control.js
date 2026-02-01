@@ -82,6 +82,7 @@ window.onload = async function () {
   const adminMoviesBody = document.getElementById('admin-movies-body');
   const refreshMoviesBtn = document.getElementById('refresh-movies');
   const deleteSelectedBtn = document.getElementById('delete-selected');
+  const updateOmdbSelectedBtn = document.getElementById('update-omdb-selected');
   const selectAllBox = document.getElementById('select-all-movies');
   const selectedCountEl = document.getElementById('selected-count');
 
@@ -121,6 +122,7 @@ window.onload = async function () {
   const editRefreshOmdbEl = document.getElementById('edit_refresh_omdb');
   const editTitleEl = document.getElementById('edit_title');
   const editRatingEl = document.getElementById('edit_rating');
+  const editRuntimeEl = document.getElementById('edit_runtime');
   const editPosterEl = document.getElementById('edit_poster');
   const editDescriptionEl = document.getElementById('edit_description');
   const editCamFlagEl = document.getElementById('edit_cam_flag');
@@ -2238,6 +2240,7 @@ window.onload = async function () {
     const selectedIds = getSelectedMovieIds();
     selectedCountEl.textContent = String(selectedIds.length);
     deleteSelectedBtn.disabled = selectedIds.length === 0;
+    if (updateOmdbSelectedBtn) updateOmdbSelectedBtn.disabled = selectedIds.length === 0;
 
     const allBoxes = Array.from(adminMoviesBody.querySelectorAll('input[type="checkbox"][data-movie-id]'));
     const checked = allBoxes.filter((b) => b.checked).length;
@@ -2324,6 +2327,7 @@ window.onload = async function () {
 
     editTitleEl.value = movie.title || '';
     editRatingEl.value = movie.rating || '';
+    if (editRuntimeEl) editRuntimeEl.value = movie.runtime || '';
     editPosterEl.value = movie.poster || '';
     editDescriptionEl.value = movie.description || '';
     if (editCamFlagEl) editCamFlagEl.checked = !!movie.cam;
@@ -2359,6 +2363,7 @@ window.onload = async function () {
 
     const title = editTitleEl.value;
     const rating = editRatingEl.value;
+    const runtime = editRuntimeEl ? editRuntimeEl.value : '';
     const poster = editPosterEl.value;
     const description = editDescriptionEl.value;
 
@@ -2407,6 +2412,7 @@ window.onload = async function () {
       body.title = title;
       body.description = description;
       body.rating = rating;
+      body.runtime = runtime;
       body.poster = poster;
     }
 
@@ -2618,6 +2624,65 @@ window.onload = async function () {
       showResponse('danger', err.message || 'Erreur réseau');
     }
   });
+
+  if (updateOmdbSelectedBtn) {
+    updateOmdbSelectedBtn.addEventListener('click', async () => {
+      const selectedIds = getSelectedMovieIds();
+      if (!selectedIds.length) return;
+
+      const yearLabel = manageYearSelect.value ? ` (${manageYearSelect.value})` : '';
+      const ok = window.confirm(`Rafraîchir ${selectedIds.length} film(s)${yearLabel} depuis OMDb ? Cette opération peut écraser les infos (titre, plot, rating, poster, runtime).`);
+      if (!ok) return;
+
+      updateOmdbSelectedBtn.disabled = true;
+      updateOmdbSelectedBtn.textContent = 'Refresh OMDb...';
+
+      let successCount = 0;
+      let errorCount = 0;
+      const errors = [];
+
+      for (const movieId of selectedIds) {
+        try {
+          const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ refreshOmdb: true })
+          });
+
+          if (!res.ok) {
+            let msg = `Erreur (${res.status})`;
+            try {
+              const data = await res.json();
+              msg = data.message || data.error || msg;
+            } catch (_) {}
+            errors.push(`${movieId}: ${msg}`);
+            errorCount++;
+          } else {
+            successCount++;
+          }
+        } catch (err) {
+          errors.push(`${movieId}: ${err.message || 'Erreur réseau'}`);
+          errorCount++;
+        }
+      }
+
+      updateOmdbSelectedBtn.disabled = false;
+      updateOmdbSelectedBtn.textContent = 'Refresh OMDb';
+
+      if (errorCount === 0) {
+        showResponse('success', `${successCount} film(s) mis à jour depuis OMDb.`);
+      } else if (successCount === 0) {
+        showResponse('danger', `Échec pour ${errorCount} film(s). ${errors.slice(0, 3).join('; ')}`);
+      } else {
+        showResponse('warning', `${successCount} succès, ${errorCount} échec(s). ${errors.slice(0, 2).join('; ')}`);
+      }
+
+      await loadMoviesForManagement();
+    });
+  }
 
   if (saveMovieChangesBtn) {
     saveMovieChangesBtn.addEventListener('click', saveMovieChanges);
