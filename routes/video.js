@@ -92,7 +92,7 @@ router.post("/session", (req, res) => {
     const maxAgeSecondsRaw = typeof process.env.VIDEO_SESSION_MAX_AGE_SECONDS === "string" ? process.env.VIDEO_SESSION_MAX_AGE_SECONDS.trim() : "";
     const maxAgeSeconds = Number.isFinite(Number(maxAgeSecondsRaw)) && Number(maxAgeSecondsRaw) > 0
       ? Math.floor(Number(maxAgeSecondsRaw))
-      : 60 * 60 * 8; // 8h
+      : 60 * 60 * 24; // 24h (longer default to avoid expiration during long movie sessions)
     const cookie = [
       `video_auth=${encodeURIComponent(token)}`,
       "Path=/api/video",

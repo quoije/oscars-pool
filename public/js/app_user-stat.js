@@ -300,11 +300,21 @@ window.addEventListener('DOMContentLoaded', async function () {
         } else {
           const wrap = document.createElement('div');
           wrap.className = 'd-flex flex-wrap gap-1';
-          completers.forEach((u) => {
-            const name = document.createElement('span');
-            name.className = 'badge bg-light text-dark border';
-            name.textContent = u?.name || '(sans nom)';
-            wrap.appendChild(name);
+          completers.forEach((u, idx) => {
+            const rank = idx + 1;
+            const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-light text-dark border';
+            // Show rank, medal (if top 3), and name
+            const rankPrefix = medal ? `${medal} ` : `#${rank} `;
+            // Format completion date if available
+            let dateStr = '';
+            if (u?.completedAt) {
+              const date = new Date(u.completedAt);
+              dateStr = ` (${date.toLocaleDateString('fr-CA')})`;
+            }
+            badge.textContent = `${rankPrefix}${u?.name || '(sans nom)'}${dateStr}`;
+            wrap.appendChild(badge);
           });
           tdNames.appendChild(wrap);
         }
@@ -663,9 +673,16 @@ window.addEventListener('DOMContentLoaded', async function () {
         bonPicksHeader.style.display = showBonPicksColumn ? '' : 'none';
       }
 
-      // Sort by total points (descending)
+      // Sort by total points (descending), then by last watched date (earlier = better rank)
       stats.sort((a, b) => {
-        return (b.totalPoints || 0) - (a.totalPoints || 0);
+        const pointsDiff = (b.totalPoints || 0) - (a.totalPoints || 0);
+        if (pointsDiff !== 0) return pointsDiff;
+        // Tiebreaker: earlier completion wins (user who finished first ranks higher)
+        const aDate = a.lastWatchedAt ? new Date(a.lastWatchedAt).getTime() : Infinity;
+        const bDate = b.lastWatchedAt ? new Date(b.lastWatchedAt).getTime() : Infinity;
+        if (aDate !== bDate) return aDate - bDate;
+        // Final tiebreaker: alphabetical
+        return String(a.name || '').localeCompare(String(b.name || ''), 'fr', { sensitivity: 'base' });
       });
 
       // Clear previous rows to prevent duplication
