@@ -352,6 +352,11 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
 
   const onPlay = () => {
     startInterval();
+    // Start session keepalive to prevent cookie expiration during long playback
+    const videoSrc = videoEl.currentSrc || videoEl.src;
+    if (videoSrc && token) {
+      startSessionKeepalive(videoSrc, token);
+    }
     // Ensure we create/refresh a progress row as soon as playback starts
     // (so the movies page can show a "resume" state quickly).
     if (!startedOnce) {
@@ -360,7 +365,7 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
       startSaveTimer = window.setTimeout(() => { void persist({ force: true }); }, 650);
     }
   };
-  const onPause = () => { stopInterval(); void persist({ force: true }); };
+  const onPause = () => { stopInterval(); stopSessionKeepalive(); void persist({ force: true }); };
   const onSeeking = () => {
     // While scrubbing, browsers fire many events; debounce a forced save so it lands quickly.
     if (seekSaveTimer) window.clearTimeout(seekSaveTimer);
@@ -373,8 +378,8 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
     }
     void persist({ force: true });
   };
-  const onEnded = () => { stopInterval(); void persist(); };
-  const onError = () => { stopInterval(); };
+  const onEnded = () => { stopInterval(); stopSessionKeepalive(); void persist(); };
+  const onError = () => { stopInterval(); stopSessionKeepalive(); };
   const onTimeUpdate = () => {
     if (videoEl.paused || videoEl.seeking) return;
     void persist();
@@ -405,6 +410,7 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
 
   return () => {
     stopInterval();
+    stopSessionKeepalive();
     if (seekSaveTimer) window.clearTimeout(seekSaveTimer);
     if (savedUiTimer) window.clearTimeout(savedUiTimer);
     if (startSaveTimer) window.clearTimeout(startSaveTimer);
@@ -805,6 +811,8 @@ function toVideoSessionUrl(videoSrc) {
 // Keyed by sessionUrl + token (token is already in-memory, not persisted here).
 const _videoSessionCache = new Map(); // key -> expiresAt ms
 let _currentMovie = null;
+let _sessionKeepaliveInterval = null; // interval ID for session keep-alive
+const SESSION_KEEPALIVE_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes
 
 async function ensureVideoSessionForSource(videoSrc, token) {
   // Only needed for our protected /api/video/* streams.
@@ -839,6 +847,50 @@ async function ensureVideoSessionForSource(videoSrc, token) {
     _videoSessionCache.set(cacheKey, Date.now() + 60_000); // 60s
   } catch (_) {
     // best-effort
+  }
+}
+
+// Force-refresh the video session cookie, bypassing cache.
+// Used for keep-alive during long playback sessions.
+async function forceRefreshVideoSession(videoSrc, token) {
+  if (!token) return;
+  if (!isApiVideoUrl(videoSrc)) return;
+  const sessionUrl = toVideoSessionUrl(videoSrc);
+  if (!sessionUrl) return;
+
+  try {
+    await fetch(sessionUrl, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : undefined,
+      credentials: 'include',
+      cache: 'no-store',
+    });
+    // Update the cache
+    const cacheKey = `${sessionUrl}::${token}`;
+    _videoSessionCache.set(cacheKey, Date.now() + 60_000);
+  } catch (_) {
+    // best-effort
+  }
+}
+
+// Start periodic session keep-alive while watching a movie.
+// This prevents the video_auth cookie from expiring during long playback.
+function startSessionKeepalive(videoSrc, token) {
+  stopSessionKeepalive();
+  if (!token || !isApiVideoUrl(videoSrc)) return;
+
+  _sessionKeepaliveInterval = window.setInterval(() => {
+    void forceRefreshVideoSession(videoSrc, token);
+  }, SESSION_KEEPALIVE_INTERVAL_MS);
+
+  // Also refresh immediately when starting
+  void forceRefreshVideoSession(videoSrc, token);
+}
+
+function stopSessionKeepalive() {
+  if (_sessionKeepaliveInterval) {
+    window.clearInterval(_sessionKeepaliveInterval);
+    _sessionKeepaliveInterval = null;
   }
 }
 

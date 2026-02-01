@@ -232,6 +232,17 @@ router.get("/stats", verifyToken, async (req, res) => {
       const watchedCount = watchedMoviesDetails.length;
       const watchedRatio = ((watchedCount / totalMoviesCount) * 100).toFixed(1);
 
+      // Calculate the last watched date (used for ranking tiebreakers - earlier completion = better)
+      let lastWatchedAt = null;
+      watchedMoviesDetails.forEach((wm) => {
+        if (wm.watchedDate) {
+          const d = new Date(wm.watchedDate);
+          if (!lastWatchedAt || d > lastWatchedAt) {
+            lastWatchedAt = d;
+          }
+        }
+      });
+
       // Calculate points
       const userId = String(user._id);
       const correctPicks = picksByUserId.get(userId) || 0;
@@ -251,7 +262,8 @@ router.get("/stats", verifyToken, async (req, res) => {
         moviePoints: moviePoints,
         pickPoints: pickPoints,
         totalPoints: totalPoints,
-        pointsConfig: pointsConfig
+        pointsConfig: pointsConfig,
+        lastWatchedAt: lastWatchedAt ? lastWatchedAt.toISOString() : null,
       };
     });
 
@@ -300,7 +312,7 @@ router.get("/completions", verifyToken, async (req, res) => {
       totals[String(y)] = set ? set.size : 0;
     }
 
-    const users = await User.find().select("name watchedMovies.imdb_id").lean();
+    const users = await User.find().select("name watchedMovies.imdb_id watchedMovies.watchedDate").lean();
 
     const completersByYear = {};
     for (const y of years) {
@@ -314,27 +326,55 @@ router.get("/completions", verifyToken, async (req, res) => {
       const completers = [];
       users.forEach((u) => {
         const watched = Array.isArray(u?.watchedMovies) ? u.watchedMovies : [];
-        const watchedSet = new Set(
-          watched
-            .map((wm) => (typeof wm?.imdb_id === "string" ? wm.imdb_id : ""))
-            .filter(Boolean)
-        );
 
-        let count = 0;
-        for (const imdb of watchedSet) {
-          if (yearSet.has(imdb)) count += 1;
-        }
+        // Build a map of imdb_id -> watchedDate for this user's movies in this year
+        const watchedInYear = [];
+        watched.forEach((wm) => {
+          const imdb = typeof wm?.imdb_id === "string" ? wm.imdb_id : "";
+          if (!imdb || !yearSet.has(imdb)) return;
+          watchedInYear.push({
+            imdb_id: imdb,
+            watchedDate: wm?.watchedDate ? new Date(wm.watchedDate) : null,
+          });
+        });
+
+        // Count unique movies watched in this year
+        const uniqueImdbIds = new Set(watchedInYear.map((w) => w.imdb_id));
+        const count = uniqueImdbIds.size;
 
         if (count === total) {
+          // Find the completion date (the latest watchedDate among movies for this year)
+          // This is when the user completed 100% of the checklist
+          let completedAt = null;
+          watchedInYear.forEach((w) => {
+            if (w.watchedDate && (!completedAt || w.watchedDate > completedAt)) {
+              completedAt = w.watchedDate;
+            }
+          });
+
           completers.push({
             name: u?.name || "(sans nom)",
             watchedCount: count,
             totalMoviesCount: total,
+            completedAt: completedAt ? completedAt.toISOString() : null,
           });
         }
       });
 
-      completers.sort((a, b) => String(a.name).localeCompare(String(b.name), "fr", { sensitivity: "base" }));
+      // Sort by completion date (earliest first = higher rank), then alphabetically for ties
+      completers.sort((a, b) => {
+        // Users with a completion date come before those without
+        if (a.completedAt && !b.completedAt) return -1;
+        if (!a.completedAt && b.completedAt) return 1;
+        // Both have dates: earliest first
+        if (a.completedAt && b.completedAt) {
+          const dateA = new Date(a.completedAt).getTime();
+          const dateB = new Date(b.completedAt).getTime();
+          if (dateA !== dateB) return dateA - dateB;
+        }
+        // Tie-breaker: alphabetical
+        return String(a.name).localeCompare(String(b.name), "fr", { sensitivity: "base" });
+      });
       completersByYear[String(y)] = completers;
     }
 

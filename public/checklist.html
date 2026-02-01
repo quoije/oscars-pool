@@ -149,6 +149,25 @@
 <!-- Include confetti-js library -->
 <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.3.2"></script>
 
+<!-- Uncheck Confirmation Modal -->
+<div class="modal fade" id="uncheckConfirmModal" tabindex="-1" aria-labelledby="uncheckConfirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="uncheckConfirmModalLabel">Confirmer le retrait</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Es-tu sûr de vouloir retirer <strong id="uncheckMovieTitle"></strong> de ta liste?</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
+        <button type="button" class="btn btn-danger" id="confirmUncheckBtn">Retirer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Reward Modal -->
 <div class="modal fade" id="videoModal" tabindex="-1" aria-labelledby="videoModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">

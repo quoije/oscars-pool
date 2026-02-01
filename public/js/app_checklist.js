@@ -475,18 +475,71 @@ window.addEventListener('DOMContentLoaded', async function () {
         const watchedDateCell = document.getElementById(`watched-date-${movie.imdb_id}`);
         const row = event.target.closest('tr'); // Get the parent row
 
-        if (isChecked) {
-          watchedDateCell.textContent = new Date().toLocaleString();
-          if (row) {
-            row.classList.add('table-success');
-            row.classList.remove('table-danger');
-          }
-        } else {
-          watchedDateCell.textContent = '';
-          if (row) {
-            row.classList.add('table-danger');
-            row.classList.remove('table-success');
-          }
+        // If unchecking, show confirmation modal first
+        if (!isChecked) {
+          // Revert the checkbox temporarily until confirmed
+          event.target.checked = true;
+
+          // Show confirmation modal
+          const uncheckModal = new bootstrap.Modal(document.getElementById('uncheckConfirmModal'));
+          const movieTitleEl = document.getElementById('uncheckMovieTitle');
+          const confirmBtn = document.getElementById('confirmUncheckBtn');
+
+          if (movieTitleEl) movieTitleEl.textContent = movie.title;
+
+          // Remove any previous event listener to avoid duplicates
+          const newConfirmBtn = confirmBtn.cloneNode(true);
+          confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+
+          newConfirmBtn.addEventListener('click', async () => {
+            uncheckModal.hide();
+
+            // Now actually uncheck
+            event.target.checked = false;
+            watchedDateCell.textContent = '';
+            if (row) {
+              row.classList.add('table-danger');
+              row.classList.remove('table-success');
+            }
+
+            await fetch('/api/movies/users/updateWatchedMovies', {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ imdb_id: movie.imdb_id, isChecked: false })
+            });
+
+            const updatedWatchedMoviesRes = await fetch('/api/movies/watchedMovies', {
+              method: 'GET',
+              headers: { 'Authorization': `Bearer ${token}` },
+              cache: 'no-cache',
+            });
+
+            if (updatedWatchedMoviesRes.ok) {
+              const updatedWatchedMovies = await updatedWatchedMoviesRes.json();
+              watchedMoviesInYear = updatedWatchedMovies.filter((wm) => movieImdbIds.has(wm.imdb_id));
+              const updatedWatchedCount = watchedMoviesInYear.length;
+              const updatedPct = totalMoviesCount > 0 ? ((updatedWatchedCount / totalMoviesCount) * 100).toFixed(1) : '0.0';
+              document.getElementById('watched-ratio').innerText = `Vu: ${updatedWatchedCount} / ${totalMoviesCount} (${updatedPct}%)`;
+              updateProgressBar(updatedWatchedCount, totalMoviesCount);
+
+              const moviesLeft = totalMoviesCount - updatedWatchedCount;
+              const moviesPerDay = daysLeft > 0 ? (moviesLeft / daysLeft).toFixed(2) : moviesLeft;
+              document.getElementById('movies-per-day').textContent = `À voir par jour: ${moviesPerDay} films`;
+            }
+          });
+
+          uncheckModal.show();
+          return;
+        }
+
+        // Checking a movie - no confirmation needed
+        watchedDateCell.textContent = new Date().toLocaleString();
+        if (row) {
+          row.classList.add('table-success');
+          row.classList.remove('table-danger');
         }
 
         await fetch('/api/movies/users/updateWatchedMovies', {

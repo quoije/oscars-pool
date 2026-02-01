@@ -228,7 +228,7 @@ def create_video_session(request: Request, response: Response, authorization: Op
 
     secure = request.url.scheme == "https" or (request.headers.get("x-forwarded-proto") == "https")
     encoded = quote(token, safe="")
-    cookie_max_age_seconds = int(_env_str("VIDEO_SESSION_MAX_AGE_SECONDS", "28800"))  # 8h
+    cookie_max_age_seconds = int(_env_str("VIDEO_SESSION_MAX_AGE_SECONDS", "86400"))  # 24h (longer default to avoid expiration during long movie sessions)
     cookie_samesite = _env_str("VIDEO_COOKIE_SAMESITE", "Lax")  # Lax|Strict|None
     samesite = (cookie_samesite or "Lax").strip().lower()
     if samesite not in ("lax", "strict", "none"):
