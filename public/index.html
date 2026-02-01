@@ -47,7 +47,40 @@
 </button>
 
 <div class="container">
-  <div class="card p-4" style="max-width: 400px; margin: auto;">
+  <!-- First-time setup card (hidden by default) -->
+  <div id="setup-card" class="card p-4 d-none" style="max-width: 450px; margin: auto;">
+    <div class="text-center mb-3">
+      <img src="img/logo.png" class="logo-invert" style="width: 80%;" alt="Pool Oscars">
+    </div>
+    <div class="alert alert-info mb-3">
+      <strong>Première installation</strong><br>
+      Aucun administrateur n'existe. Créez le premier compte admin pour commencer.
+    </div>
+    <form id="setup-form">
+      <div class="mb-3">
+        <label for="setup-name" class="form-label">Nom</label>
+        <input type="text" class="form-control" id="setup-name" placeholder="Votre nom" required>
+      </div>
+      <div class="mb-3">
+        <label for="setup-email" class="form-label">Courriel</label>
+        <input type="email" class="form-control" id="setup-email" placeholder="admin@exemple.com" required>
+      </div>
+      <div class="mb-3">
+        <label for="setup-password" class="form-label">Mot de passe</label>
+        <input type="password" class="form-control" id="setup-password" minlength="6" required>
+        <div class="form-text">Minimum 6 caractères</div>
+      </div>
+      <div class="mb-3">
+        <label for="setup-password-confirm" class="form-label">Confirmer le mot de passe</label>
+        <input type="password" class="form-control" id="setup-password-confirm" minlength="6" required>
+      </div>
+      <div id="setup-error" class="alert alert-danger d-none" role="alert"></div>
+      <button type="submit" class="btn btn-warning w-100">Créer le compte admin</button>
+    </form>
+  </div>
+
+  <!-- Normal login card -->
+  <div id="login-card" class="card p-4" style="max-width: 400px; margin: auto;">
     <div class="text-center mb-4">
       <img src="img/logo.png" class="logo-invert" style="width: 80%;" alt="Pool Oscars">
     </div>

@@ -160,6 +160,20 @@ window.addEventListener('DOMContentLoaded', async function () {
       return `${m}:${String(sec).padStart(2, '0')}`;
     }
 
+    function formatRuntime(runtime) {
+      // Convert "142 min" or "142" to "2h 22min" format
+      if (!runtime || runtime === 'N/A') return '';
+      const raw = String(runtime).trim();
+      // Extract minutes from strings like "142 min", "142min", or just "142"
+      const match = raw.match(/^(\d+)\s*min/i);
+      const minutes = match ? parseInt(match[1], 10) : parseInt(raw, 10);
+      if (!Number.isFinite(minutes) || minutes <= 0) return raw;
+      if (minutes < 60) return `${minutes}min`;
+      const h = Math.floor(minutes / 60);
+      const m = minutes % 60;
+      return m > 0 ? `${h}h ${m}min` : `${h}h`;
+    }
+
     async function fetchPlaybackProgressByYear(year, token) {
       try {
         const res = await fetch(`/api/movies/progress?year=${encodeURIComponent(String(year))}`, {
@@ -571,6 +585,7 @@ window.addEventListener('DOMContentLoaded', async function () {
                           : `<span class="text-dark">${movie.title}</span>`
                       }
                     </h5>
+                    ${movie.runtime && movie.runtime !== 'N/A' ? `<div class="text-muted small mb-1">${formatRuntime(movie.runtime)}</div>` : ''}
                     <div class="movie-rating-block mt-1">
                       <div class="movie-rating-sub movie-rating-avg${userRatingText ? '' : ' movie-rating-sub--empty'}" data-role="avg-rating">${userRatingText ? `Note utilisateurs ${userRatingText}` : ''}</div>
                     </div>

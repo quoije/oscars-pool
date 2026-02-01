@@ -242,6 +242,7 @@ async function fetchMovieDetailsFromOmdb(imdb_id) {
         title: response.data.Title,
         description: response.data.Plot,
         rating: response.data.imdbRating,
+        runtime: response.data.Runtime,
         poster: response.data.Poster
       };
     } else {
@@ -289,7 +290,7 @@ router.get("/", async (req, res) => {
 
     const projection = isChecklist
       ? "imdb_id title"
-      : "imdb_id title description rating poster cam year category vod_link player_mode video_src embed_src video_file video_file_low subtitles subtitle_file subtitle_lang subtitle_label subtitle_default updatedAt createdAt";
+      : "imdb_id title description rating runtime poster cam year category vod_link player_mode video_src embed_src video_file video_file_low subtitles subtitle_file subtitle_lang subtitle_label subtitle_default updatedAt createdAt";
 
     const cacheKey = `movies:list:${year || "all"}:${isChecklist ? "checklist" : "films"}`;
     const cached = cacheGet(cacheKey);
@@ -583,6 +584,7 @@ router.post("/add", async (req, res) => {
           title: String(imdb_id || "").trim() || "Untitled",
           description: "",
           rating: "",
+          runtime: "",
           poster: ""
         };
       } else {
@@ -596,6 +598,7 @@ router.post("/add", async (req, res) => {
       title: movieDetails.title,
       description: movieDetails.description,
       rating: movieDetails.rating,
+      runtime: movieDetails.runtime,
       poster: movieDetails.poster,
       cam: !!cam,
       year: parsedYear,
@@ -852,6 +855,7 @@ router.put("/:id", async (req, res) => {
       title,
       description,
       rating,
+      runtime,
       poster,
       year,
       category,
@@ -1008,6 +1012,7 @@ router.put("/:id", async (req, res) => {
         movie.title = details.title;
         movie.description = details.description;
         movie.rating = details.rating;
+        movie.runtime = details.runtime;
         movie.poster = details.poster;
       } catch (err) {
         if (err?.code === "OMDB_NOT_CONFIGURED") {
@@ -1019,6 +1024,7 @@ router.put("/:id", async (req, res) => {
       if (title !== undefined) movie.title = title;
       if (description !== undefined) movie.description = description;
       if (rating !== undefined) movie.rating = rating;
+      if (runtime !== undefined) movie.runtime = runtime;
       if (poster !== undefined) movie.poster = poster;
     }
 
