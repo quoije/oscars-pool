@@ -656,7 +656,7 @@ function initUserRating({ movieId, token, initial } = {}) {
 
       isSaving = true;
       buttons.forEach((b) => b.setAttribute('disabled', 'disabled'));
-      metaEl.textContent = 'Enregistrement…';
+      metaEl.textContent = t('player.saving', 'Saving…');
 
       const shouldClear = currentRating && value === currentRating;
       const result = shouldClear

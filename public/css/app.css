@@ -409,11 +409,18 @@ body:not(.i18n-ready) .navbar .nav-link,
 body:not(.i18n-ready) .navbar .navbar-text,
 body:not(.i18n-ready) .navbar .btn {
   transition: filter 220ms ease, opacity 220ms ease, transform 220ms ease;
-  /* Light mode & default: fully fade out navbar until i18n is ready
-     so fallback labels never flash. */
-  opacity: 0;
-  transform: translateY(-2px);
+  /* Light mode & default: muted appearance while i18n loads. */
+  filter: blur(1.2px) saturate(0.95);
+  opacity: 0.45;
+  transform: translateY(-1px);
   pointer-events: none;
+}
+
+/* Light mode: keep navbar container visible to avoid layout jump. */
+html:not([data-theme="dark"]) body:not(.i18n-ready) nav.navbar,
+html:not([data-theme="dark"]) body:not(.i18n-ready) .navbar {
+  opacity: 1;
+  transform: none;
 }
 
 /* Dark mode: keep the original soft blur effect while loading
