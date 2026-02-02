@@ -400,7 +400,7 @@ footer {
   }
 
 /* Smooth navbar transition while i18n loads
-   - Keep navbar visible but subtly blurred/faded to avoid abrupt disappearance.
+   - Keep navbar visible with a soft fade/slide to avoid abrupt disappearance.
    - Make elements non-interactive until translations are applied. */
 body:not(.i18n-ready) nav.navbar,
 body:not(.i18n-ready) .navbar,
@@ -409,10 +409,23 @@ body:not(.i18n-ready) .navbar .nav-link,
 body:not(.i18n-ready) .navbar .navbar-text,
 body:not(.i18n-ready) .navbar .btn {
   transition: filter 220ms ease, opacity 220ms ease, transform 220ms ease;
-  filter: blur(6px) saturate(0.9) grayscale(0.06);
-  opacity: 0.85;
+  /* Light mode & default: fully fade out navbar until i18n is ready
+     so fallback labels never flash. */
+  opacity: 0;
   transform: translateY(-2px);
   pointer-events: none;
+}
+
+/* Dark mode: keep the original soft blur effect while loading
+   so the navbar stays visible but its text is obscured. */
+html[data-theme="dark"] body:not(.i18n-ready) nav.navbar,
+html[data-theme="dark"] body:not(.i18n-ready) .navbar,
+html[data-theme="dark"] body:not(.i18n-ready) .navbar .navbar-brand,
+html[data-theme="dark"] body:not(.i18n-ready) .navbar .nav-link,
+html[data-theme="dark"] body:not(.i18n-ready) .navbar .navbar-text,
+html[data-theme="dark"] body:not(.i18n-ready) .navbar .btn {
+  filter: blur(6px) saturate(0.9) grayscale(0.06);
+  opacity: 0.85;
 }
 
 /* When translations are ready, restore full clarity and interactivity */

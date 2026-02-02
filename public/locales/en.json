@@ -377,6 +377,8 @@
   "admin.modal100.videoLabel": "Video",
   "admin.modal100.videoInfoShort": "accepts relative path (e.g.: video/reward.mp4) or full URL.",
 
+  "admin.modal100.defaultTitle": "Congratulations! very nice 🎉🎉🎉",
+
   "admin.users.usersCount": "user(s)",
   "admin.users.addUser": "Add user",
   "admin.users.name": "Name",
@@ -488,6 +490,7 @@
   "admin.backup.downloadDesc": "retrieves the file locally (useful before a risky operation).",
   "admin.backup.restoreHowDesc": "imports the file. With drop, restored collections are deleted first.",
   "admin.backup.quickCheck": "Quick check",
+  "admin.backup.noBackups": "No backups found.",
   "admin.backup.quickCheckDesc": "After restore, reload the page and check \"Films\", \"Checklist\" and \"Stats\".",
   "admin.backup.confirmDelete": "Delete backup \"{name}\"?",
   "admin.backup.creating": "Creating…",

@@ -155,7 +155,8 @@ window.addEventListener('DOMContentLoaded', async function () {
     }
 
     const DEFAULT_COMPLETION_MODAL = Object.freeze({
-      title: (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('checklist.congratulations') : 'Congratulations! very nice 🎉🎉🎉',
+      // Default title: use the localized 100% modal title if available.
+      title: t('admin.modal100.defaultTitle', 'Congratulations! very nice 🎉🎉🎉'),
       bodyText: '',
       videoSrc: 'video/reward.mp4',
       bodyHtml: ''
@@ -194,7 +195,12 @@ window.addEventListener('DOMContentLoaded', async function () {
       const videoEl = document.getElementById('rewardVideo');
       const videoSourceEl = document.getElementById('rewardVideoSource');
 
-      const title = String(content?.title || '').trim() || DEFAULT_COMPLETION_MODAL.title;
+      const rawTitle = String(content?.title || '').trim();
+      // If the stored value is the i18n key itself, translate it; otherwise
+      // use the stored title, falling back to the localized default.
+      const title = (!rawTitle || rawTitle === 'admin.modal100.defaultTitle')
+        ? t('admin.modal100.defaultTitle', 'Congratulations! very nice 🎉🎉🎉')
+        : rawTitle;
       const bodyText = String(content?.bodyText || '');
       const bodyHtml = sanitizeHtml(String(content?.bodyHtml || ''));
       const videoSrc = String(content?.videoSrc || '').trim();

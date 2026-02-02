@@ -488,6 +488,7 @@
   "admin.backup.restoreWarning": "La restauration peut écraser les données. Fais un backup juste avant si besoin.",
   "admin.backup.backupFile": "Fichier de backup",
   "admin.backup.dropBeforeRestore": "Drop les collections avant restore (recommandé)",
+  "admin.backup.noBackups": "Aucune sauvegarde.",
   "admin.backup.tip": "Conseil",
   "admin.backup.tipDesc": "Utilise drop sauf si tu sais exactement ce que tu fais (sinon risque de doublons/erreurs).",
   "admin.backup.howItWorks": "Fonctionnement",

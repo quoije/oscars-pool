@@ -1637,7 +1637,8 @@ window.onload = async function () {
     if (!dbBackupListBody) return;
     const list = Array.isArray(backups) ? backups : [];
     if (!list.length) {
-      dbBackupListBody.innerHTML = '<tr><td colspan="4" class="text-muted">Aucune sauvegarde.</td></tr>';
+      const emptyText = t('admin.backup.noBackups', 'No backups found.');
+      dbBackupListBody.innerHTML = `<tr><td colspan="4" class="text-muted">${emptyText}</td></tr>`;
       return;
     }
 
