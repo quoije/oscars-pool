@@ -5,10 +5,8 @@ Little nodejs + mongodb app that I hack together with ChatGPT and Cursor to keep
 
 **Disclaimer:** This was a fun, experimental project built with “AI slop” (Cursor, Claude and Copilot), so it may have security issues. For example, `python_video_server` uses the default token‑in‑URL approach to serve video files, which can leave user tokens in logs or browser history. There are ways to improve this, but at this point I’m blinder than Ray Charles.
 
-| Movies | Checklist |
-| --- | --- |
 | ![Movies](img/preview_movies.png) | ![Checklist](img/preview_checklist.png) |
-| Statistics | Admin |
+| --- | --- |
 | ![Statistics](img/preview_stats.png) | ![Admin](img/preview_admin.png) |
 
 ## Features
