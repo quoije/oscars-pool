@@ -410,8 +410,8 @@ body:not(.i18n-ready) .navbar .navbar-text,
 body:not(.i18n-ready) .navbar .btn {
   transition: filter 220ms ease, opacity 220ms ease, transform 220ms ease;
   /* Light mode & default: muted appearance while i18n loads. */
-  filter: blur(1.2px) saturate(0.95);
-  opacity: 0.45;
+  filter: blur(0.8px) saturate(0.97);
+  opacity: 0.55;
   transform: translateY(-1px);
   pointer-events: none;
 }
@@ -421,6 +421,15 @@ html:not([data-theme="dark"]) body:not(.i18n-ready) nav.navbar,
 html:not([data-theme="dark"]) body:not(.i18n-ready) .navbar {
   opacity: 1;
   transform: none;
+  filter: none;
+  border: none;
+  outline: none;
+  box-shadow: none;
+}
+
+/* Light mode: match page background to navbar during loading to avoid edge lines. */
+html:not([data-theme="dark"]) body:not(.i18n-ready) {
+  background-color: var(--app-navbar);
 }
 
 /* Dark mode: keep the original soft blur effect while loading
@@ -995,6 +1004,16 @@ body.i18n-ready .navbar .btn {
 
   html[data-theme="dark"] .navbar-custom .btn-outline-light:hover {
     background: rgba(255, 255, 255, 0.12);
+  }
+
+  /* Light mode navbar buttons */
+  .navbar-custom .btn-outline-light {
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.25);
+  }
+
+  .navbar-custom .btn-outline-light:hover {
+    background: rgba(255, 255, 255, 0.08);
   }
 
   html[data-theme="dark"] .btn-outline-dark {
