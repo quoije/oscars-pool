@@ -833,10 +833,35 @@ body.i18n-ready .navbar .btn {
     color: #fff;
   }
 
+  /* Override btn-warning for active state */
+  .navbar-custom .navbar-nav #admin-control-link.is-current {
+    background: rgba(255, 255, 255, 0.16) !important;
+    border-color: rgba(255, 255, 255, 0.55) !important;
+  }
+
   .navbar-custom .navbar-nav .nav-link.btn.is-current:hover {
     background: rgba(255, 255, 255, 0.22);
     border-color: rgba(255, 255, 255, 0.65);
     color: #fff;
+  }
+
+  /* Override btn-warning hover state */
+  .navbar-custom .navbar-nav #admin-control-link.is-current:hover {
+    background: rgba(255, 255, 255, 0.22) !important;
+    border-color: rgba(255, 255, 255, 0.65) !important;
+  }
+
+  /* Admin button current state in light mode - override btn-warning */
+  .navbar-custom .navbar-nav #admin-control-link.btn-warning.is-current,
+  .navbar-custom .navbar-nav #admin-control-link.btn-warning.is-current:focus {
+    background: rgba(255, 255, 255, 0.16) !important;
+    border-color: rgba(255, 255, 255, 0.55) !important;
+  }
+
+  .navbar-custom .navbar-nav #admin-control-link.btn-warning.is-current:hover,
+  .navbar-custom .navbar-nav #admin-control-link.btn-warning.is-current:active {
+    background: rgba(255, 255, 255, 0.22) !important;
+    border-color: rgba(255, 255, 255, 0.65) !important;
   }
 
   html[data-theme="dark"] .navbar-custom .navbar-nav .nav-link.btn.is-current {
@@ -845,9 +870,28 @@ body.i18n-ready .navbar .btn {
     color: #fff;
   }
 
+  /* Dark mode: Admin button active state */
+  html[data-theme="dark"] .navbar-custom .navbar-nav #admin-control-link.is-current {
+    background: rgba(79, 124, 255, 0.22) !important;
+    border-color: rgba(79, 124, 255, 0.58) !important;
+  }
+
   html[data-theme="dark"] .navbar-custom .navbar-nav .nav-link.btn.is-current:hover {
     background: rgba(79, 124, 255, 0.28);
     border-color: rgba(79, 124, 255, 0.7);
+  }
+
+  /* Admin button current state in dark mode */
+  html[data-theme="dark"] .navbar-custom .navbar-nav #admin-control-link.is-current {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+  }
+
+  html[data-theme="dark"] .navbar-custom .navbar-nav #admin-control-link.is-current:hover {
+    background-color: #0b5ed7;
+    border-color: #0b5ed7;
+    color: #fff;
   }
 
   /* The logo image has a bit of built-in left whitespace; nudge it back to align with page titles. */

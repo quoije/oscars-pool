@@ -379,7 +379,7 @@ window.addEventListener('DOMContentLoaded', async function () {
     }
 
     const activeYear = await fetchActiveYear();
-    document.title = `Pool Oscars (${activeYear}) - Films`;
+    document.title = `Pool Oscars (${activeYear}) - Movies`;
     const oscarYearEl = document.getElementById('oscar-year');
     if (oscarYearEl) oscarYearEl.textContent = String(activeYear);
 
