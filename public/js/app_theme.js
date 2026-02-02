@@ -7,6 +7,21 @@
   const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
   const API_ENDPOINT = '/api/users/theme';
 
+  function t(key, fallback, params) {
+    try {
+      if (window.i18n && typeof window.i18n.t === 'function') {
+        return window.i18n.t(key, params || {});
+      }
+    } catch (_) {}
+    let out = (typeof fallback === 'string') ? fallback : String(key);
+    if (params && typeof params === 'object') {
+      Object.keys(params).forEach((k) => {
+        out = out.replace(new RegExp(`\\{${k}\\}`, 'g'), String(params[k]));
+      });
+    }
+    return out;
+  }
+
   function normalizeTheme(value) {
     return value === 'light' || value === 'dark' ? value : null;
   }
@@ -111,9 +126,14 @@
     buttons.forEach((button) => {
       button.setAttribute('aria-checked', String(isDark));
       button.dataset.theme = theme;
-      const label = isDark ? 'Mode sombre' : 'Mode clair';
-      const sourceLabel = source === 'system' ? ' (système)' : '';
-      button.setAttribute('title', `${label}${sourceLabel} — Shift+clic pour système`);
+      const label = isDark
+        ? t('theme.darkMode', 'Dark mode')
+        : t('theme.lightMode', 'Light mode');
+      const sourceLabel = source === 'system'
+        ? t('theme.systemSuffix', ' (system)')
+        : '';
+      const hint = t('theme.systemHint', '— Shift+click for system');
+      button.setAttribute('title', `${label}${sourceLabel} ${hint}`.trim());
     });
   }
 

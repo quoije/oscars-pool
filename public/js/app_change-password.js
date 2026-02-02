@@ -2,6 +2,20 @@ function decodeJwt(token) {
   return JSON.parse(atob(token.split('.')[1]));
 }
 
+// i18n helper function
+function t(key, fallback = '', params = {}) {
+  if (window.i18n && typeof window.i18n.t === 'function') {
+    return window.i18n.t(key, params);
+  }
+  let result = fallback;
+  if (params && typeof params === 'object') {
+    Object.keys(params).forEach(k => {
+      result = result.replace(`{${k}}`, String(params[k]));
+    });
+  }
+  return result;
+}
+
 function isTokenExpired(decoded) {
   const currentTime = Math.floor(Date.now() / 1000);
   return !!decoded.exp && decoded.exp < currentTime;
@@ -81,11 +95,11 @@ window.onload = function () {
     const confirmPassword = document.getElementById('confirm-password').value;
 
     if (newPassword.length < 8) {
-      showError('Le mot de passe doit contenir au moins 8 caractères.');
+      showError(t('auth.passwordMinLength', 'Password must be at least 8 characters.'));
       return;
     }
     if (newPassword !== confirmPassword) {
-      showError('Les mots de passe ne correspondent pas.');
+      showError(t('auth.passwordsDoNotMatch', 'Passwords do not match'));
       return;
     }
 
@@ -116,7 +130,7 @@ window.onload = function () {
 
       window.location.href = '/movies.html';
     } catch (err) {
-      showError(err.message || 'Erreur réseau');
+      showError(err.message || t('auth.networkError', 'Network error'));
     }
   });
 };

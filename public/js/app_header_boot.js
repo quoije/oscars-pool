@@ -86,10 +86,12 @@
       // Show button immediately based on cached value
       if (cachedValue.showPicksButton !== false) {
         picksButton.style.display = '';
+      } else {
+        picksButton.style.display = 'none';
       }
     } else {
-      // Default to showing while we fetch
-      picksButton.style.display = '';
+      // Default to hiding while we fetch (new installs should start disabled)
+      picksButton.style.display = 'none';
     }
     
     // Fetch fresh value from server

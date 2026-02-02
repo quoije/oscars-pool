@@ -165,6 +165,13 @@ eng.traineddata
 Thumbs.db
 desktop.ini
 
+# VS Code project settings
+.vscode/
+
+# AI assistant/editor metadata
+.claude/
+.cursor/
+
 # Python cache files
 __pycache__/
 *.pyc
@@ -174,3 +181,10 @@ __pycache__/
 
 # Temporary scripts
 temp/
+
+# Localization helper artifacts (not part of app)
+BEFORE_AFTER_COMPARISON.md
+LOCALIZATION_COMPLETE.md
+LOCALIZATION_PROGRESS.md
+VERIFICATION_REPORT.md
+localize_remaining.py

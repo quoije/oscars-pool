@@ -2,6 +2,39 @@ function decodeJwt(token) {
   return JSON.parse(atob(token.split('.')[1]));
 }
 
+// i18n helper function
+function t(key, fallback = '', params = {}) {
+  if (window.i18n && typeof window.i18n.t === 'function') {
+    return window.i18n.t(key, params);
+  }
+  let result = fallback;
+  if (params && typeof params === 'object') {
+    Object.keys(params).forEach(k => {
+      result = result.replace(`{${k}}`, String(params[k]));
+    });
+  }
+  return result;
+}
+
+function translateApiMessage(messageKey, message, fallbackKey, fallbackText) {
+  try {
+    if (window.i18n && typeof window.i18n.t === 'function') {
+      if (messageKey) return window.i18n.t(messageKey);
+      const map = {
+        "L'utilisateur n'a pas été trouvé": 'auth.userNotFound',
+        'User not found': 'auth.userNotFound',
+        "Informations d'identification non valides": 'auth.invalidCredentials',
+        'Invalid credentials': 'auth.invalidCredentials',
+        "Le mot de passe temporaire a expiré. Demandez à un admin de réinitialiser votre mot de passe.": 'auth.tempPasswordExpired',
+        'Temporary password expired. Ask an admin to reset your password.': 'auth.tempPasswordExpired',
+      };
+      if (message && map[message]) return window.i18n.t(map[message]);
+      if (fallbackKey) return window.i18n.t(fallbackKey);
+    }
+  } catch (_) {}
+  return message || fallbackText || '';
+}
+
 async function applyActiveOscarYearToTitle() {
   const base = 'Pool Oscars';
   const current = String(document.title || base);
@@ -110,13 +143,13 @@ if (setupForm) {
         window.location.href = '/movies.html';
       } else {
         if (setupError) {
-          setupError.textContent = data.message || 'Erreur lors de la création du compte';
+          setupError.textContent = data.message || t('auth.errorCreatingAccount', 'Error creating account');
           setupError.classList.remove('d-none');
         }
       }
     } catch (err) {
       if (setupError) {
-        setupError.textContent = 'Erreur réseau. Veuillez réessayer.';
+        setupError.textContent = t('auth.networkError', 'Network error. Please try again.');
         setupError.classList.remove('d-none');
       }
     }
@@ -147,7 +180,8 @@ document.getElementById('login-form').addEventListener('submit', async function 
       window.location.href = '/movies.html';  // Redirect to movies page on success
     }
   } else {
-    const error = await res.json();
-    alert(`${error.message}`);
+    const error = await res.json().catch(() => ({}));
+    const msg = translateApiMessage(error.messageKey, error.message, 'auth.loginFailed', 'Login failed');
+    alert(msg);
   }
 });

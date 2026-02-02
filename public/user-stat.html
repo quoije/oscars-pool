@@ -3,11 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pool Oscars - Statistiques des utilisateurs</title>
+  <title data-i18n="stats.title">Oscar Pool - Statistics</title>
   <script src="./js/app_theme.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="./css/app.css" rel="stylesheet">
   <link rel="preload" as="image" href="img/logo_w.png">
+  <style>
+    /* Hide translatable content until translations are ready - prevents flash during page navigation */
+    body:not(.i18n-ready) [data-i18n] {
+      opacity: 0;
+      transition: opacity 0.1s ease-in;
+    }
+    body.i18n-ready [data-i18n] {
+      opacity: 1;
+    }
+    /* Fallback: show content after 2 seconds even if JS fails */
+    body:not(.i18n-ready) [data-i18n] {
+      animation: show-after-delay 0.1s 2s forwards;
+    }
+    @keyframes show-after-delay {
+      to { opacity: 1; }
+    }
+  </style>
+  <script src="./js/localization.js" defer></script>
   <script src="./js/app_header_boot.js" defer></script>
   <style>
     .navbar-custom {
@@ -95,7 +113,7 @@
 <!-- Preloaded loader overlay to avoid initial "clear" flash -->
 <div id="page-loader-overlay" class="page-loader-overlay" data-preloaded="true" role="status" aria-live="polite" aria-busy="true">
   <div class="page-loader-card page-loader-card--baronly">
-    <span class="visually-hidden">Chargement…</span>
+    <span class="visually-hidden" data-i18n="common.loading">Loading…</span>
     <div class="page-loader-progress" aria-hidden="true">
       <div class="page-loader-bar" id="page-loader-bar" style="width: 8%;"></div>
     </div>
@@ -114,16 +132,16 @@
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
       <div class="navbar-nav">
-        <a href="movies.html" class="nav-link btn btn-outline-light me-2">Films</a>
-        <a href="checklist.html" class="nav-link btn btn-outline-light me-2">Checklist</a>
-        <a href="user-stat.html" class="nav-link btn btn-outline-light me-2">Stats</a>
-        <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;">Mes picks</a>
-        <a id="admin-control-link" href="control.html" class="nav-link btn btn-warning me-2 d-none">Admin</a>
+        <a href="movies.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.films">Movies</a>
+        <a href="checklist.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.checklist">Checklist</a>
+        <a href="user-stat.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.stats">Stats</a>
+        <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;" data-i18n="nav.myPicks">My picks</a>
+        <a id="admin-control-link" href="control.html" class="nav-link btn btn-warning me-2 d-none" data-i18n="nav.admin">Admin</a>
       </div>
       <!-- Move user info inside collapsible navbar and align it properly -->
       <div class="d-flex ms-auto mt-2 mt-lg-0 align-items-center gap-2 navbar-user">
         <span id="user-name" class="navbar-text" data-user-name></span>
-        <button class="theme-toggle" type="button" data-theme-toggle role="switch" aria-checked="false" aria-label="Basculer le mode sombre">
+        <button class="theme-toggle" type="button" data-theme-toggle role="switch" aria-checked="false" data-i18n-aria-label="common.toggleDarkMode" aria-label="Toggle dark mode">
           <span class="theme-toggle-icon theme-toggle-icon-sun" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="4"></circle>
@@ -144,7 +162,7 @@
             </svg>
           </span>
         </button>
-        <button id="log-off" class="btn btn-danger">Déconnexion</button>
+        <button id="log-off" class="btn btn-danger" data-i18n="nav.logout">Log out</button>
       </div>
     </div>
   </div>
@@ -155,17 +173,17 @@
   <ul class="nav nav-tabs stats-tabs" id="statsTabs" role="tablist">
     <li class="nav-item" role="presentation">
       <button class="nav-link active" id="tab-ranking" data-bs-toggle="tab" data-bs-target="#pane-ranking" type="button" role="tab" aria-controls="pane-ranking" aria-selected="true">
-        Classement
-        <span id="stats-active-year-badge" class="badge bg-dark ms-2 d-none" aria-label="Année active"></span>
+        <span data-i18n="stats.ranking">Ranking</span>
+        <span id="stats-active-year-badge" class="badge bg-dark ms-2 d-none" aria-label="Active year"></span>
       </button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="tab-winners" data-bs-toggle="tab" data-bs-target="#pane-winners" type="button" role="tab" aria-controls="pane-winners" aria-selected="false">
-        Gagnants 🏆
+      <button class="nav-link" id="tab-winners" data-bs-toggle="tab" data-bs-target="#pane-winners" type="button" role="tab" aria-controls="pane-winners" aria-selected="false" data-i18n="stats.winners">
+        Winners 🏆
       </button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="tab-completion" data-bs-toggle="tab" data-bs-target="#pane-completion" type="button" role="tab" aria-controls="pane-completion" aria-selected="false">
+      <button class="nav-link" id="tab-completion" data-bs-toggle="tab" data-bs-target="#pane-completion" type="button" role="tab" aria-controls="pane-completion" aria-selected="false" data-i18n="stats.completers">
         100%
       </button>
     </li>
@@ -180,11 +198,11 @@
       <table class="table table-striped table-hover align-middle user-table d-none">
         <thead>
           <tr>
-            <th scope="col">#</th>
-            <th scope="col">Nom</th>
-            <th scope="col" id="films-header">Films</th>
-            <th scope="col" id="bon-picks-header">Bon picks</th>
-            <th scope="col" class="text-center">Points</th>
+            <th scope="col" data-i18n="stats.rank">#</th>
+            <th scope="col" data-i18n="stats.name">Name</th>
+            <th scope="col" id="films-header" data-i18n="stats.films">Movies</th>
+            <th scope="col" id="bon-picks-header" data-i18n="stats.correctPicks">Correct picks</th>
+            <th scope="col" class="text-center" data-i18n="stats.points">Points</th>
           </tr>
         </thead>
         <tbody id="user-table-body">
@@ -199,13 +217,13 @@
         <table class="table table-sm table-striped align-middle mb-0">
           <thead>
             <tr>
-              <th scope="col" style="width: 110px;">Année</th>
-              <th scope="col">Gagnant(s)</th>
+              <th scope="col" style="width: 110px;" data-i18n="stats.year">Year</th>
+              <th scope="col" data-i18n="stats.winnersColumn">Winner(s)</th>
             </tr>
           </thead>
           <tbody id="winners-table-body">
             <tr>
-              <td colspan="2" class="text-center py-4 text-muted" aria-live="polite" aria-busy="true">Chargement…</td>
+              <td colspan="2" class="text-center py-4 text-muted" aria-live="polite" aria-busy="true" data-i18n="common.loading">Loading…</td>
             </tr>
           </tbody>
         </table>
@@ -216,20 +234,20 @@
     <div class="tab-pane fade" id="pane-completion" role="tabpanel" aria-labelledby="tab-completion" tabindex="0">
       <div class="small text-muted mb-2 d-flex align-items-center gap-2">
         <span class="badge bg-light text-dark border" aria-hidden="true">i</span>
-        <span>Utilisateurs ayant terminé 100% (par année)</span>
+        <span data-i18n="stats.completersHelp">Users who have watched 100% (by year)</span>
       </div>
       <div class="table-responsive mb-4">
         <table class="table table-sm table-striped align-middle mb-0">
           <thead>
             <tr>
-              <th scope="col" style="width: 110px;">Année</th>
-              <th scope="col" style="width: 140px;">Total films</th>
-              <th scope="col">Noms</th>
+              <th scope="col" style="width: 110px;" data-i18n="stats.year">Year</th>
+              <th scope="col" style="width: 140px;" data-i18n="stats.totalFilms">Total films</th>
+              <th scope="col" data-i18n="stats.names">Names</th>
             </tr>
           </thead>
           <tbody id="completers-table-body">
             <tr>
-              <td colspan="3" class="text-center py-4 text-muted" aria-live="polite" aria-busy="true">Chargement…</td>
+              <td colspan="3" class="text-center py-4 text-muted" aria-live="polite" aria-busy="true" data-i18n="common.loading">Loading…</td>
             </tr>
           </tbody>
         </table>
@@ -243,14 +261,14 @@
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="moviesModalLabel">Films regardés</h5>
+        <h5 class="modal-title" id="moviesModalLabel" data-i18n="stats.moviesWatched">Movies watched</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div class="d-flex flex-column gap-3">
           <div id="movies-summary" class="text-muted small"></div>
 
-          <div id="movies-empty" class="text-muted d-none">Aucun film à afficher.</div>
+          <div id="movies-empty" class="text-muted d-none" data-i18n="stats.noMoviesToShow">No movies to show.</div>
           <div id="movie-grid" class="stats-movies-grid" aria-live="polite"></div>
         </div>
       </div>
@@ -260,7 +278,7 @@
 
 <!-- Footer Section  -->
 <footer>
-  <p id="footer-copy">Oscar Pool <span aria-hidden="true">·</span> <a id="copy" href="https://github.com/quoije/oscars-pool">quoije</a></p>
+  <p id="footer-copy"><span data-i18n="footer.oscarPool">Oscar Pool</span> <span aria-hidden="true">·</span> <a id="copy" href="https://github.com/quoije/oscars-pool">quoije</a></p>
   <p id="footer-text"></p>
 </footer>
 

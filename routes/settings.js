@@ -16,6 +16,7 @@ const APP_VERSION_KEY = "app_version_control";
 const PLAYER_ADMIN_STATUS_UI_KEY = "player_admin_status_ui";
 const POINTS_CONFIG_KEY = "points_config";
 const VISIBILITY_CONFIG_KEY = "visibility_config";
+const LANGUAGE_KEY = "site_language";
 
 const crypto = require("crypto");
 
@@ -38,9 +39,13 @@ const DEFAULT_POINTS_CONFIG = Object.freeze({
 });
 
 const DEFAULT_VISIBILITY_CONFIG = Object.freeze({
-  showPicksButton: true,
-  showBonPicksColumn: true,
+  showPicksButton: false,
+  showBonPicksColumn: false,
+  showVersionTab: true,
 });
+
+const DEFAULT_LANGUAGE = "en";
+const SUPPORTED_LANGUAGES = Object.freeze(["en", "fr"]);
 
 function parseOscarYear(raw) {
   if (raw === undefined || raw === null || raw === "") return null;
@@ -772,7 +777,8 @@ function normalizeVisibilityConfig(rawValue) {
   const v = rawValue && typeof rawValue === "object" && !Array.isArray(rawValue) ? rawValue : {};
   const showPicksButton = typeof v.showPicksButton === "boolean" ? v.showPicksButton : DEFAULT_VISIBILITY_CONFIG.showPicksButton;
   const showBonPicksColumn = typeof v.showBonPicksColumn === "boolean" ? v.showBonPicksColumn : DEFAULT_VISIBILITY_CONFIG.showBonPicksColumn;
-  return { showPicksButton, showBonPicksColumn };
+  const showVersionTab = typeof v.showVersionTab === "boolean" ? v.showVersionTab : DEFAULT_VISIBILITY_CONFIG.showVersionTab;
+  return { showPicksButton, showBonPicksColumn, showVersionTab };
 }
 
 // Public: get points configuration
@@ -843,6 +849,50 @@ router.put("/visibility-config", async (req, res) => {
     ).select("value");
 
     return res.status(200).json(normalizeVisibilityConfig(updated?.value));
+  } catch (err) {
+    if (err instanceof jwt.JsonWebTokenError) {
+      return res.status(401).json({ message: "Invalid or expired token" });
+    }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// Language normalization
+function normalizeLanguage(raw) {
+  const lang = String(raw || "").trim().toLowerCase();
+  return SUPPORTED_LANGUAGES.includes(lang) ? lang : DEFAULT_LANGUAGE;
+}
+
+// Public: get current language setting
+router.get("/language", async (req, res) => {
+  try {
+    const existing = await Setting.findOne({ key: LANGUAGE_KEY }).select("value");
+    const language = normalizeLanguage(existing?.value);
+    return res.status(200).json({ language, supported: SUPPORTED_LANGUAGES });
+  } catch (err) {
+    return res.status(200).json({ language: DEFAULT_LANGUAGE, supported: SUPPORTED_LANGUAGES });
+  }
+});
+
+// Admin-only: set language
+router.put("/language", async (req, res) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ message: "Authentication token is required" });
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded.admin) {
+      return res.status(403).json({ message: "You do not have admin privileges" });
+    }
+
+    const language = normalizeLanguage(req.body?.language);
+    await Setting.findOneAndUpdate(
+      { key: LANGUAGE_KEY },
+      { $set: { value: language } },
+      { upsert: true, new: true }
+    );
+
+    return res.status(200).json({ language, supported: SUPPORTED_LANGUAGES });
   } catch (err) {
     if (err instanceof jwt.JsonWebTokenError) {
       return res.status(401).json({ message: "Invalid or expired token" });

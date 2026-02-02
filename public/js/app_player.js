@@ -7,6 +7,20 @@ function decodeJwt(token) {
   return JSON.parse(atob(padded));
 }
 
+// i18n helper function
+function t(key, fallback = '', params = {}) {
+  if (window.i18n && typeof window.i18n.t === 'function') {
+    return window.i18n.t(key, params);
+  }
+  let result = fallback;
+  if (params && typeof params === 'object') {
+    Object.keys(params).forEach(k => {
+      result = result.replace(`{${k}}`, String(params[k]));
+    });
+  }
+  return result;
+}
+
 function createPageLoader(options = {}) {
   const title = String(options.title || 'Chargement…');
   let progress = 0;
@@ -262,19 +276,19 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
       pendingRestoreTime = clamped;
       restoreInProgress = true;
       try { videoEl.currentTime = clamped; } catch (_) {}
-      lastSaveStatus = `Reprise · ${formatClock(clamped)}`;
-      setProgressUi({ state: 'info', text: lastSaveStatus, showText: true, ariaText: `Reprise à ${formatClock(clamped)}` });
+      lastSaveStatus = t('player.resumingAt', 'Resuming at {time}', { time: formatClock(clamped) });
+      setProgressUi({ state: 'info', text: lastSaveStatus, showText: true, ariaText: t('player.resumingAt', 'Resuming at {time}', { time: formatClock(clamped) }) });
     } else {
       pendingRestoreTime = null;
       restoreInProgress = false;
-      lastSaveStatus = 'Début';
-      setProgressUi({ state: 'info', text: 'Début', showText: true, ariaText: 'Lecture depuis le début' });
+      lastSaveStatus = t('player.beginning', 'Start');
+      setProgressUi({ state: 'info', text: t('player.beginning', 'Start'), showText: true, ariaText: t('player.playFromBeginning', 'Playing from the beginning') });
     }
     return true;
   }
 
   function scheduleRestore() {
-    if (!restored) setProgressUi({ state: 'preparing', text: 'Reprise', showText: true, ariaText: 'Prépare la reprise…' });
+    if (!restored) setProgressUi({ state: 'preparing', text: t('player.resuming', 'Resuming'), showText: true, ariaText: t('player.preparingResume', 'Preparing resume…') });
     void tryRestoreProgress();
   }
 
@@ -315,18 +329,18 @@ function setupVideoProgress({ videoEl, movieId, token, userId, imdbId }) {
     } catch (_) {}
 
     // Icon-only saving indicator (avoid noisy text updates).
-    setProgressUi({ state: 'saving', text: '', showText: false, ariaText: 'Sauvegarde…' });
+    setProgressUi({ state: 'saving', text: '', showText: false, ariaText: t('player.saving', 'Saving…') });
     const ok = await savePlaybackProgress(movieId, token, { ...snap, imdbId, keepalive: !!keepalive });
     if (ok === false) {
       // Token expired mid-playback; stop spamming requests and prompt user.
       stopInterval();
       try { localStorage.removeItem('auth_token'); } catch (_) {}
-      lastSaveStatus = 'Connexion requise pour sauvegarder.';
-      setProgressUi({ state: 'warning', text: 'Connexion', showText: true, ariaText: lastSaveStatus });
-      showAlertVariant('Session expirée. Reconnecte-toi pour continuer à sauvegarder la progression.', 'warning');
+      lastSaveStatus = t('player.connectionRequired', 'Connection required for saving.');
+      setProgressUi({ state: 'warning', text: t('player.connection', 'Connection'), showText: true, ariaText: lastSaveStatus });
+      showAlertVariant(t('player.sessionExpired', 'Session expired. Please reconnect to continue saving progress.'), 'warning');
       return;
     }
-    lastSaveStatus = `Sauvegardé à ${formatClock(snap.time)}.`;
+    lastSaveStatus = t('player.saved', 'Saved at {time}.', { time: formatClock(snap.time) });
     setProgressUi({ state: 'saved', text: '', showText: false, ariaText: lastSaveStatus });
     if (savedUiTimer) window.clearTimeout(savedUiTimer);
     savedUiTimer = window.setTimeout(() => {
@@ -574,11 +588,11 @@ function applyRatingState({ wrap, buttons, metaEl, averageRating, ratingsCount, 
   });
 
   const parts = [];
-  if (avg && count > 0) {
-    parts.push(`Note utilisateurs: ${avg.toFixed(1)} (${count})`);
-  } else {
-    parts.push('Note utilisateurs: —');
-  }
+  const ratingLabel = (avg && count > 0) ? `${avg.toFixed(1)} (${count})` : '—';
+  const translatedRating = (window.i18n && typeof window.i18n.t === 'function')
+    ? window.i18n.t('movies.userRating', { rating: ratingLabel })
+    : `User rating ${ratingLabel}`;
+  parts.push(translatedRating);
   metaEl.textContent = parts.join(' • ');
 }
 
@@ -1250,7 +1264,7 @@ async function initQualityToggle({ movieId, token, fallbackSrc, hasLowFile }) {
 }
 
 window.onload = async function () {
-  const pageLoader = createPageLoader({ title: 'Chargement du lecteur' });
+  const pageLoader = createPageLoader({ title: t('player.loadingPlayer', 'Loading player…') });
 
   // Basic auth UX: require a valid local token (like the rest of the app).
   const token = localStorage.getItem('auth_token');
@@ -1373,13 +1387,13 @@ window.onload = async function () {
     const videoEl = document.getElementById('video');
     if (videoEl && !videoEl.classList.contains('d-none')) {
       applySubtitleTrack({ videoEl, movie, token });
-      setProgressUi({ state: 'preparing', text: 'Reprise', showText: true, ariaText: 'Prépare la reprise…' });
+      setProgressUi({ state: 'preparing', text: t('player.resuming', 'Resuming'), showText: true, ariaText: t('player.preparingResume', 'Preparing resume…') });
       const userId = normalizeUserId(decoded);
       if (userId) {
         setupVideoProgress({ videoEl, movieId: id, token, userId, imdbId: movie?.imdb_id });
       } else {
         // Avoid a "stuck" progress state if the token payload is unexpected.
-        setProgressUi({ state: 'warning', text: '—', showText: true, ariaText: "Impossible d'identifier l'utilisateur pour sauvegarder la progression." });
+        setProgressUi({ state: 'warning', text: '—', showText: true, ariaText: t('player.unableToIdentifyUser', "Unable to identify user for saving progress.") });
       }
     } else {
       setProgressUi({ state: 'info', text: '—', showText: true });

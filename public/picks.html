@@ -3,11 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pool Oscars - Mes picks</title>
+  <title data-i18n="picks.title">Oscar Pool - My picks</title>
   <script src="./js/app_theme.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="./css/app.css" rel="stylesheet">
   <link rel="preload" as="image" href="img/logo_w.png">
+  <style>
+    /* Hide translatable content until translations are ready - prevents flash during page navigation */
+    body:not(.i18n-ready) [data-i18n] {
+      opacity: 0;
+      transition: opacity 0.1s ease-in;
+    }
+    body.i18n-ready [data-i18n] {
+      opacity: 1;
+    }
+    /* Fallback: show content after 2 seconds even if JS fails */
+    body:not(.i18n-ready) [data-i18n] {
+      animation: show-after-delay 0.1s 2s forwards;
+    }
+    @keyframes show-after-delay {
+      to { opacity: 1; }
+    }
+  </style>
+  <script src="./js/localization.js" defer></script>
   <script src="./js/app_header_boot.js" defer></script>
   <style>
     .navbar-custom {
@@ -113,7 +131,7 @@
 <!-- Preloaded loader overlay to avoid initial "clear" flash -->
 <div id="page-loader-overlay" class="page-loader-overlay" data-preloaded="true" role="status" aria-live="polite" aria-busy="true">
   <div class="page-loader-card page-loader-card--baronly">
-    <span class="visually-hidden">Chargement…</span>
+    <span class="visually-hidden" data-i18n="common.loading">Loading…</span>
     <div class="page-loader-progress" aria-hidden="true">
       <div class="page-loader-bar" id="page-loader-bar" style="width: 8%;"></div>
     </div>
@@ -131,15 +149,15 @@
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
       <div class="navbar-nav">
-        <a href="movies.html" class="nav-link btn btn-outline-light me-2">Films</a>
-        <a href="checklist.html" class="nav-link btn btn-outline-light me-2">Checklist</a>
-        <a href="user-stat.html" class="nav-link btn btn-outline-light me-2">Stats</a>
-        <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;">Mes picks</a>
-        <a id="admin-control-link" href="control.html" class="nav-link btn btn-warning me-2 d-none">Admin</a>
+        <a href="movies.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.films">Films</a>
+        <a href="checklist.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.checklist">Checklist</a>
+        <a href="user-stat.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.stats">Stats</a>
+        <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;" data-i18n="nav.myPicks">My picks</a>
+        <a id="admin-control-link" href="control.html" class="nav-link btn btn-warning me-2 d-none" data-i18n="nav.admin">Admin</a>
       </div>
       <div class="d-flex ms-auto mt-2 mt-lg-0 align-items-center gap-2 navbar-user">
         <span id="user-name" class="navbar-text" data-user-name></span>
-        <button class="theme-toggle" type="button" data-theme-toggle role="switch" aria-checked="false" aria-label="Basculer le mode sombre">
+        <button class="theme-toggle" type="button" data-theme-toggle role="switch" aria-checked="false" data-i18n-aria-label="common.toggleDarkMode" aria-label="Toggle dark mode">
           <span class="theme-toggle-icon theme-toggle-icon-sun" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="4"></circle>
@@ -160,7 +178,7 @@
             </svg>
           </span>
         </button>
-        <button id="log-off" class="btn btn-danger">Déconnexion</button>
+        <button id="log-off" class="btn btn-danger" data-i18n="nav.logout">Log out</button>
       </div>
     </div>
   </div>
@@ -168,23 +186,23 @@
 
 <div class="container mt-4 pb-5">
   <div id="alert-container"></div>
-  
+
   <!-- Tabs -->
   <ul class="nav nav-tabs" id="picksTabs" role="tablist">
     <li class="nav-item" role="presentation">
-      <button class="nav-link active" id="tab-my-picks" data-bs-toggle="tab" data-bs-target="#pane-my-picks" type="button" role="tab" aria-controls="pane-my-picks" aria-selected="true">
-        Mes picks
+      <button class="nav-link active" id="tab-my-picks" data-bs-toggle="tab" data-bs-target="#pane-my-picks" type="button" role="tab" aria-controls="pane-my-picks" aria-selected="true" data-i18n="picks.myPicks">
+        My picks
       </button>
     </li>
     <li class="nav-item" role="presentation">
-      <button class="nav-link" id="tab-scores" data-bs-toggle="tab" data-bs-target="#pane-scores" type="button" role="tab" aria-controls="pane-scores" aria-selected="false">
+      <button class="nav-link" id="tab-scores" data-bs-toggle="tab" data-bs-target="#pane-scores" type="button" role="tab" aria-controls="pane-scores" aria-selected="false" data-i18n="picks.scores">
         Scores
       </button>
     </li>
     <li class="nav-item" role="presentation">
       <button class="nav-link d-none" id="tab-winners" data-bs-toggle="tab" data-bs-target="#pane-winners" type="button" role="tab" aria-controls="pane-winners" aria-selected="false">
-        Gagnants
-        <span class="badge bg-warning text-dark ms-1">Admin</span>
+        <span data-i18n="picks.winners">Winners</span>
+        <span class="badge bg-warning text-dark ms-1" data-i18n="picks.adminBadge">Admin</span>
       </button>
     </li>
   </ul>
@@ -194,16 +212,16 @@
     <div class="tab-pane fade show active" id="pane-my-picks" role="tabpanel" aria-labelledby="tab-my-picks" tabindex="0">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div>
-          <span class="fw-semibold">Année: <span id="current-year">—</span></span>
-          <span class="text-muted small ms-2">Progression: <span id="picks-progress">0 / 0</span></span>
+          <span class="fw-semibold"><span data-i18n="picks.year">Year:</span> <span id="current-year">—</span></span>
+          <span class="text-muted small ms-2"><span data-i18n="picks.progress">Progress:</span> <span id="picks-progress">0 / 0</span></span>
         </div>
         <div class="d-flex gap-2">
-          <button type="button" id="load-my-picks" class="btn btn-sm btn-outline-secondary">Recharger</button>
+          <button type="button" id="load-my-picks" class="btn btn-sm btn-outline-secondary" data-i18n="picks.reload">Reload</button>
         </div>
       </div>
 
       <div id="categories-container">
-        <div class="text-center py-3 text-muted small">Chargement des catégories…</div>
+        <div class="text-center py-3 text-muted small" data-i18n="picks.loadingCategories">Loading categories…</div>
       </div>
     </div>
 
@@ -211,15 +229,15 @@
     <div class="tab-pane fade" id="pane-scores" role="tabpanel" aria-labelledby="tab-scores" tabindex="0">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div>
-          <span class="fw-semibold">Année: <span id="scores-year">—</span></span>
+          <span class="fw-semibold"><span data-i18n="picks.year">Year:</span> <span id="scores-year">—</span></span>
         </div>
         <div class="d-flex gap-2">
-          <button type="button" id="refresh-scores" class="btn btn-sm btn-outline-secondary">Rafraîchir</button>
+          <button type="button" id="refresh-scores" class="btn btn-sm btn-outline-secondary" data-i18n="common.refresh">Refresh</button>
         </div>
       </div>
 
       <div id="scores-container">
-        <div class="text-center py-3 text-muted small">Les scores seront calculés après avoir marqué les gagnants.</div>
+        <div class="text-center py-3 text-muted small" data-i18n="picks.scoresCalculatedAfterWinners">Scores will be calculated after marking winners.</div>
       </div>
     </div>
 
@@ -227,16 +245,16 @@
     <div class="tab-pane fade" id="pane-winners" role="tabpanel" aria-labelledby="tab-winners" tabindex="0">
       <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
         <div>
-          <span class="fw-semibold">Année: <span id="winners-year">—</span></span>
-          <span class="text-muted small ms-2"><span id="winners-progress">0 / 0</span> gagnants marqués</span>
+          <span class="fw-semibold"><span data-i18n="picks.year">Year:</span> <span id="winners-year">—</span></span>
+          <span class="text-muted small ms-2"><span id="winners-progress">0 / 0</span> <span data-i18n="picks.winnersMarked">winners marked</span></span>
         </div>
         <div class="d-flex gap-2">
-          <button type="button" id="refresh-winners" class="btn btn-sm btn-outline-secondary">Rafraîchir</button>
+          <button type="button" id="refresh-winners" class="btn btn-sm btn-outline-secondary" data-i18n="common.refresh">Refresh</button>
         </div>
       </div>
 
       <div id="winners-container">
-        <div class="text-center py-3 text-muted small">Chargement des catégories…</div>
+        <div class="text-center py-3 text-muted small" data-i18n="picks.loadingCategories">Loading categories…</div>
       </div>
     </div>
   </div>
@@ -247,16 +265,16 @@
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="userPicksModalLabel">Détails des choix</h5>
+        <h5 class="modal-title" id="userPicksModalLabel" data-i18n="picks.choiceDetails">Choice details</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
         <div id="user-picks-modal-content">
-          <div class="text-center py-4 text-muted">Chargement...</div>
+          <div class="text-center py-4 text-muted" data-i18n="common.loading">Loading...</div>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button>
       </div>
     </div>
   </div>
@@ -264,7 +282,7 @@
 
 <!-- Footer Section  -->
 <footer>
-  <p id="footer-copy">Oscar Pool <span aria-hidden="true">·</span> <a id="copy" href="https://github.com/quoije/oscars-pool">quoije</a></p>
+  <p id="footer-copy"><span data-i18n="footer.oscarPool">Oscar Pool</span> <span aria-hidden="true">·</span> <a id="copy" href="https://github.com/quoije/oscars-pool">quoije</a></p>
   <p id="footer-text"></p>
 </footer>
 
@@ -274,4 +292,3 @@
 
 </body>
 </html>
-

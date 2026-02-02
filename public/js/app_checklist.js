@@ -1,7 +1,21 @@
+// i18n helper function
+function t(key, fallback = '', params = {}) {
+  if (window.i18n && typeof window.i18n.t === 'function') {
+    return window.i18n.t(key, params);
+  }
+  let result = fallback;
+  if (params && typeof params === 'object') {
+    Object.keys(params).forEach(k => {
+      result = result.replace(`{${k}}`, String(params[k]));
+    });
+  }
+  return result;
+}
+
 function createPageLoader(options = {}) {
-  const title = String(options.title || 'Chargement…');
+  const title = String(options.title || t('common.loading', 'Loading…'));
   // Subtitle kept for backwards-compat with callers, but we no longer render text in the UI.
-  const subtitle = String(options.subtitle || 'Préparation de la page…');
+  const subtitle = String(options.subtitle || t('common.preparingPage', 'Preparing page…'));
 
   let progress = 0;
   let removed = false;
@@ -119,8 +133,8 @@ function createPageLoader(options = {}) {
 
 window.addEventListener('DOMContentLoaded', async function () {
     const pageLoader = createPageLoader({
-      title: 'Chargement de la checklist',
-      subtitle: 'Récupération des données…'
+      title: (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('checklist.loadingChecklist') : 'Loading checklist',
+      subtitle: (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.fetchingData') : 'Fetching data…'
     });
 
     const token = localStorage.getItem('auth_token');
@@ -133,7 +147,7 @@ window.addEventListener('DOMContentLoaded', async function () {
         <tr>
           <td colspan="3">
             <div class="alert alert-danger my-2" role="alert">
-              ${message || 'Erreur lors du chargement.'}
+              ${message || t('common.errorLoading', 'Error loading.')}
             </div>
           </td>
         </tr>
@@ -141,7 +155,7 @@ window.addEventListener('DOMContentLoaded', async function () {
     }
 
     const DEFAULT_COMPLETION_MODAL = Object.freeze({
-      title: 'Félicitations! very nice 🎉🎉🎉',
+      title: (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('checklist.congratulations') : 'Congratulations! very nice 🎉🎉🎉',
       bodyText: '',
       videoSrc: 'video/reward.mp4',
       bodyHtml: ''
@@ -265,16 +279,20 @@ window.addEventListener('DOMContentLoaded', async function () {
     const fallbackDate = parseLocalNoonFromIsoDate(`${activeYear}-03-15`) || new Date(`March 15, ${activeYear} 12:00:00`);
     if (oscarDayMonthEl) {
       try {
-        oscarDayMonthEl.textContent = fallbackDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+        const locale = (window.i18n && typeof window.i18n.getLanguage === 'function') ? window.i18n.getLanguage() : (document.documentElement.lang || 'en');
+        oscarDayMonthEl.textContent = fallbackDate.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
       } catch (_) {
-        oscarDayMonthEl.textContent = '15 mars';
+        oscarDayMonthEl.textContent = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('checklist.march15') : 'March 15';
       }
     }
 
     const currentDate = new Date();
     let timeDifference = fallbackDate - currentDate;
     let daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
-    if (timeLeftEl) timeLeftEl.textContent = `${daysLeft} jours`;
+    if (timeLeftEl) {
+      const daysLabel = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.daysLeft', { days: daysLeft }) : `${daysLeft} days`;
+      timeLeftEl.textContent = daysLabel;
+    }
 
     fetchOscarEffectiveDate(activeYear).then((oscarEffectiveDate) => {
       const targetDate =
@@ -283,13 +301,17 @@ window.addEventListener('DOMContentLoaded', async function () {
 
       if (oscarDayMonthEl) {
         try {
-          oscarDayMonthEl.textContent = targetDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+          const locale = (window.i18n && typeof window.i18n.getLanguage === 'function') ? window.i18n.getLanguage() : (document.documentElement.lang || 'en');
+          oscarDayMonthEl.textContent = targetDate.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
         } catch (_) {}
       }
       const now = new Date();
       timeDifference = targetDate - now;
       daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
-      if (timeLeftEl) timeLeftEl.textContent = `${daysLeft} jours`;
+      if (timeLeftEl) {
+        const daysLabel = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.daysLeft', { days: daysLeft }) : `${daysLeft} days`;
+        timeLeftEl.textContent = daysLabel;
+      }
     }).catch(() => {});
 
     if (token) {
@@ -333,7 +355,12 @@ window.addEventListener('DOMContentLoaded', async function () {
           const totalCount = Number(summary?.totalMoviesCount) || 0;
           const watchedCount = Number(summary?.watchedMoviesCount) || 0;
           const ratioPct = totalCount > 0 ? ((watchedCount / totalCount) * 100).toFixed(1) : '0.0';
-          if (watchedRatioEl) watchedRatioEl.innerText = `Vu: ${watchedCount} / ${totalCount} (${ratioPct}%)`;
+          if (watchedRatioEl) {
+            const txt = (window.i18n && typeof window.i18n.t === 'function')
+              ? window.i18n.t('movies.watchedRatio', { watched: watchedCount, total: totalCount, percent: ratioPct })
+              : `Watched: ${watchedCount} / ${totalCount} (${ratioPct}%)`;
+            watchedRatioEl.innerText = txt;
+          }
           updateProgressBar(watchedCount, totalCount, false);
           pageLoader.setProgress(32);
           return summary;
@@ -341,7 +368,7 @@ window.addEventListener('DOMContentLoaded', async function () {
         .catch(() => null);
 
       // Fetch remaining data in parallel.
-      pageLoader.setSubtitle('Chargement de la liste des films…');
+      pageLoader.setSubtitle(t('checklist.loadingMovies', 'Loading movies…'));
       pageLoader.setProgress(26);
       const [completionModalContent, moviesRes] = await Promise.all([
         fetchCompletionModalContent(),
@@ -372,8 +399,8 @@ window.addEventListener('DOMContentLoaded', async function () {
 
       if (progressBarEl) progressBarEl.removeAttribute('aria-busy');
     } catch (e) {
-      showTableError('Impossible de charger la checklist. Réessaie dans quelques instants.');
-      pageLoader.fail('Impossible de charger la checklist. Vérifie ta connexion puis réessaie.');
+      showTableError((window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('checklist.unableToLoad') : 'Unable to load checklist. Please try again later.');
+      pageLoader.fail((window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('checklist.unableToLoadNetwork') : 'Unable to load checklist. Check your connection and try again.');
       return;
     }
 
@@ -383,7 +410,12 @@ window.addEventListener('DOMContentLoaded', async function () {
     const totalMoviesCount = movies.length;
     const watchedMoviesCount = watchedMoviesInYear.length;
     const ratioPct = totalMoviesCount > 0 ? ((watchedMoviesCount / totalMoviesCount) * 100).toFixed(1) : '0.0';
-    document.getElementById('watched-ratio').innerText = `Vu: ${watchedMoviesCount} / ${totalMoviesCount} (${ratioPct}%)`;
+    if (document.getElementById('watched-ratio')) {
+      const txt = (window.i18n && typeof window.i18n.t === 'function')
+        ? window.i18n.t('movies.watchedRatio', { watched: watchedMoviesCount, total: totalMoviesCount, percent: ratioPct })
+        : `Watched: ${watchedMoviesCount} / ${totalMoviesCount} (${ratioPct}%)`;
+      document.getElementById('watched-ratio').innerText = txt;
+    }
 
     function launchConfetti() {
       const duration = 3 * 1000; // 3 seconds
@@ -522,12 +554,22 @@ window.addEventListener('DOMContentLoaded', async function () {
               watchedMoviesInYear = updatedWatchedMovies.filter((wm) => movieImdbIds.has(wm.imdb_id));
               const updatedWatchedCount = watchedMoviesInYear.length;
               const updatedPct = totalMoviesCount > 0 ? ((updatedWatchedCount / totalMoviesCount) * 100).toFixed(1) : '0.0';
-              document.getElementById('watched-ratio').innerText = `Vu: ${updatedWatchedCount} / ${totalMoviesCount} (${updatedPct}%)`;
+              if (document.getElementById('watched-ratio')) {
+                const updatedTxt = (window.i18n && typeof window.i18n.t === 'function')
+                  ? window.i18n.t('movies.watchedRatio', { watched: updatedWatchedCount, total: totalMoviesCount, percent: updatedPct })
+                  : `Watched: ${updatedWatchedCount} / ${totalMoviesCount} (${updatedPct}%)`;
+                document.getElementById('watched-ratio').innerText = updatedTxt;
+              }
               updateProgressBar(updatedWatchedCount, totalMoviesCount);
 
               const moviesLeft = totalMoviesCount - updatedWatchedCount;
               const moviesPerDay = daysLeft > 0 ? (moviesLeft / daysLeft).toFixed(2) : moviesLeft;
-              document.getElementById('movies-per-day').textContent = `À voir par jour: ${moviesPerDay} films`;
+              if (document.getElementById('movies-per-day')) {
+                const perDayText = (window.i18n && typeof window.i18n.t === 'function')
+                  ? window.i18n.t('checklist.moviesToWatchPerDay', { count: moviesPerDay })
+                  : `Movies to watch per day: ${moviesPerDay}`;
+                document.getElementById('movies-per-day').textContent = perDayText;
+              }
             }
           });
 
@@ -562,20 +604,35 @@ window.addEventListener('DOMContentLoaded', async function () {
           watchedMoviesInYear = updatedWatchedMovies.filter((wm) => movieImdbIds.has(wm.imdb_id));
           const updatedWatchedCount = watchedMoviesInYear.length;
           const updatedPct = totalMoviesCount > 0 ? ((updatedWatchedCount / totalMoviesCount) * 100).toFixed(1) : '0.0';
-          document.getElementById('watched-ratio').innerText = `Vu: ${updatedWatchedCount} / ${totalMoviesCount} (${updatedPct}%)`;
+          if (document.getElementById('watched-ratio')) {
+            const updatedTxt = (window.i18n && typeof window.i18n.t === 'function')
+              ? window.i18n.t('movies.watchedRatio', { watched: updatedWatchedCount, total: totalMoviesCount, percent: updatedPct })
+              : `Watched: ${updatedWatchedCount} / ${totalMoviesCount} (${updatedPct}%)`;
+            document.getElementById('watched-ratio').innerText = updatedTxt;
+          }
           updateProgressBar(updatedWatchedCount, totalMoviesCount);
 
           // Recalculate and update movies per day
           const moviesLeft = totalMoviesCount - updatedWatchedCount;
           const moviesPerDay = daysLeft > 0 ? (moviesLeft / daysLeft).toFixed(2) : moviesLeft;
-          document.getElementById('movies-per-day').textContent = `À voir par jour: ${moviesPerDay} films`;
+          if (document.getElementById('movies-per-day')) {
+            const perDayText = (window.i18n && typeof window.i18n.t === 'function')
+              ? window.i18n.t('checklist.moviesToWatchPerDay', { count: moviesPerDay })
+              : `Movies to watch per day: ${moviesPerDay}`;
+            document.getElementById('movies-per-day').textContent = perDayText;
+          }
         }
       });
     });
 
     const moviesLeft = totalMoviesCount - watchedMoviesCount;
     const moviesPerDay = daysLeft > 0 ? (moviesLeft / daysLeft).toFixed(2) : moviesLeft;
-    document.getElementById('movies-per-day').textContent = `À voir par jour: ${moviesPerDay} films`;
+    if (document.getElementById('movies-per-day')) {
+      const perDayText = (window.i18n && typeof window.i18n.t === 'function')
+        ? window.i18n.t('checklist.moviesToWatchPerDay', { count: moviesPerDay })
+        : `Movies to watch per day: ${moviesPerDay}`;
+      document.getElementById('movies-per-day').textContent = perDayText;
+    }
 
     pageLoader.setSubtitle('Finalisation de l’affichage…');
     pageLoader.setProgress(92);

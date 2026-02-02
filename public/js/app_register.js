@@ -2,6 +2,22 @@ function decodeJwt(token) {
   return JSON.parse(atob(token.split('.')[1]));
 }
 
+function translateApiMessage(messageKey, message, fallbackKey, fallbackText) {
+  try {
+    if (window.i18n && typeof window.i18n.t === 'function') {
+      if (messageKey) return window.i18n.t(messageKey);
+      const map = {
+        'Mauvais nom de chien': 'auth.dogAnswerIncorrect',
+        "L'utilisateur s'est enregistré avec succès !": 'auth.registrationSuccess',
+        'User registered successfully!': 'auth.registrationSuccess',
+      };
+      if (message && map[message]) return window.i18n.t(map[message]);
+      if (fallbackKey) return window.i18n.t(fallbackKey);
+    }
+  } catch (_) {}
+  return message || fallbackText || '';
+}
+
 async function applyActiveOscarYearToTitle() {
   const base = 'Pool Oscars';
   const current = String(document.title || base);
@@ -92,7 +108,12 @@ initPage();
     if (res.ok) {
       const data = await res.json();
       // Show success message in the modal
-      responseMessageElement.textContent = data.message;
+      responseMessageElement.textContent = translateApiMessage(
+        data?.messageKey,
+        data?.message,
+        'auth.registrationSuccess',
+        'User registered successfully!'
+      );
       
       // Show the modal
       modal.show();
@@ -104,7 +125,11 @@ initPage();
     } else {
       const error = await res.json();
       // Show error message in the modal
-      responseMessageElement.textContent = `Error: ${error.message}`;
+      const prefix = (window.i18n && typeof window.i18n.t === 'function')
+        ? window.i18n.t('common.errorPrefix')
+        : 'Error:';
+      const msg = translateApiMessage(error?.messageKey, error?.message, 'common.errorOccurred', 'An error occurred');
+      responseMessageElement.textContent = `${prefix} ${msg}`.trim();
       
       // Show the modal
       modal.show();

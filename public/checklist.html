@@ -3,11 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pool Oscars - Checklist</title>
+  <title data-i18n="checklist.title">Oscar Pool - Checklist</title>
   <script src="./js/app_theme.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="./css/app.css" rel="stylesheet">
   <link rel="preload" as="image" href="img/logo_w.png">
+  <style>
+    /* Hide translatable content until translations are ready - prevents flash during page navigation */
+    body:not(.i18n-ready) [data-i18n] {
+      opacity: 0;
+      transition: opacity 0.1s ease-in;
+    }
+    body.i18n-ready [data-i18n] {
+      opacity: 1;
+    }
+    /* Fallback: show content after 2 seconds even if JS fails */
+    body:not(.i18n-ready) [data-i18n] {
+      animation: show-after-delay 0.1s 2s forwards;
+    }
+    @keyframes show-after-delay {
+      to { opacity: 1; }
+    }
+  </style>
+  <script src="./js/localization.js" defer></script>
   <script src="./js/app_header_boot.js" defer></script>
   <style>
     .navbar-custom {
@@ -52,7 +70,7 @@
 <!-- Preloaded loader overlay to avoid initial "clear" flash -->
 <div id="page-loader-overlay" class="page-loader-overlay" data-preloaded="true" role="status" aria-live="polite" aria-busy="true">
   <div class="page-loader-card page-loader-card--baronly">
-    <span class="visually-hidden">Chargement…</span>
+    <span class="visually-hidden" data-i18n="common.loading">Loading…</span>
     <div class="page-loader-progress" aria-hidden="true">
       <div class="page-loader-bar" id="page-loader-bar" style="width: 8%;"></div>
     </div>
@@ -71,16 +89,16 @@
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
       <div class="navbar-nav">
-        <a href="movies.html" class="nav-link btn btn-outline-light me-2">Films</a>
-        <a href="checklist.html" class="nav-link btn btn-outline-light me-2">Checklist</a>
-        <a href="user-stat.html" class="nav-link btn btn-outline-light me-2">Stats</a>
-        <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;">Mes picks</a>
-        <a id="admin-control-link" href="control.html" class="nav-link btn btn-warning me-2 d-none">Admin</a>
+        <a href="movies.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.films">Films</a>
+        <a href="checklist.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.checklist">Checklist</a>
+        <a href="user-stat.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.stats">Stats</a>
+        <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;" data-i18n="nav.myPicks">My picks</a>
+        <a id="admin-control-link" href="control.html" class="nav-link btn btn-warning me-2 d-none" data-i18n="nav.admin">Admin</a>
       </div>
       <!-- Move user info inside collapsible navbar and align it properly -->
       <div class="d-flex ms-auto mt-2 mt-lg-0 align-items-center gap-2 navbar-user">
         <span id="user-name" class="navbar-text" data-user-name></span>
-        <button class="theme-toggle" type="button" data-theme-toggle role="switch" aria-checked="false" aria-label="Basculer le mode sombre">
+        <button class="theme-toggle" type="button" data-theme-toggle role="switch" aria-checked="false" data-i18n-aria-label="common.toggleDarkMode" aria-label="Toggle dark mode">
           <span class="theme-toggle-icon theme-toggle-icon-sun" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="4"></circle>
@@ -101,7 +119,7 @@
             </svg>
           </span>
         </button>
-        <button id="log-off" class="btn btn-danger">Déconnexion</button>
+        <button id="log-off" class="btn btn-danger" data-i18n="nav.logout">Log out</button>
       </div>
     </div>
   </div>
@@ -113,8 +131,9 @@
     <div class="card-body">
       <div class="d-flex flex-column gap-1">
         <div id="watched-ratio" class="fw-semibold">—</div>
-        <div class="text-muted small">
-          Temps avant les Oscars (<span id="oscar-date-day-month">—</span> <span id="oscar-year">—</span>) — <span id="time-left">—</span>
+        <div class="text-muted small" id="time-until-oscars-container">
+          <span data-i18n="movies.timeUntilOscarsLabel">Time until the Oscars</span>
+          &nbsp;(<span id="oscar-date-day-month">—</span> <span id="oscar-year">—</span>) — <span id="time-left">—</span>
         </div>
         <div class="text-muted small"><span id="movies-per-day"></span></div>
       </div>
@@ -130,14 +149,14 @@
     <table class="table table-striped table-hover align-middle movie-table mb-0">
       <thead>
         <tr>
-          <th scope="col">Vu</th>
-          <th scope="col">Titre</th>
-          <th scope="col">Date</th>
+          <th scope="col" data-i18n="checklist.seen">Seen</th>
+          <th scope="col" data-i18n="checklist.filmTitle">Title</th>
+          <th scope="col" data-i18n="checklist.date">Date</th>
         </tr>
       </thead>
       <tbody id="movie-table-body">
         <tr>
-          <td colspan="3" class="text-center py-4 text-muted" aria-live="polite" aria-busy="true">Chargement…</td>
+          <td colspan="3" class="text-center py-4 text-muted" aria-live="polite" aria-busy="true" data-i18n="common.loading">Loading…</td>
         </tr>
       </tbody>
     </table>
@@ -154,15 +173,15 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="uncheckConfirmModalLabel">Confirmer le retrait</h5>
+        <h5 class="modal-title" id="uncheckConfirmModalLabel" data-i18n="checklist.confirmRemoval">Confirm removal</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <p>Es-tu sûr de vouloir retirer <strong id="uncheckMovieTitle"></strong> de ta liste?</p>
+        <p id="uncheck-confirm-text">Are you sure you want to remove <strong id="uncheckMovieTitle"></strong> from your list?</p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annuler</button>
-        <button type="button" class="btn btn-danger" id="confirmUncheckBtn">Retirer</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.cancel">Cancel</button>
+        <button type="button" class="btn btn-danger" id="confirmUncheckBtn" data-i18n="common.remove">Remove</button>
       </div>
     </div>
   </div>
@@ -173,7 +192,7 @@
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="videoModalLabel">Félicitations! very nice 🎉🎉🎉</h5>
+        <h5 class="modal-title" id="videoModalLabel" data-i18n="checklist.congratulations">Congratulations! very nice 🎉🎉🎉</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body text-center">
@@ -182,7 +201,7 @@
 
         <video id="rewardVideo" width="75%" controls class="d-none">
           <source id="rewardVideoSource" src="video/reward.mp4" type="video/mp4">
-          Votre navigateur ne supporte pas la vidéo.
+          <span data-i18n="checklist.browserNoVideo">Your browser does not support video.</span>
         </video>
       </div>
     </div>
@@ -191,7 +210,7 @@
 
 <!-- Footer Section  -->
 <footer>
-  <p id="footer-copy">Oscar Pool <span aria-hidden="true">·</span> <a id="copy" href="https://github.com/quoije/oscars-pool">quoije</a></p>
+  <p id="footer-copy"><span data-i18n="footer.oscarPool">Oscar Pool</span> <span aria-hidden="true">·</span> <a id="copy" href="https://github.com/quoije/oscars-pool">quoije</a></p>
   <p id="footer-text"></p>
 </footer>
 

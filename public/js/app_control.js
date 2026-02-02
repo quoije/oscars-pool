@@ -139,7 +139,7 @@ window.onload = async function () {
   let appVersionState = { active: null, versions: [] };
 
   const DEFAULT_COMPLETION_MODAL = Object.freeze({
-    title: 'Félicitations! very nice 🎉🎉🎉',
+    title: t('admin.modal100.defaultTitle', 'Congratulations! very nice 🎉🎉🎉'),
     bodyText: '',
     videoSrc: 'video/reward.mp4',
     bodyHtml: '',
@@ -149,6 +149,23 @@ window.onload = async function () {
     showSource: true,
     showProgress: true,
   });
+
+  // Small translation helper: prefers window.i18n.t when available,
+  // falls back to the provided fallback string and does simple {name}/{year} interpolation.
+  function t(key, fallback, params) {
+    try {
+      if (window.i18n && typeof window.i18n.t === 'function') {
+        return window.i18n.t(key, params || {});
+      }
+    } catch (_) {}
+    let out = (typeof fallback === 'string') ? fallback : String(key);
+    if (params && typeof params === 'object') {
+      Object.keys(params).forEach((k) => {
+        out = out.replace(new RegExp(`\\{${k}\\}`, 'g'), String(params[k]));
+      });
+    }
+    return out;
+  }
 
   function showResponse(kind, message) {
     responseEl.classList.remove('d-none', 'alert-success', 'alert-danger', 'alert-warning');
@@ -283,7 +300,7 @@ window.onload = async function () {
     } catch (err) {
       // Keep defaults so admin can still set something.
       setPlayerUiForm(DEFAULT_PLAYER_UI);
-      showResponse('warning', err.message || 'Impossible de charger les réglages du lecteur.');
+      showResponse('warning', err.message || t('admin.player.errorLoading', 'Unable to load player settings.'));
     }
   }
 
@@ -451,7 +468,7 @@ window.onload = async function () {
           `</div>` +
           `<div class="flex-shrink-0 d-flex gap-2">` +
             `${activateBtn}` +
-            `<button type="button" class="btn btn-sm btn-outline-danger btn-compact" data-app-version-delete="${escapeHtml(id)}">Supprimer</button>` +
+            `<button type="button" class="btn btn-sm btn-outline-danger btn-compact" data-app-version-delete="${escapeHtml(id)}">${t('common.delete','Delete')}</button>` +
           `</div>` +
         `</div>`
       );
@@ -472,9 +489,9 @@ window.onload = async function () {
           appVersionLoadedOnce = true;
           renderAppVersionUI();
           await refreshAppVersionPreview();
-          setAppVersionAlert('success', 'Version active mise à jour.');
+          setAppVersionAlert('success', t('admin.versions.updated', 'Version updated.'));
         } catch (err) {
-          setAppVersionAlert('danger', err.message || 'Erreur réseau');
+          setAppVersionAlert('danger', err.message || 'Network error');
         } finally {
           btn.disabled = false;
           btn.textContent = old;
@@ -486,7 +503,7 @@ window.onload = async function () {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-app-version-delete');
         if (!id) return;
-        const ok = window.confirm('Supprimer cette version ?');
+        const ok = window.confirm(t('admin.version.confirmDelete','Delete this version?'));
         if (!ok) return;
         btn.disabled = true;
         const old = btn.textContent;
@@ -497,9 +514,9 @@ window.onload = async function () {
           appVersionLoadedOnce = true;
           renderAppVersionUI();
           await refreshAppVersionPreview();
-          setAppVersionAlert('success', 'Version supprimée.');
+          setAppVersionAlert('success', t('admin.versions.deleted', 'Version deleted.'));
         } catch (err) {
-          setAppVersionAlert('danger', err.message || 'Erreur réseau');
+          setAppVersionAlert('danger', err.message || 'Network error');
         } finally {
           btn.disabled = false;
           btn.textContent = old;
@@ -523,7 +540,7 @@ window.onload = async function () {
       appVersionState = { active: null, versions: [] };
       renderAppVersionUI();
       await refreshAppVersionPreview();
-      setAppVersionAlert('danger', err.message || 'Erreur réseau');
+      setAppVersionAlert('danger', err.message || 'Network error');
     }
   }
 
@@ -773,7 +790,7 @@ window.onload = async function () {
 
       const badges = [];
       if (u?.admin) badges.push({ text: 'Admin', cls: 'bg-warning text-dark' });
-      if (u?.mustChangePassword) badges.push({ text: 'Reset MDP', cls: 'bg-danger' });
+      if (u?.mustChangePassword) badges.push({ text: t('admin.users.resetPassword','Reset MDP'), cls: 'bg-danger' });
 
       if (!badges.length) {
         const span = document.createElement('span');
@@ -798,18 +815,20 @@ window.onload = async function () {
       const resetBtn = document.createElement('button');
       resetBtn.type = 'button';
       resetBtn.className = 'btn btn-outline-danger btn-sm me-1';
-      resetBtn.textContent = 'Reset MDP';
+      resetBtn.textContent = t('admin.users.resetPassword','Reset MDP');
       resetBtn.addEventListener('click', () => openResetUserModal(u));
 
       const deleteBtn = document.createElement('button');
       deleteBtn.type = 'button';
       deleteBtn.className = 'btn btn-outline-danger btn-sm';
-      deleteBtn.textContent = 'Supprimer';
+      deleteBtn.textContent = t('common.delete','Delete');
 
       const isSelf = String(u?.id || '') && String(u.id) === String(decoded?.id || '');
       if (isSelf || u?.admin) {
         deleteBtn.disabled = true;
-        deleteBtn.title = isSelf ? 'Impossible de supprimer ton propre compte' : 'Suppression des admins désactivée';
+        deleteBtn.title = isSelf
+          ? t('admin.users.cannotDeleteSelf','You cannot delete your own account from here.')
+          : t('admin.users.adminDeleteDisabled','Deleting admin accounts is disabled via this interface.');
       }
 
       deleteBtn.addEventListener('click', () => openDeleteUserModal(u));
@@ -855,14 +874,14 @@ window.onload = async function () {
       users.sort((a, b) => (a?.name || '').localeCompare((b?.name || ''), 'fr', { sensitivity: 'base' }));
       renderAdminUsers(users);
     } catch (err) {
-      adminUsersBody.innerHTML = `<tr><td colspan="4" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
+      adminUsersBody.innerHTML = `<tr><td colspan="4" class="text-danger">${err.message || t('common.networkError', 'Network error')}</td></tr>`;
       setUsersCount(null);
     }
   }
 
   function parseYear(value) {
     const n = Number(value);
-    if (!Number.isInteger(n)) return null;
+      if (!Number.isInteger(n)) return null; // Ensure the year is an integer
     if (n < 1900 || n > 3000) return null;
     return n;
   }
@@ -922,7 +941,9 @@ window.onload = async function () {
     const lines = years.map((y) => {
       const key = String(y);
       const val = oscarDatesByYear && typeof oscarDatesByYear === 'object' ? oscarDatesByYear[key] : null;
-      const date = (typeof val === 'string' && isIsoDateString(val)) ? val : '— (défaut: 03-15)';
+      const date = (typeof val === 'string' && isIsoDateString(val))
+        ? val
+        : t('admin.settings.oscarDateDefaultShort', '— (default: 03-15)');
       return `${key}: ${date}`;
     });
 
@@ -932,7 +953,7 @@ window.onload = async function () {
 
   function applyOscarDateSelection() {
     if (!oscarDateYearSelect || !oscarDateValueInput) return;
-    const y = parseYear(oscarDateYearSelect.value);
+      const y = parseYear(oscarDateYearSelect.value); // Parse the selected year
     if (!y) {
       oscarDateValueInput.value = '';
       return;
@@ -944,7 +965,7 @@ window.onload = async function () {
 
   async function fetchWinners() {
     const res = await fetch('/api/settings/winners', { method: 'GET', cache: 'no-store' });
-    const data = await res.json().catch(() => ({}));
+      const data = await res.json().catch(() => ({})); // Handle JSON parsing errors
     if (!res.ok) {
       const msg = data.message || data.error || `Erreur (${res.status})`;
       throw new Error(msg);
@@ -1017,7 +1038,7 @@ window.onload = async function () {
     if (!years.length) {
       const opt = document.createElement('option');
       opt.value = '';
-      opt.textContent = 'Aucune année (ajoute un film)';
+      opt.textContent = t('admin.settings.noYearAddMovie', 'No year (add a movie)');
       opt.disabled = true;
       opt.selected = true;
       winnerYearSelect.appendChild(opt);
@@ -1093,19 +1114,19 @@ window.onload = async function () {
       }
 
       const rows = sorted.map((w) => {
-        const name = escapeHtml(w?.name || '(utilisateur supprimé)');
+        const name = escapeHtml(w?.name || t('stats.deletedUser', '(deleted user)'));
         const pts = w?.points === null || w?.points === undefined ? null : Number(w.points);
         const ptsLabel = pts === null || Number.isNaN(pts) ? '' : ` <span class="text-muted">— ${escapeHtml(String(Math.round(pts)))} pts</span>`;
         const uid = escapeHtml(String(w?.userId || '').trim());
         return (
           `<div class="d-flex justify-content-between align-items-center border rounded px-2 py-1 mb-2 bg-white">` +
             `<div class="me-2 min-width-0"><strong class="text-break">${name}</strong>${ptsLabel}</div>` +
-            `<button type="button" class="btn btn-sm btn-outline-danger btn-compact flex-shrink-0" data-winner-remove-year="${escapeHtml(String(y))}" data-winner-remove-user="${uid}">Retirer</button>` +
+            `<button type="button" class="btn btn-sm btn-outline-danger btn-compact flex-shrink-0" data-winner-remove-year="${escapeHtml(String(y))}" data-winner-remove-user="${uid}">${t('common.remove','Retirer')}</button>` +
           `</div>`
         );
       }).join('');
 
-      const tieLabel = sorted.length > 1 ? ' <span class="text-muted fw-normal">(égalité)</span>' : '';
+      const tieLabel = sorted.length > 1 ? ` <span class="text-muted fw-normal">${t('admin.winners.tie', '(tie)')}</span>` : '';
       return `
         <div class="border rounded p-2 bg-light mb-2">
           <div class="fw-semibold mb-2">${escapeHtml(String(y))}${tieLabel}</div>
@@ -1129,9 +1150,9 @@ window.onload = async function () {
         try {
           await removeWinner(yy, uid);
           await loadWinners({ force: true });
-          showResponse('success', `Gagnant retiré pour ${yy}.`);
+          showResponse('success', t('admin.winners.removedFor', 'Winner removed for {year}.', { year: yy }));
         } catch (err) {
-          showResponse('danger', err.message || 'Erreur réseau');
+          showResponse('danger', err.message || 'Network error');
         } finally {
           btn.disabled = false;
           btn.textContent = old;
@@ -1259,7 +1280,7 @@ window.onload = async function () {
         completionModalReloadBtn.textContent = 'Chargement...';
         try {
           await loadCompletionModalIntoUi();
-          showResponse('success', 'Contenu rechargé.');
+          showResponse('success', t('admin.content.reloaded', 'Content reloaded.'));
         } catch (_) {
           // loadCompletionModalIntoUi already handles messaging
         } finally {
@@ -1273,16 +1294,16 @@ window.onload = async function () {
       completionModalSaveBtn.addEventListener('click', async () => {
         completionModalSaveBtn.disabled = true;
         const oldText = completionModalSaveBtn.textContent;
-        completionModalSaveBtn.textContent = 'Enregistrement...';
+        completionModalSaveBtn.textContent = t('common.saving', 'Saving...');
         try {
           const value = getCompletionModalFormValue();
           // send raw HTML; server sanitizes/caps it
           const saved = await saveCompletionModal(value);
           setCompletionModalForm(saved);
           updateCompletionModalPreview(getCompletionModalFormValue());
-          showResponse('success', 'Modal 100% enregistré.');
+          showResponse('success', t('admin.modal100.saved', '100% modal saved.'));
         } catch (err) {
-          showResponse('danger', err.message || 'Erreur réseau');
+          showResponse('danger', err.message || 'Network error');
         } finally {
           completionModalSaveBtn.disabled = false;
           completionModalSaveBtn.textContent = oldText;
@@ -1302,7 +1323,7 @@ window.onload = async function () {
     saveOscarDateBtn.addEventListener('click', async () => {
       const y = parseYear(oscarDateYearSelect.value);
       if (!y) {
-        showResponse('warning', 'Année invalide. Exemple attendu: 2026');
+        showResponse('warning', t('admin.oscars.invalidYear', 'Invalid year. Expected: 2026'));
         return;
       }
 
@@ -1315,21 +1336,21 @@ window.onload = async function () {
       saveOscarDateBtn.disabled = true;
       if (clearOscarDateBtn) clearOscarDateBtn.disabled = true;
       const oldText = saveOscarDateBtn.textContent;
-      saveOscarDateBtn.textContent = 'Enregistrement...';
+      saveOscarDateBtn.textContent = t('common.saving', 'Saving...');
 
       try {
         const result = await setOscarDateForYear(y, dateValue);
         if (result?.date) {
           oscarDatesByYear[String(y)] = String(result.date);
-          showResponse('success', `Date Oscars enregistrée pour ${y}: ${result.date}`);
+          showResponse('success', t('admin.oscars.dateSaved', 'Oscars date saved for {year}: {date}', { year: y, date: result.date }));
         } else {
           delete oscarDatesByYear[String(y)];
-          showResponse('success', `Date Oscars effacée pour ${y} (retour au défaut: 15 mars).`);
+          showResponse('success', t('admin.oscars.dateCleared', 'Oscars date cleared for {year} (reverted to default: March 15).', { year: y }));
         }
 
         await refreshYears();
       } catch (err) {
-        showResponse('danger', err.message || 'Erreur réseau');
+        showResponse('danger', err.message || 'Network error');
       } finally {
         saveOscarDateBtn.disabled = false;
         if (clearOscarDateBtn) clearOscarDateBtn.disabled = false;
@@ -1343,23 +1364,23 @@ window.onload = async function () {
     clearOscarDateBtn.addEventListener('click', async () => {
       const y = parseYear(oscarDateYearSelect.value);
       if (!y) {
-        showResponse('warning', 'Année invalide. Exemple attendu: 2026');
+        showResponse('warning', t('admin.oscars.invalidYear', 'Invalid year. Expected: 2026'));
         return;
       }
 
       clearOscarDateBtn.disabled = true;
       if (saveOscarDateBtn) saveOscarDateBtn.disabled = true;
       const oldText = clearOscarDateBtn.textContent;
-      clearOscarDateBtn.textContent = 'Effacement...';
+      clearOscarDateBtn.textContent = t('common.saving', 'Saving...');
 
       try {
         oscarDateValueInput.value = '';
         await setOscarDateForYear(y, '');
         delete oscarDatesByYear[String(y)];
-        showResponse('success', `Date Oscars effacée pour ${y} (retour au défaut: 15 mars).`);
+        showResponse('success', t('admin.oscars.dateCleared', 'Oscars date cleared for {year} (reverted to default: March 15).', { year: y }));
         await refreshYears();
       } catch (err) {
-        showResponse('danger', err.message || 'Erreur réseau');
+        showResponse('danger', err.message || 'Network error');
       } finally {
         clearOscarDateBtn.disabled = false;
         if (saveOscarDateBtn) saveOscarDateBtn.disabled = false;
@@ -1383,11 +1404,11 @@ window.onload = async function () {
       if (!text || text === '—') return;
       try {
         await navigator.clipboard.writeText(text);
-        setAlert(resetUserModalResponseEl, 'success', 'Copié.');
+        setAlert(resetUserModalResponseEl, 'success', t('admin.users.copied', 'Copied.'));
         setTimeout(() => hideAlert(resetUserModalResponseEl), 1200);
       } catch (_) {
         // Fallback: select text for manual copy
-        setAlert(resetUserModalResponseEl, 'warning', 'Impossible de copier automatiquement. Copie manuellement.');
+        setAlert(resetUserModalResponseEl, 'warning', t('admin.users.cannotCopyAuto', 'Unable to copy automatically. Copy manually.'));
       }
     });
   }
@@ -1398,10 +1419,10 @@ window.onload = async function () {
       if (!text || text === '—') return;
       try {
         await navigator.clipboard.writeText(text);
-        setAlert(addUserResponseEl, 'success', 'Copié.');
+        setAlert(addUserResponseEl, 'success', t('admin.users.copied', 'Copied.'));
         setTimeout(() => hideAlert(addUserResponseEl), 1200);
       } catch (_) {
-        setAlert(addUserResponseEl, 'warning', 'Impossible de copier automatiquement. Copie manuellement.');
+        setAlert(addUserResponseEl, 'warning', t('admin.users.cannotCopyAuto', 'Unable to copy automatically. Copy manually.'));
       }
     });
   }
@@ -1433,16 +1454,16 @@ window.onload = async function () {
       const admin = !!addUserAdminEl?.checked;
 
       if (!name) {
-        setAlert(addUserResponseEl, 'warning', 'Nom requis.');
+        setAlert(addUserResponseEl, 'warning', t('admin.users.nameRequired', 'Name required.'));
         return;
       }
       if (!email) {
-        setAlert(addUserResponseEl, 'warning', 'Email requis.');
+        setAlert(addUserResponseEl, 'warning', t('admin.users.emailRequired', 'Email required.'));
         return;
       }
 
       if (addUserSubmitBtn) addUserSubmitBtn.disabled = true;
-      setAlert(addUserResponseEl, 'warning', 'Création...');
+      setAlert(addUserResponseEl, 'warning', t('admin.users.creating', 'Creating…'));
 
       try {
         const res = await fetch('/api/users/admin/create', {
@@ -1463,15 +1484,15 @@ window.onload = async function () {
 
         // Show temp password once
         if (addUserTempPasswordEl) addUserTempPasswordEl.textContent = data?.tempPassword || '—';
-        if (addUserExpiresAtEl) addUserExpiresAtEl.textContent = data?.expiresAt ? `Expire: ${data.expiresAt}` : '';
+        if (addUserExpiresAtEl) addUserExpiresAtEl.textContent = data?.expiresAt ? t('admin.users.tempPasswordExpires', 'Expires: {expiresAt}', { expiresAt: data.expiresAt }) : '';
         if (addUserResultEl) addUserResultEl.classList.remove('d-none');
-        setAlert(addUserResponseEl, 'success', data.message || 'Utilisateur créé.');
+        setAlert(addUserResponseEl, 'success', data.message || t('admin.users.userCreated', 'User created. Temporary password generated.'));
         if (addUserSubmitBtn) addUserSubmitBtn.disabled = false;
 
         // Refresh list if already loaded or when user tab is active
         await loadAdminUsers({ force: true });
       } catch (err) {
-        setAlert(addUserResponseEl, 'danger', err.message || 'Erreur réseau');
+        setAlert(addUserResponseEl, 'danger', err.message || 'Network error');
         if (addUserSubmitBtn) addUserSubmitBtn.disabled = false;
       }
     });
@@ -1485,7 +1506,7 @@ window.onload = async function () {
 
       confirmResetUserPasswordBtn.disabled = true;
       resetResetUserModalUi();
-      setAlert(resetUserModalResponseEl, 'warning', 'Génération du mot de passe temporaire...');
+      setAlert(resetUserModalResponseEl, 'warning', t('admin.users.tempPasswordGenerating', 'Generating temporary password…'));
 
       try {
         const res = await fetch('/api/users/admin/reset-temp-password', {
@@ -1509,11 +1530,11 @@ window.onload = async function () {
           resetUserExpiresAtEl.textContent = data?.expiresAt ? `Expire: ${data.expiresAt}` : '';
         }
         if (resetUserModalResultEl) resetUserModalResultEl.classList.remove('d-none');
-        setAlert(resetUserModalResponseEl, 'success', 'Mot de passe temporaire généré. Copie-le et envoie-le à l’utilisateur.');
+        setAlert(resetUserModalResponseEl, 'success', t('admin.users.tempPasswordGenerated', 'Temporary password generated. Copy it and send it to the user.'));
         confirmResetUserPasswordBtn.disabled = false;
         await loadAdminUsers({ force: true });
       } catch (err) {
-        setAlert(resetUserModalResponseEl, 'danger', err.message || 'Erreur réseau');
+        setAlert(resetUserModalResponseEl, 'danger', err.message || 'Network error');
         confirmResetUserPasswordBtn.disabled = false;
       }
     });
@@ -1548,14 +1569,14 @@ window.onload = async function () {
           return;
         }
 
-        setAlert(deleteUserModalResponseEl, 'success', data.message || 'Utilisateur supprimé.');
+        setAlert(deleteUserModalResponseEl, 'success', data.message || t('admin.users.userDeleted', 'User deleted.'));
         await loadAdminUsers({ force: true });
         // Close shortly after success
         setTimeout(() => {
           try { deleteUserModal?.hide(); } catch (_) {}
         }, 600);
       } catch (err) {
-        setAlert(deleteUserModalResponseEl, 'danger', err.message || 'Erreur réseau');
+        setAlert(deleteUserModalResponseEl, 'danger', err.message || 'Network error');
       }
     });
   }
@@ -1621,7 +1642,16 @@ window.onload = async function () {
     }
 
     dbBackupListBody.innerHTML = '';
-    list.forEach((b) => {
+    const sorted = list.slice().sort((a, b) => {
+      const at = a?.mtime ? new Date(a.mtime).getTime() : 0;
+      const bt = b?.mtime ? new Date(b.mtime).getTime() : 0;
+      if (Number.isFinite(at) && Number.isFinite(bt) && at !== bt) return bt - at; // newest first
+      const an = String(a?.name || '');
+      const bn = String(b?.name || '');
+      return an.localeCompare(bn, 'fr', { sensitivity: 'base' });
+    });
+
+    sorted.forEach((b) => {
       const name = String(b?.name || '');
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -1629,8 +1659,8 @@ window.onload = async function () {
         <td class="text-nowrap">${formatBytes(b?.sizeBytes)}</td>
         <td class="text-nowrap">${formatDateTime(b?.mtime)}</td>
         <td class="text-end text-nowrap">
-          <button type="button" class="btn btn-sm btn-outline-secondary btn-compact me-1" data-backup-download="${name}">Télécharger</button>
-          <button type="button" class="btn btn-sm btn-outline-danger btn-compact" data-backup-delete="${name}">Supprimer</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-compact me-1" data-backup-download="${name}">${t('admin.backup.download','Download')}</button>
+          <button type="button" class="btn btn-sm btn-outline-danger btn-compact" data-backup-delete="${name}">${t('common.delete','Delete')}</button>
         </td>
       `;
       dbBackupListBody.appendChild(tr);
@@ -1662,7 +1692,7 @@ window.onload = async function () {
           a.remove();
           URL.revokeObjectURL(url);
         } catch (err) {
-          showResponse('danger', err.message || 'Erreur réseau');
+          showResponse('danger', err.message || 'Network error');
         } finally {
           btn.disabled = false;
           btn.textContent = old;
@@ -1674,7 +1704,7 @@ window.onload = async function () {
       btn.addEventListener('click', async () => {
         const name = btn.getAttribute('data-backup-delete');
         if (!name) return;
-        const ok = window.confirm(`Supprimer la sauvegarde "${name}" ?`);
+        const ok = window.confirm(t('admin.backup.confirmDelete', `Delete backup "${name}"?`, { name }));
         if (!ok) return;
         btn.disabled = true;
         const old = btn.textContent;
@@ -1688,10 +1718,10 @@ window.onload = async function () {
           if (!res.ok) {
             throw new Error(data.message || data.error || `Erreur (${res.status})`);
           }
-          showResponse('success', data.message || 'Sauvegarde supprimée.');
+          showResponse('success', data.message || t('admin.backup.deleted', 'Backup deleted.'));
           await loadBackups({ force: true });
         } catch (err) {
-          showResponse('danger', err.message || 'Erreur réseau');
+          showResponse('danger', err.message || 'Network error');
         } finally {
           btn.disabled = false;
           btn.textContent = old;
@@ -1710,7 +1740,7 @@ window.onload = async function () {
       backupsLoadedOnce = true;
       renderBackups(backups);
     } catch (err) {
-      dbBackupListBody.innerHTML = `<tr><td colspan="4" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
+      dbBackupListBody.innerHTML = `<tr><td colspan="4" class="text-danger">${err.message || 'Network error'}</td></tr>`;
     }
   }
 
@@ -1718,7 +1748,7 @@ window.onload = async function () {
     if (!dbBackupCreateBtn) return;
     dbBackupCreateBtn.disabled = true;
     const old = dbBackupCreateBtn.textContent;
-    dbBackupCreateBtn.textContent = 'Création...';
+    dbBackupCreateBtn.textContent = t('admin.backup.creating', 'Creating…');
     try {
       const res = await fetch('/api/admin/db/backup', {
         method: 'POST',
@@ -1728,10 +1758,10 @@ window.onload = async function () {
       if (!res.ok) {
         throw new Error(data.message || data.error || `Erreur (${res.status})`);
       }
-      showResponse('success', `Sauvegarde créée: ${data?.backup?.name || 'OK'}`);
+      showResponse('success', t('admin.backup.created', 'Backup created: {name}', { name: data?.backup?.name || 'OK' }));
       await loadBackups({ force: true });
     } catch (err) {
-      showResponse('danger', err.message || 'Erreur réseau');
+      showResponse('danger', err.message || 'Network error');
     } finally {
       dbBackupCreateBtn.disabled = false;
       dbBackupCreateBtn.textContent = old;
@@ -1742,21 +1772,21 @@ window.onload = async function () {
     if (!dbRestoreRunBtn || !dbRestoreFileEl) return;
     const file = dbRestoreFileEl.files && dbRestoreFileEl.files[0];
     if (!file) {
-      showResponse('warning', 'Choisis un fichier de sauvegarde (.ndjson.gz).');
+      showResponse('warning', t('admin.backup.chooseFile', 'Choose a backup file (.ndjson.gz).'));
       return;
     }
 
     const drop = !!dbRestoreDropEl?.checked;
     const warning = drop
-      ? 'RESTORE avec DROP: toutes les collections restaurées seront remplacées.'
-      : 'RESTORE sans DROP: risque élevé de doublons/erreurs si la DB contient déjà des données.';
+      ? t('admin.backup.restoreWithDrop', 'RESTORE with DROP: all restored collections will be replaced.')
+      : t('admin.backup.restoreWithoutDrop', 'RESTORE without DROP: high risk of duplicates/errors if the DB already contains data.');
 
-    const ok = window.confirm(`${warning}\n\nContinuer ?`);
+    const ok = window.confirm(`${warning}\n\n${t('common.continueQuestion', 'Continue?')}`);
     if (!ok) return;
 
     dbRestoreRunBtn.disabled = true;
     const old = dbRestoreRunBtn.textContent;
-    dbRestoreRunBtn.textContent = 'Restauration...';
+    dbRestoreRunBtn.textContent = t('common.saving', 'Saving…');
     if (dbRestoreResultEl) dbRestoreResultEl.textContent = '';
 
     try {
@@ -1774,17 +1804,17 @@ window.onload = async function () {
         throw new Error(data.message || data.error || `Erreur (${res.status})`);
       }
 
-      showResponse('success', 'Restore terminé.');
+      showResponse('success', t('admin.backup.restoreComplete', 'Restore complete.'));
       if (dbRestoreResultEl) {
         const inserted = data?.inserted && typeof data.inserted === 'object' ? data.inserted : {};
         const keys = Object.keys(inserted);
         const summary = keys.length
           ? keys.map((k) => `${k}: ${inserted[k]}`).join(' | ')
-          : 'Aucun document inséré (ou backup vide).';
+          : t('admin.backup.noDocumentsInserted', 'No documents inserted (or empty backup).');
         dbRestoreResultEl.textContent = summary;
       }
     } catch (err) {
-      showResponse('danger', err.message || 'Erreur réseau');
+      showResponse('danger', err.message || 'Network error');
     } finally {
       dbRestoreRunBtn.disabled = false;
       dbRestoreRunBtn.textContent = old;
@@ -1821,9 +1851,9 @@ window.onload = async function () {
       if (appVersionNewMessageEl) appVersionNewMessageEl.value = '';
       renderAppVersionUI();
       await refreshAppVersionPreview();
-      setAppVersionAlert('success', activate ? 'Version créée et activée.' : 'Version créée.');
+      setAppVersionAlert('success', activate ? t('admin.version.createdAndActivated', 'Version created & activated.') : t('admin.version.created', 'Version created.'));
     } catch (err) {
-      setAppVersionAlert('danger', err.message || 'Erreur réseau');
+      setAppVersionAlert('danger', err.message || 'Network error');
     } finally {
       btn.disabled = false;
       btn.textContent = old;
@@ -1867,7 +1897,7 @@ window.onload = async function () {
       ]);
       renderWinnerCurrent();
     } catch (err) {
-      showResponse('danger', err.message || 'Erreur réseau');
+      showResponse('danger', err.message || 'Network error');
     }
   }
 
@@ -1886,7 +1916,7 @@ window.onload = async function () {
       winnerReloadBtn.textContent = 'Chargement...';
       try {
         await initWinnersTab({ force: true });
-        showResponse('success', 'Gagnants rechargés.');
+        showResponse('success', t('admin.winners.reloaded', 'Winners reloaded.'));
       } finally {
         winnerReloadBtn.disabled = false;
         winnerReloadBtn.textContent = old;
@@ -1899,16 +1929,16 @@ window.onload = async function () {
       if (!winnerYearSelect) return;
       const y = parseYear(winnerYearSelect.value);
       if (!y) return;
-      const ok = window.confirm(`Supprimer tous les gagnants pour ${y} ?`);
+      const ok = window.confirm(t('admin.winners.confirmDeleteAll', 'Delete all winners for {year}?', { year: y }));
       if (!ok) return;
       try {
         if (winnerUserSelect) winnerUserSelect.value = '';
         if (winnerPointsEl) winnerPointsEl.value = '';
         await addWinner(y, '', null);
         await loadWinners({ force: true });
-        showResponse('success', `Gagnant supprimé pour ${y}.`);
+        showResponse('success', t('admin.winners.deletedFor', 'Winner deleted for {year}.', { year: y }));
       } catch (err) {
-        showResponse('danger', err.message || 'Erreur réseau');
+        showResponse('danger', err.message || 'Network error');
       }
     });
   }
@@ -1918,12 +1948,12 @@ window.onload = async function () {
       if (!winnerYearSelect) return;
       const y = parseYear(winnerYearSelect.value);
       if (!y) {
-        showResponse('warning', 'Année invalide.');
+        showResponse('warning', t('admin.oscars.invalidYearShort', 'Invalid year.'));
         return;
       }
       const userId = String(winnerUserSelect?.value || '').trim();
       if (!userId) {
-        showResponse('warning', 'Choisis un utilisateur.');
+        showResponse('warning', t('admin.winners.chooseUser', 'Choose a user.'));
         return;
       }
       const pointsRaw = String(winnerPointsEl?.value || '').trim();
@@ -1932,13 +1962,13 @@ window.onload = async function () {
 
       winnerSaveBtn.disabled = true;
       const old = winnerSaveBtn.textContent;
-      winnerSaveBtn.textContent = 'Enregistrement...';
+      winnerSaveBtn.textContent = t('common.saving', 'Saving…');
       try {
         await addWinner(y, userId, pointsToSend);
         await loadWinners({ force: true });
-        showResponse('success', `Gagnant ajouté pour ${y}.`);
+        showResponse('success', t('admin.winners.addedFor', 'Winner added for {year}.', { year: y }));
       } catch (err) {
-        showResponse('danger', err.message || 'Erreur réseau');
+        showResponse('danger', err.message || 'Network error');
       } finally {
         winnerSaveBtn.disabled = false;
         winnerSaveBtn.textContent = old;
@@ -1965,7 +1995,7 @@ window.onload = async function () {
     const subtitle_default = false;
 
     if (!year) {
-      showResponse('warning', 'Année invalide. Exemple attendu: 2026');
+      showResponse('warning', t('admin.oscars.invalidYearExample', 'Invalid year. Expected example: 2026'));
       return;
     }
 
@@ -2010,15 +2040,14 @@ window.onload = async function () {
               label: subtitle_label,
               isDefault: subtitle_default,
             });
-            showResponse('success', 'Film ajouté avec sous-titres.');
+            showResponse('success', t('admin.movies.addedWithSubtitles', 'Movie added with subtitles.'));
           } catch (err) {
-            showResponse('warning', `Film ajouté, mais sous-titres non uploadés: ${err.message || 'Erreur'}`);
+            showResponse('warning', t('admin.movies.addedNoSubtitles', 'Movie added, but subtitles were not uploaded: {error}', { error: err.message || 'Error' }));
           }
         } else {
-          showResponse('success', 'Film ajouté avec succès.');
+          showResponse('success', t('admin.movies.addedSuccessfully', 'Movie added successfully.'));
         }
         form.reset();
-        if (subtitleFileInput) subtitleFileInput.value = '';
         await refreshYears();
         await loadMoviesForManagement();
         return;
@@ -2033,7 +2062,7 @@ window.onload = async function () {
       }
       showResponse('danger', errMessage);
     } catch (err) {
-      showResponse('danger', err.message || 'Erreur réseau');
+      showResponse('danger', err.message || 'Network error');
     }
   });
 
@@ -2054,7 +2083,7 @@ window.onload = async function () {
       manageYearSelect.innerHTML = '';
       const allOpt = document.createElement('option');
       allOpt.value = '';
-      allOpt.textContent = 'Toutes';
+      allOpt.textContent = t('admin.movies.allYears', 'All');
       manageYearSelect.appendChild(allOpt);
 
       cleanedYears.forEach((y) => {
@@ -2090,7 +2119,7 @@ window.onload = async function () {
         if (cleanedYears.length === 0) {
           const opt = document.createElement('option');
           opt.value = '';
-          opt.textContent = 'Aucune année (ajoute un film)';
+          opt.textContent = t('admin.settings.noYearAddMovie', 'No year (add a movie)');
           opt.disabled = true;
           opt.selected = true;
           activeYearInput.appendChild(opt);
@@ -2126,7 +2155,7 @@ window.onload = async function () {
         if (cleanedYears.length === 0) {
           const opt = document.createElement('option');
           opt.value = '';
-          opt.textContent = 'Aucune année (ajoute un film)';
+          opt.textContent = t('admin.settings.noYearAddMovie', 'No year (add a movie)');
           opt.disabled = true;
           opt.selected = true;
           oscarDateYearSelect.appendChild(opt);
@@ -2176,7 +2205,7 @@ window.onload = async function () {
         if (cleanedYears.length === 0) {
           const opt = document.createElement('option');
           opt.value = '';
-          opt.textContent = 'Aucune année (ajoute un film)';
+          opt.textContent = t('admin.settings.noYearAddMovie', 'No year (add a movie)');
           opt.disabled = true;
           manualYearSelect.appendChild(opt);
         } else {
@@ -2204,7 +2233,7 @@ window.onload = async function () {
         // Add "All years" option
         const allOpt = document.createElement('option');
         allOpt.value = '';
-        allOpt.textContent = 'Toutes les années';
+        allOpt.textContent = t('admin.categories.allYears', 'All years');
         listYearFilterSelect.appendChild(allOpt);
         
         if (cleanedYears.length > 0) {
@@ -2263,7 +2292,7 @@ window.onload = async function () {
       const file = escapeHtml(String(s?.file || ''));
       const title = label || lang || file || 'Sous-titres';
       const meta = [lang, label].filter(Boolean).join(' · ');
-      const isDefault = s?.default ? '<span class="badge bg-success ms-2">Par défaut</span>' : '';
+      const isDefault = s?.default ? `<span class="badge bg-success ms-2">${t('admin.settings.defaultBadge', 'Default')}</span>` : '';
 
       return `
         <div class="d-flex align-items-center justify-content-between gap-2">
@@ -2273,7 +2302,7 @@ window.onload = async function () {
             ${isDefault}
           </div>
           <button type="button" class="btn btn-sm btn-outline-danger" data-remove-subtitle-id="${id}">
-            Supprimer
+            ${t('common.delete','Delete')}
           </button>
         </div>
       `;
@@ -2284,16 +2313,16 @@ window.onload = async function () {
         const subtitleId = btn.getAttribute('data-remove-subtitle-id');
         const movieId = String(editMovieIdEl?.value || '');
         if (!movieId || !subtitleId) return;
-        if (!confirm('Supprimer ce sous-titre ?')) return;
+        if (!confirm(t('admin.movies.confirmRemoveSubtitle','Delete this subtitle?'))) return;
         try {
           btn.disabled = true;
           const updated = await removeMovieSubtitle({ movieId, subtitleId });
           moviesById.set(updated._id, updated);
           renderSubtitleList(updated);
-          showResponse('success', 'Sous-titre supprimé.');
+          showResponse('success', t('admin.movies.subtitleDeleted', 'Subtitle deleted.'));
           await loadMoviesForManagement();
         } catch (err) {
-          showResponse('danger', err.message || 'Erreur réseau');
+          showResponse('danger', err.message || 'Network error');
         } finally {
           btn.disabled = false;
         }
@@ -2376,13 +2405,13 @@ window.onload = async function () {
     if (yearRaw !== '') {
       year = parseYear(yearRaw);
       if (!year) {
-        showResponse('warning', 'Année invalide. Exemple attendu: 2026');
+        showResponse('warning', t('admin.oscars.invalidYearExample', 'Invalid year. Expected example: 2026'));
         return;
       }
     }
 
     if (!category) {
-      showResponse('warning', 'Catégorie invalide.');
+      showResponse('warning', t('admin.categories.categoryInvalid', 'Invalid category.'));
       return;
     }
 
@@ -2418,7 +2447,7 @@ window.onload = async function () {
 
     try {
       saveMovieChangesBtn.disabled = true;
-      saveMovieChangesBtn.textContent = 'Enregistrement...';
+      saveMovieChangesBtn.textContent = t('common.saving', 'Saving...');
 
       const res = await fetch(`/api/movies/${encodeURIComponent(movieId)}`, {
         method: 'PUT',
@@ -2451,16 +2480,16 @@ window.onload = async function () {
           });
           if (uploaded) moviesById.set(uploaded._id, uploaded);
         } catch (err) {
-          showResponse('warning', `Film mis à jour, mais sous-titres non uploadés: ${err.message || 'Erreur'}`);
+          showResponse('warning', t('admin.movies.updatedNoSubtitles', 'Movie updated, but subtitles were not uploaded: {error}', { error: err.message || 'Error' }));
         }
       }
       moviesById.set(updated._id, updated);
-      showResponse('success', 'Film mis à jour avec succès.');
+      showResponse('success', t('admin.movies.updatedSuccessfully', 'Movie updated successfully.'));
       editMovieModal.hide();
       await refreshYears();
       await loadMoviesForManagement();
     } catch (err) {
-      showResponse('danger', err.message || 'Erreur réseau');
+      showResponse('danger', err.message || 'Network error');
     } finally {
       saveMovieChangesBtn.disabled = false;
       saveMovieChangesBtn.textContent = 'Enregistrer';
@@ -2483,7 +2512,7 @@ window.onload = async function () {
       moviesById = new Map(movies.map((m) => [m._id, m]));
 
       if (!movies.length) {
-        adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-muted">Aucun film.</td></tr>`;
+        adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-muted">${t('admin.movies.noMovies', 'No movies.')}</td></tr>`;
         updateSelectionUI();
         return;
       }
@@ -2544,7 +2573,7 @@ window.onload = async function () {
           <td>${m.year || ''}</td>
           <td class="text-end">
             <button type="button" class="btn btn-sm btn-outline-secondary" data-edit-movie-id="${m._id}">
-              Éditer
+              ${t('common.edit','Edit')}
             </button>
           </td>
         `;
@@ -2565,16 +2594,16 @@ window.onload = async function () {
           if (!id) return;
           const ok = await copyToClipboard(id);
           if (ok) {
-            showResponse('success', 'Movie ID copié.');
+            showResponse('success', t('admin.movies.idCopied', 'Movie ID copied.'));
           } else {
-            showResponse('warning', 'Impossible de copier automatiquement. Copie manuellement.');
+            showResponse('warning', t('admin.users.cannotCopyAuto', 'Unable to copy automatically. Copy manually.'));
           }
         });
       });
 
       updateSelectionUI();
     } catch (err) {
-      adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-danger">${err.message || 'Erreur réseau'}</td></tr>`;
+      adminMoviesBody.innerHTML = `<tr><td colspan="7" class="text-danger">${err.message || 'Network error'}</td></tr>`;
     }
   }
 
@@ -2594,7 +2623,7 @@ window.onload = async function () {
     if (!selectedIds.length) return;
 
     const yearLabel = manageYearSelect.value ? ` (${manageYearSelect.value})` : '';
-    const ok = window.confirm(`Supprimer ${selectedIds.length} film(s)${yearLabel} ? Cette action est irréversible.`);
+    const ok = window.confirm(t('admin.movies.confirmDeleteSelected', `Delete ${selectedIds.length} movie(s)${yearLabel}? This action is irreversible.`, { count: selectedIds.length }));
     if (!ok) return;
 
     try {
@@ -2617,11 +2646,11 @@ window.onload = async function () {
         return;
       }
 
-      showResponse('success', 'Film(s) supprimé(s) avec succès.');
+      showResponse('success', t('admin.movies.deletedSuccessfully', 'Movie(s) deleted successfully.'));
       await refreshYears();
       await loadMoviesForManagement();
     } catch (err) {
-      showResponse('danger', err.message || 'Erreur réseau');
+      showResponse('danger', err.message || 'Network error');
     }
   });
 
@@ -2631,7 +2660,7 @@ window.onload = async function () {
       if (!selectedIds.length) return;
 
       const yearLabel = manageYearSelect.value ? ` (${manageYearSelect.value})` : '';
-      const ok = window.confirm(`Rafraîchir ${selectedIds.length} film(s)${yearLabel} depuis OMDb ? Cette opération peut écraser les infos (titre, plot, rating, poster, runtime).`);
+      const ok = window.confirm(t('admin.movies.confirmRefreshOmdb', `Refresh ${selectedIds.length} movie(s)${yearLabel} from OMDb? This operation may overwrite info (title, plot, rating, poster, runtime).`, { count: selectedIds.length }));
       if (!ok) return;
 
       updateOmdbSelectedBtn.disabled = true;
@@ -2664,7 +2693,7 @@ window.onload = async function () {
             successCount++;
           }
         } catch (err) {
-          errors.push(`${movieId}: ${err.message || 'Erreur réseau'}`);
+          errors.push(`${movieId}: ${err.message || 'Network error'}`);
           errorCount++;
         }
       }
@@ -2673,11 +2702,16 @@ window.onload = async function () {
       updateOmdbSelectedBtn.textContent = 'Refresh OMDb';
 
       if (errorCount === 0) {
-        showResponse('success', `${successCount} film(s) mis à jour depuis OMDb.`);
+        showResponse('success', t('admin.movies.updatedFromOmdb', '{count} movie(s) updated from OMDb.', { count: successCount }));
       } else if (successCount === 0) {
-        showResponse('danger', `Échec pour ${errorCount} film(s). ${errors.slice(0, 3).join('; ')}`);
+        showResponse('danger', `Failed for ${errorCount} movie(s). ${errors.slice(0, 3).join('; ')}`);
       } else {
-        showResponse('warning', `${successCount} succès, ${errorCount} échec(s). ${errors.slice(0, 2).join('; ')}`);
+        const details = errors.slice(0, 2).join('; ');
+        showResponse('warning', t('admin.movies.omdbResults', '{success} success, {errors} error(s). {details}', {
+          success: successCount,
+          errors: errorCount,
+          details,
+        }));
       }
 
       await loadMoviesForManagement();
@@ -2694,9 +2728,9 @@ window.onload = async function () {
       if (!id) return;
       const ok = await copyToClipboard(id);
       if (ok) {
-        showResponse('success', 'Movie ID copié.');
+        showResponse('success', t('admin.movies.idCopied', 'Movie ID copied.'));
       } else {
-        showResponse('warning', 'Impossible de copier automatiquement. Copie manuellement.');
+        showResponse('warning', t('admin.users.cannotCopyAuto', 'Unable to copy automatically. Copy manually.'));
       }
     });
   }
@@ -2718,7 +2752,7 @@ window.onload = async function () {
       playerUiReloadBtn.textContent = 'Chargement...';
       try {
         await loadPlayerUiIntoUi();
-        showResponse('success', 'Réglages du lecteur rechargés.');
+        showResponse('success', t('admin.player.settingsReloaded', 'Player settings reloaded.'));
       } finally {
         playerUiReloadBtn.disabled = false;
         playerUiReloadBtn.textContent = old;
@@ -2730,14 +2764,14 @@ window.onload = async function () {
     playerUiSaveBtn.addEventListener('click', async () => {
       playerUiSaveBtn.disabled = true;
       const old = playerUiSaveBtn.textContent;
-      playerUiSaveBtn.textContent = 'Enregistrement...';
+      playerUiSaveBtn.textContent = 'Saving...';
       try {
         const payload = getPlayerUiFormValue();
         const saved = await savePlayerUi(payload);
         setPlayerUiForm(saved);
-        showResponse('success', 'Réglages du lecteur enregistrés.');
+        showResponse('success', t('admin.player.settingsSaved', 'Player settings saved.'));
       } catch (err) {
-        showResponse('danger', err.message || 'Erreur réseau');
+        showResponse('danger', err.message || 'Network error');
       } finally {
         playerUiSaveBtn.disabled = false;
         playerUiSaveBtn.textContent = old;
@@ -2749,7 +2783,7 @@ window.onload = async function () {
     saveActiveYearBtn.addEventListener('click', async () => {
       const y = parseYear(activeYearInput.value);
       if (!y) {
-        showResponse('warning', 'Année invalide. Exemple attendu: 2026');
+        showResponse('warning', t('admin.oscars.invalidYear', 'Invalid year. Expected: 2026'));
         return;
       }
       saveActiveYearBtn.disabled = true;
@@ -2760,11 +2794,11 @@ window.onload = async function () {
         activeYearInput.value = String(activeYear);
         yearInput.value = String(activeYear);
         document.title = `Pool Oscars (${activeYear}) - Admin`;
-        showResponse('success', `Année active appliquée: ${activeYear}`);
+        showResponse('success', t('admin.activeYear.applied', 'Active year applied: {year}', { year: activeYear }));
         await refreshYears();
         await loadMoviesForManagement();
       } catch (err) {
-        showResponse('danger', err.message || 'Erreur réseau');
+        showResponse('danger', err.message || 'Network error');
       } finally {
         saveActiveYearBtn.disabled = false;
         saveActiveYearBtn.textContent = oldText;
@@ -2816,7 +2850,7 @@ window.onload = async function () {
   if (pointsConfigReloadBtn) {
     pointsConfigReloadBtn.addEventListener('click', async () => {
       await loadPointsConfig();
-      showResponse('success', 'Configuration rechargée');
+      showResponse('success', t('admin.configuration.reloaded', 'Configuration reloaded.'));
     });
   }
 
@@ -2828,7 +2862,7 @@ window.onload = async function () {
       if (pointsPerMovie < 0 || pointsPerCorrectPick < 0) {
         if (pointsConfigAlert) {
           pointsConfigAlert.className = 'alert alert-warning';
-          pointsConfigAlert.textContent = 'Les points doivent être positifs ou nuls';
+          pointsConfigAlert.textContent = t('admin.settings.pointsMustBeNonNegative', 'Points must be zero or positive');
           pointsConfigAlert.classList.remove('d-none');
         }
         return;
@@ -2837,7 +2871,7 @@ window.onload = async function () {
       try {
         pointsConfigSaveBtn.disabled = true;
         const oldText = pointsConfigSaveBtn.textContent;
-        pointsConfigSaveBtn.textContent = 'Enregistrement...';
+        pointsConfigSaveBtn.textContent = t('common.saving', 'Saving...');
 
         const res = await fetch('/api/settings/points-config', {
           method: 'PUT',
@@ -2858,7 +2892,7 @@ window.onload = async function () {
 
         const data = await res.json();
         updatePointsPreview();
-        showResponse('success', `Configuration enregistrée: ${data.pointsPerMovie} pts/film, ${data.pointsPerCorrectPick} pts/bonne réponse`);
+        showResponse('success', t('admin.settings.pointsSaved', 'Configuration saved: {p} pts/movie, {q} pts/correct pick', { p: data.pointsPerMovie, q: data.pointsPerCorrectPick }));
       } catch (err) {
         if (pointsConfigAlert) {
           pointsConfigAlert.className = 'alert alert-danger';
@@ -2876,9 +2910,24 @@ window.onload = async function () {
 
   // Visibility config
   const visibilityShowPicksFeaturesEl = document.getElementById('visibility-show-picks-features');
+  const visibilityShowVersionTabEl = document.getElementById('visibility-show-version-tab');
   const visibilityConfigReloadBtn = document.getElementById('visibility-config-reload');
   const visibilityConfigSaveBtn = document.getElementById('visibility-config-save');
   const visibilityConfigAlert = document.getElementById('visibility-config-alert');
+
+  function applyVersionTabVisibility(showVersionTab) {
+    const versionTabBtn = document.getElementById('admin-version-tab');
+    const versionPane = document.getElementById('admin-version');
+    if (versionTabBtn) versionTabBtn.style.display = showVersionTab ? '' : 'none';
+    if (versionPane) versionPane.style.display = showVersionTab ? '' : 'none';
+    if (!showVersionTab) {
+      const activeTab = document.querySelector('#adminTabs .nav-link.active');
+      if (activeTab && activeTab.id === 'admin-version-tab') {
+        const fallback = document.getElementById('admin-settings-tab');
+        if (fallback) fallback.click();
+      }
+    }
+  }
 
   async function loadVisibilityConfig() {
     try {
@@ -2889,12 +2938,18 @@ window.onload = async function () {
       // Both settings should be the same - use showPicksButton as the master
       const isEnabled = config.showPicksButton !== false && config.showBonPicksColumn !== false;
       if (visibilityShowPicksFeaturesEl) visibilityShowPicksFeaturesEl.checked = isEnabled;
+      if (visibilityShowVersionTabEl) visibilityShowVersionTabEl.checked = config.showVersionTab !== false;
+      applyVersionTabVisibility(config.showVersionTab !== false);
     } catch (err) {
       console.error('Error loading visibility config:', err);
       // Default to showing both
-      if (visibilityShowPicksFeaturesEl) visibilityShowPicksFeaturesEl.checked = true;
+      if (visibilityShowPicksFeaturesEl) visibilityShowPicksFeaturesEl.checked = false;
+      if (visibilityShowVersionTabEl) visibilityShowVersionTabEl.checked = true;
+      applyVersionTabVisibility(true);
     }
   }
+
+  await loadVisibilityConfig();
 
   if (visibilityConfigReloadBtn) {
     visibilityConfigReloadBtn.addEventListener('click', async () => {
@@ -2906,7 +2961,7 @@ window.onload = async function () {
           loadVisibilityConfig(),
           loadPlayerUiIntoUi()
         ]);
-        showResponse('success', 'Configuration rechargée');
+        showResponse('success', t('admin.configuration.reloaded', 'Configuration reloaded.'));
       } catch (err) {
         showResponse('warning', 'Erreur lors du rechargement: ' + (err.message || 'Erreur inconnue'));
       } finally {
@@ -2921,11 +2976,12 @@ window.onload = async function () {
       const isEnabled = visibilityShowPicksFeaturesEl ? visibilityShowPicksFeaturesEl.checked : true;
       const showPicksButton = isEnabled;
       const showBonPicksColumn = isEnabled;
+      const showVersionTab = visibilityShowVersionTabEl ? visibilityShowVersionTabEl.checked : true;
 
       try {
         visibilityConfigSaveBtn.disabled = true;
         const oldText = visibilityConfigSaveBtn.textContent;
-        visibilityConfigSaveBtn.textContent = 'Enregistrement...';
+        visibilityConfigSaveBtn.textContent = t('common.saving', 'Saving...');
 
         // Save both visibility config and player UI settings
         const [visibilityRes, playerUiPayload] = await Promise.all([
@@ -2937,7 +2993,8 @@ window.onload = async function () {
             },
             body: JSON.stringify({
               showPicksButton,
-              showBonPicksColumn
+              showBonPicksColumn,
+              showVersionTab
             })
           }),
           Promise.resolve(getPlayerUiFormValue())
@@ -2961,18 +3018,20 @@ window.onload = async function () {
         
         // Clear cache so all pages get the new setting immediately
         localStorage.removeItem('visibility_config_cache');
+
+        applyVersionTabVisibility(showVersionTab);
         
-        showResponse('success', 'Configuration enregistrée');
+        showResponse('success', t('admin.visibility.saved', 'Configuration saved'));
       } catch (err) {
         if (visibilityConfigAlert) {
           visibilityConfigAlert.className = 'alert alert-danger';
-          visibilityConfigAlert.textContent = 'Erreur: ' + err.message;
+          visibilityConfigAlert.textContent = t('admin.visibility.saveError', 'Error saving configuration: {error}', { error: err.message });
           visibilityConfigAlert.classList.remove('d-none');
         }
-        showResponse('danger', 'Erreur lors de l\'enregistrement: ' + err.message);
+        showResponse('danger', t('admin.visibility.saveError', 'Error saving configuration: {error}', { error: err.message }));
       } finally {
         visibilityConfigSaveBtn.disabled = false;
-        visibilityConfigSaveBtn.textContent = oldText;
+        visibilityConfigSaveBtn.textContent = oldText || t('common.save', 'Save');
       }
     });
   }
@@ -2985,6 +3044,82 @@ window.onload = async function () {
         loadVisibilityConfig(),
         loadPlayerUiIntoUi()
       ]);
+    });
+  }
+
+
+  // Language config
+  const siteLanguageSelect = document.getElementById('site_language');
+  const languageConfigSaveBtn = document.getElementById('language-config-save');
+  const languageConfigAlert = document.getElementById('language-config-alert');
+
+  async function loadLanguageConfig() {
+    try {
+      const res = await fetch('/api/settings/language', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load language setting');
+      const data = await res.json();
+      if (siteLanguageSelect) {
+        siteLanguageSelect.value = data.language || 'en';
+      }
+    } catch (err) {
+      console.error('Error loading language config:', err);
+      if (siteLanguageSelect) siteLanguageSelect.value = 'en';
+    }
+  }
+
+  if (languageConfigSaveBtn) {
+    languageConfigSaveBtn.addEventListener('click', async () => {
+      const language = siteLanguageSelect ? siteLanguageSelect.value : 'en';
+
+      try {
+        languageConfigSaveBtn.disabled = true;
+        const oldText = languageConfigSaveBtn.textContent;
+        languageConfigSaveBtn.textContent = 'Saving...';
+
+        const res = await fetch('/api/settings/language', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ language })
+        });
+
+        if (!res.ok) {
+          const error = await res.json();
+          throw new Error(error.message || 'Failed to save language setting');
+        }
+
+        // Clear i18n cache and reload translations
+        if (typeof window.i18n !== 'undefined' && window.i18n.setLanguage) {
+          await window.i18n.setLanguage(language);
+          // After applying the new language, reload the page so all UI text updates
+          // (this avoids requiring the admin to manually refresh the page).
+          setTimeout(() => {
+            try { window.location.reload(); } catch (_) {}
+          }, 200);
+        }
+
+        showResponse('success', t('admin.language.saved', 'Language saved'));
+      } catch (err) {
+        if (languageConfigAlert) {
+          languageConfigAlert.className = 'alert alert-danger';
+          languageConfigAlert.textContent = 'Error: ' + err.message;
+          languageConfigAlert.classList.remove('d-none');
+        }
+        showResponse('danger', 'Error: ' + err.message);
+      } finally {
+        languageConfigSaveBtn.disabled = false;
+        languageConfigSaveBtn.textContent = typeof window.i18n !== 'undefined' ? window.i18n.t('common.save') : 'Save';
+      }
+    });
+  }
+
+  // Load language config when language tab is shown
+  const languageSubTab = document.getElementById('admin-settings-subtab-language');
+  if (languageSubTab) {
+    languageSubTab.addEventListener('shown.bs.tab', async () => {
+      await loadLanguageConfig();
     });
   }
 
@@ -3014,7 +3149,7 @@ window.onload = async function () {
       const nomineesText = document.getElementById('nominees-list').value.trim();
 
       if (!year || !categoryNumber || !categoryName || !nomineesText) {
-        showCategoriesAlert('Veuillez remplir tous les champs', 'warning');
+        showCategoriesAlert(t('admin.categories.fillAllFields', 'Please fill in all fields'), 'warning');
         return;
       }
 
@@ -3023,7 +3158,7 @@ window.onload = async function () {
         .filter(line => line.length > 0);
 
       if (nominees.length === 0) {
-        showCategoriesAlert('Veuillez entrer au moins un nommé', 'warning');
+        showCategoriesAlert(t('admin.categories.enterAtLeastOneNominee', 'Please enter at least one nominee'), 'warning');
         return;
       }
 
@@ -3048,7 +3183,7 @@ window.onload = async function () {
         }
 
         const data = await res.json();
-        showCategoriesAlert('Catégorie créée avec succès', 'success');
+        showCategoriesAlert(t('admin.categories.categoryCreated', 'Category created successfully.'), 'success');
         createCategoryForm.reset();
         if (refreshCategoriesListBtn) refreshCategoriesListBtn.click();
       } catch (err) {
@@ -3077,7 +3212,10 @@ window.onload = async function () {
       const categories = data.categories || [];
 
       if (categories.length === 0) {
-        categoriesListContainer.innerHTML = `<div class="text-muted">Aucune catégorie trouvée${year ? ` pour l'année ${year}` : ''}.</div>`;
+        const emptyMsg = year
+          ? t('admin.categories.noneFoundYear', 'No categories found for year {year}.', { year })
+          : t('admin.categories.noneFound', 'No categories found.');
+        categoriesListContainer.innerHTML = `<div class="text-muted">${emptyMsg}</div>`;
         return;
       }
 
@@ -3087,12 +3225,12 @@ window.onload = async function () {
             <thead>
               <tr>
                 <th style="width: 40px;">
-                  <input type="checkbox" class="form-check-input" id="select-all-categories" title="Sélectionner tout">
+                  <input type="checkbox" class="form-check-input" id="select-all-categories" title="${t('admin.categories.selectAllTitle','Select all')}">
                 </th>
-                <th>#</th>
-                <th>Nom</th>
-                <th>Nommés</th>
-                <th>Actions</th>
+                <th>${t('admin.categories.table.number','#')}</th>
+                <th>${t('admin.categories.table.name','Nom')}</th>
+                <th>${t('admin.categories.table.nominees','Nominees')}</th>
+                <th>${t('admin.categories.table.actions','Actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -3105,12 +3243,12 @@ window.onload = async function () {
                   <td><strong>${cat.categoryName}</strong></td>
                   <td>
                     <ul class="mb-0 small">
-                      ${cat.nominees.map(n => `<li>${n.name}</li>`).join('')}
+                      ${cat.nominees.map(n => `<li>${escapeHtml(n.name)}</li>`).join('')}
                     </ul>
                   </td>
                   <td>
-                    <button class="btn btn-sm btn-primary me-1" onclick="editCategory('${cat._id}')">Éditer</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteCategory('${cat._id}')">Supprimer</button>
+                    <button class="btn btn-sm btn-primary me-1" onclick="editCategory('${cat._id}')">${t('common.edit','Edit')}</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteCategory('${cat._id}')">${t('common.delete','Delete')}</button>
                   </td>
                 </tr>
               `).join('')}
@@ -3135,7 +3273,7 @@ window.onload = async function () {
 
       if (!res.ok) {
         if (res.status === 404) {
-          showResponse('danger', 'Catégorie non trouvée');
+          showResponse('danger', t('admin.categories.categoryNotFound', 'Category not found.'));
           return;
         }
         throw new Error('Failed to load category');
@@ -3145,7 +3283,7 @@ window.onload = async function () {
       const category = data.category;
       
       if (!category) {
-        showResponse('danger', 'Catégorie non trouvée');
+        showResponse('danger', t('admin.categories.categoryNotFound', 'Category not found.'));
         return;
       }
 
@@ -3170,7 +3308,7 @@ window.onload = async function () {
   };
 
   window.deleteCategory = async function(categoryId) {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette catégorie?')) return;
+    if (!confirm(t('admin.categories.confirmDelete','Are you sure you want to delete this category?'))) return;
 
     try {
       const res = await fetch(`/api/categories/${categoryId}`, {
@@ -3183,7 +3321,7 @@ window.onload = async function () {
         throw new Error(error.message || 'Delete failed');
       }
 
-      showResponse('success', 'Catégorie supprimée');
+      showResponse('success', t('admin.categories.categoryDeleted', 'Category deleted.'));
       await loadCategoriesList();
     } catch (err) {
       showResponse('danger', 'Erreur: ' + err.message);
@@ -3202,7 +3340,7 @@ window.onload = async function () {
       if (!categoryName || !nomineesText) {
         if (alertEl) {
           alertEl.className = 'alert alert-warning';
-          alertEl.textContent = 'Veuillez remplir tous les champs';
+          alertEl.textContent = t('admin.categories.fillAllFields', 'Please fill in all fields');
           alertEl.classList.remove('d-none');
         }
         return;
@@ -3215,7 +3353,7 @@ window.onload = async function () {
       if (nominees.length === 0) {
         if (alertEl) {
           alertEl.className = 'alert alert-warning';
-          alertEl.textContent = 'Veuillez entrer au moins un nommé';
+          alertEl.textContent = t('admin.categories.enterAtLeastOneNominee', 'Please enter at least one nominee');
           alertEl.classList.remove('d-none');
         }
         return;
@@ -3225,7 +3363,7 @@ window.onload = async function () {
       if (!categoryNumber || categoryNumber < 1 || categoryNumber > 50) {
         if (alertEl) {
           alertEl.className = 'alert alert-warning';
-          alertEl.textContent = 'Le numéro de catégorie doit être entre 1 et 50';
+          alertEl.textContent = t('admin.categories.numberBetween1And50', 'Category number must be between 1 and 50');
           alertEl.classList.remove('d-none');
         }
         return;
@@ -3236,7 +3374,7 @@ window.onload = async function () {
       
       try {
         saveCategoryChangesBtn.disabled = true;
-        saveCategoryChangesBtn.textContent = 'Enregistrement...';
+        saveCategoryChangesBtn.textContent = t('common.saving', 'Saving...');
         
         // Hide any previous alerts
         if (alertEl) {
@@ -3262,7 +3400,7 @@ window.onload = async function () {
         }
 
         const data = await res.json();
-        showResponse('success', 'Catégorie mise à jour avec succès');
+        showResponse('success', t('admin.categories.categoryUpdated', 'Category updated successfully.'));
         
         // Close modal
         const modal = bootstrap.Modal.getInstance(document.getElementById('editCategoryModal'));
@@ -3358,8 +3496,12 @@ window.onload = async function () {
       const categoryIds = selected.map(cb => cb.dataset.categoryId);
       const categoryNames = selected.map(cb => cb.dataset.categoryName);
       
-      const confirmMessage = `Êtes-vous sûr de vouloir supprimer ${categoryIds.length} catégorie(s)?\n\n${categoryNames.join('\n')}\n\nCette action est irréversible.`;
-      if (!confirm(confirmMessage)) return;
+      const confirmMessage = t(
+        'admin.categories.bulkDeleteConfirm',
+        `Are you sure you want to delete ${categoryIds.length} category(ies)?\n\n${categoryNames.join('\n')}\n\nThis action is irreversible.`,
+        { count: categoryIds.length }
+      );
+      if (!confirm(t('admin.categories.confirmDeleteMultiple', confirmMessage, { count: categoryIds.length, names: categoryNames.join('\n') }))) return;
       
       try {
         bulkDeleteBtn.disabled = true;
@@ -3389,10 +3531,14 @@ window.onload = async function () {
         }
         
         if (successCount > 0) {
-          showResponse('success', `${successCount} catégorie(s) supprimée(s)${errorCount > 0 ? `, ${errorCount} erreur(s)` : ''}`);
+          const errorsSuffix = errorCount > 0 ? `, ${errorCount} error(s)` : '';
+          showResponse('success', t('admin.categories.deletedCount', '{count} category/categories deleted{errors}', {
+            count: successCount,
+            errors: errorsSuffix,
+          }));
           await loadCategoriesList();
         } else {
-          showResponse('danger', `Erreur lors de la suppression: ${errorCount} erreur(s)`);
+          showResponse('danger', `Error while deleting: ${errorCount} error(s)`);
         }
       } catch (err) {
         showResponse('danger', 'Erreur: ' + err.message);

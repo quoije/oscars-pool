@@ -41,6 +41,27 @@
   let categories = [];
   let currentYear = new Date().getFullYear();
 
+  function t(key, fallback, params) {
+    try {
+      if (window.i18n && typeof window.i18n.t === 'function') {
+        return window.i18n.t(key, params || {});
+      }
+    } catch (_) {}
+    let out = (typeof fallback === 'string') ? fallback : String(key);
+    if (params && typeof params === 'object') {
+      Object.keys(params).forEach((k) => {
+        out = out.replace(new RegExp(`\\{${k}\\}`, 'g'), String(params[k]));
+      });
+    }
+    return out;
+  }
+
+  function getLocale() {
+    return (window.i18n && typeof window.i18n.getLanguage === 'function')
+      ? window.i18n.getLanguage()
+      : (document.documentElement.lang || 'en');
+  }
+
   function showAlert(message, type = 'info') {
     const container = document.getElementById('alert-container');
     if (!container) return;
@@ -91,7 +112,7 @@
       renderPicks();
     } catch (err) {
       console.error('Error fetching picks:', err);
-      showAlert('Erreur lors du chargement des choix: ' + err.message, 'danger');
+      showAlert(t('viewPicks.errorLoading', 'Error loading picks: {error}', { error: err.message }), 'danger');
     }
   }
 
@@ -102,7 +123,7 @@
     if (allPicks.length === 0) {
       container.innerHTML = `
         <div class="alert alert-info">
-          Aucun utilisateur n'a encore soumis ses choix pour l'année ${currentYear}.
+          ${t('viewPicks.noPicks', 'No user has submitted picks for year {year} yet.', { year: currentYear })}
         </div>
       `;
       return;
@@ -115,9 +136,19 @@
     });
     
     container.innerHTML = allPicks.map(pick => {
-      const userName = pick.userId?.name || 'Utilisateur inconnu';
+      const userName = pick.userId?.name || t('viewPicks.unknownUser', 'Unknown user');
       const userEmail = pick.userId?.email || '';
-      const submittedDate = pick.submittedAt ? new Date(pick.submittedAt).toLocaleString('fr-FR') : '—';
+      let submittedDate = '—';
+      if (pick.submittedAt) {
+        const d = new Date(pick.submittedAt);
+        if (!Number.isNaN(d.getTime())) {
+          try {
+            submittedDate = d.toLocaleString(getLocale(), { dateStyle: 'medium', timeStyle: 'short' });
+          } catch (_) {
+            submittedDate = d.toLocaleString();
+          }
+        }
+      }
       
       // Create a map of picks by category
       const picksMap = new Map();
@@ -141,7 +172,7 @@
                 <strong>${cat.categoryNumber}. ${cat.categoryName}</strong><br>
                 <span class="text-muted">${selected}</span>
               </div>
-              ${isWinner ? '<span class="badge bg-success">Gagnant</span>' : ''}
+              ${isWinner ? `<span class="badge bg-success">${t('viewPicks.winnerBadge', 'Winner')}</span>` : ''}
             </div>
           </div>
         `;
@@ -156,13 +187,13 @@
                 <small class="text-muted">${userEmail}</small>
               </div>
               <div class="text-end">
-                <small class="text-muted">Soumis le: ${submittedDate}</small><br>
-                <span class="badge bg-primary">${pick.picks.length} / ${categories.length} catégories</span>
+                <small class="text-muted">${t('viewPicks.submittedOn', 'Submitted on: {date}', { date: submittedDate })}</small><br>
+                <span class="badge bg-primary">${t('viewPicks.categoriesCount', '{count} / {total} categories', { count: pick.picks.length, total: categories.length })}</span>
               </div>
             </div>
           </div>
           <div class="card-body">
-            ${picksList || '<div class="text-muted">Aucun choix enregistré</div>'}
+            ${picksList || `<div class="text-muted">${t('viewPicks.noPicks2', 'No picks recorded')}</div>`}
           </div>
         </div>
       `;
@@ -172,7 +203,7 @@
   // Event listeners
   document.getElementById('refresh-picks')?.addEventListener('click', () => {
     fetchAllPicks();
-    showAlert('Choix rafraîchis', 'info');
+    showAlert(t('viewPicks.picksRefreshed', 'Picks refreshed'), 'info');
   });
 
   // Initial load

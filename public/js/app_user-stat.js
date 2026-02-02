@@ -1,7 +1,7 @@
 function createPageLoader(options = {}) {
-  const title = String(options.title || 'Chargement…');
+  const title = String(options.title || t('common.loading', 'Loading…'));
   // Subtitle kept for backwards-compat with callers, but we no longer render text in the UI.
-  const subtitle = String(options.subtitle || 'Préparation de la page…');
+  const subtitle = String(options.subtitle || t('stats.preparingPage', 'Preparing page…'));
 
   let progress = 0;
   let removed = false;
@@ -118,10 +118,31 @@ function createPageLoader(options = {}) {
   return { setProgress, setSubtitle, done, fail };
 }
 
+function getLocale() {
+  return (window.i18n && typeof window.i18n.getLanguage === 'function')
+    ? window.i18n.getLanguage()
+    : (document.documentElement.lang || 'en');
+}
+
+function t(key, fallback, params) {
+  try {
+    if (window.i18n && typeof window.i18n.t === 'function') {
+      return window.i18n.t(key, params || {});
+    }
+  } catch (_) {}
+  let out = (typeof fallback === 'string') ? fallback : String(key);
+  if (params && typeof params === 'object') {
+    Object.keys(params).forEach((k) => {
+      out = out.replace(new RegExp(`\\{${k}\\}`, 'g'), String(params[k]));
+    });
+  }
+  return out;
+}
+
 window.addEventListener('DOMContentLoaded', async function () {
     const pageLoader = createPageLoader({
-      title: 'Chargement des statistiques',
-      subtitle: 'Récupération des données…'
+      title: t('stats.loadingStats', 'Loading statistics'),
+      subtitle: t('stats.fetchingData', 'Fetching data…')
     });
 
     const token = localStorage.getItem('auth_token');
@@ -173,7 +194,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       if (!list.length) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="2" class="text-muted">Aucun gagnant défini.</td>
+            <td colspan="2" class="text-muted">${t('stats.noWinnersDefined', 'No winners defined.')}</td>
           </tr>
         `;
         return;
@@ -187,7 +208,7 @@ window.addEventListener('DOMContentLoaded', async function () {
         const arr = byYear.get(String(y)) || [];
         arr.push({
           year: y,
-          name: w?.name || '(utilisateur supprimé)',
+          name: w?.name || t('stats.deletedUser', '(deleted user)'),
           points: w?.points === null || w?.points === undefined || w?.points === '' ? null : Number(w.points),
         });
         byYear.set(String(y), arr);
@@ -215,7 +236,7 @@ window.addEventListener('DOMContentLoaded', async function () {
         if (sorted.length > 1) {
           const small = document.createElement('div');
           small.className = 'text-muted small';
-          small.textContent = 'égalité';
+          small.textContent = t('stats.tie', 'tie');
           tdYear.appendChild(document.createElement('br'));
           tdYear.appendChild(small);
         }
@@ -227,7 +248,7 @@ window.addEventListener('DOMContentLoaded', async function () {
 
           const name = document.createElement('span');
           name.className = 'fw-semibold';
-          name.textContent = w?.name || '(utilisateur supprimé)';
+          name.textContent = w?.name || t('stats.deletedUser', '(deleted user)');
           row.appendChild(name);
 
           const pts = w.points === null || Number.isNaN(w.points) ? null : w.points;
@@ -254,7 +275,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       if (!completions || typeof completions !== 'object') {
         tbody.innerHTML = `
           <tr>
-            <td colspan="3" class="text-muted">Impossible de charger les finisseurs 100%.</td>
+            <td colspan="3" class="text-muted">${t('stats.unableToLoadCompleters', 'Unable to load 100% completers.')}</td>
           </tr>
         `;
         return;
@@ -267,7 +288,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       if (!years.length) {
         tbody.innerHTML = `
           <tr>
-            <td colspan="3" class="text-muted">Aucune année trouvée.</td>
+            <td colspan="3" class="text-muted">${t('stats.noYearsFound', 'No years found.')}</td>
           </tr>
         `;
         return;
@@ -311,9 +332,9 @@ window.addEventListener('DOMContentLoaded', async function () {
             let dateStr = '';
             if (u?.completedAt) {
               const date = new Date(u.completedAt);
-              dateStr = ` (${date.toLocaleDateString('fr-CA')})`;
+              dateStr = ` (${date.toLocaleDateString(getLocale())})`;
             }
-            badge.textContent = `${rankPrefix}${u?.name || '(sans nom)'}${dateStr}`;
+            badge.textContent = `${rankPrefix}${u?.name || t('stats.unnamed', '(unnamed)')}${dateStr}`;
             wrap.appendChild(badge);
           });
           tdNames.appendChild(wrap);
@@ -359,7 +380,7 @@ window.addEventListener('DOMContentLoaded', async function () {
     try {
       pageLoader.setProgress(12);
 
-      // Modal UI (Films regardés)
+      // Modal UI (watched movies)
       const moviesModalEl = document.getElementById('moviesModal');
       const movieGridEl = document.getElementById('movie-grid');
       const moviesSummaryEl = document.getElementById('movies-summary');
@@ -383,7 +404,7 @@ window.addEventListener('DOMContentLoaded', async function () {
         const d = new Date(iso);
         if (Number.isNaN(d.getTime())) return '';
         try {
-          return d.toLocaleDateString('fr-FR', { year: 'numeric', month: 'short', day: 'numeric' });
+          return d.toLocaleDateString(getLocale(), { year: 'numeric', month: 'short', day: 'numeric' });
         } catch (_) {
           return d.toLocaleDateString();
         }
@@ -413,7 +434,9 @@ window.addEventListener('DOMContentLoaded', async function () {
         const sorted = sortMoviesRecent((Array.isArray(currentModalMovies) ? currentModalMovies : []));
 
         const total = Array.isArray(currentModalMovies) ? currentModalMovies.length : 0;
-        moviesSummaryEl.textContent = total ? `${total} film${total > 1 ? 's' : ''}` : '0 film';
+        moviesSummaryEl.textContent = total
+          ? t('stats.filmCount', '{count} movie{plural}', { count: total, plural: total > 1 ? 's' : '' })
+          : t('stats.noFilms', '0 movies');
 
         movieGridEl.innerHTML = '';
         if (!sorted.length) {
@@ -452,7 +475,7 @@ window.addEventListener('DOMContentLoaded', async function () {
             item.classList.add('stats-movie-item--clickable');
             item.setAttribute('role', 'link');
             item.setAttribute('tabindex', '0');
-            item.setAttribute('aria-label', vodLink ? `Ouvrir le lien: ${title}` : `Ouvrir le lecteur: ${title}`);
+            item.setAttribute('aria-label', vodLink ? t('stats.openLink', 'Open link') + ': ' + title : t('stats.openPlayer', 'Open player') + ': ' + title);
           }
 
           const poster = document.createElement('img');
@@ -523,7 +546,7 @@ window.addEventListener('DOMContentLoaded', async function () {
             imdbLink.href = `https://www.imdb.com/title/${encodeURIComponent(imdbId)}/`;
             imdbLink.target = '_blank';
             imdbLink.rel = 'noopener noreferrer';
-            imdbLink.setAttribute('aria-label', 'Voir sur IMDb');
+            imdbLink.setAttribute('aria-label', (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.viewOnImdb') : 'View on IMDb');
 
             const imdbIcon = document.createElement('span');
             imdbIcon.className = 'imdb-icon';
@@ -555,7 +578,7 @@ window.addEventListener('DOMContentLoaded', async function () {
           if (watchedLabel) {
             const d = document.createElement('span');
             d.className = 'text-muted';
-            d.textContent = `Vu le ${watchedLabel}`;
+            d.textContent = t('stats.watchedOn', 'Watched on {date}', { date: watchedLabel });
             meta.appendChild(d);
           }
 
@@ -568,7 +591,7 @@ window.addEventListener('DOMContentLoaded', async function () {
             details.className = 'stats-movie-details';
 
             const summary = document.createElement('summary');
-            summary.textContent = 'Détails';
+            summary.textContent = t('common.details', 'Details');
             details.appendChild(summary);
 
             const body = document.createElement('div');
@@ -592,8 +615,8 @@ window.addEventListener('DOMContentLoaded', async function () {
         if (moviesModalTitleEl) {
           const count = currentModalMovies.length;
           moviesModalTitleEl.textContent = currentModalUserName
-            ? `Films regardés — ${currentModalUserName} (${count})`
-            : `Films regardés (${count})`;
+            ? t('stats.watchedMoviesUser', 'Watched movies — {user} ({count})', { user: currentModalUserName, count: count })
+            : t('stats.watchedMovies', 'Watched movies ({count})', { count: count });
         }
 
         renderMoviesModal();
@@ -619,10 +642,10 @@ window.addEventListener('DOMContentLoaded', async function () {
       pageLoader.setProgress(20);
       const activeYear = await fetchActiveYear();
       if (activeYear) {
-        document.title = `Pool Oscars (${activeYear}) - Statistiques des utilisateurs`;
+        document.title = `Pool Oscars (${activeYear}) - ${t('stats.pageTitle', 'User Statistics')}`;
         // Keep the main heading clean; show the year in the "Classement" tab instead.
         const h2 = document.querySelector('h2');
-        if (h2) h2.textContent = 'Statistiques des utilisateurs';
+        if (h2) h2.textContent = t('stats.pageTitle', 'User Statistics');
         const badge = document.getElementById('stats-active-year-badge');
         if (badge) {
           badge.textContent = String(activeYear);
@@ -656,7 +679,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       const userTableBody = document.getElementById('user-table-body');
       
       // Check visibility config for Bon picks column
-      let showBonPicksColumn = true;
+      let showBonPicksColumn = false;
       try {
         const visibilityRes = await fetch('/api/settings/visibility-config', { cache: 'no-store' });
         if (visibilityRes.ok) {
@@ -694,7 +717,8 @@ window.addEventListener('DOMContentLoaded', async function () {
       // Update Films column header with total
       const filmsHeader = document.getElementById('films-header');
       if (filmsHeader && totalMovies > 0) {
-        filmsHeader.innerHTML = `Films <small class="text-muted" style="font-weight: normal;">(${totalMovies})</small>`;
+        const filmsLabel = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('stats.films') : 'Movies';
+        filmsHeader.innerHTML = `${filmsLabel} <small class="text-muted" style="font-weight: normal;">(${totalMovies})</small>`;
       }
 
       stats.forEach((userStat, index) => {
@@ -751,7 +775,7 @@ window.addEventListener('DOMContentLoaded', async function () {
       const statsError = document.getElementById('stats-error');
       if (table) table.classList.add('d-none');
       if (statsError) {
-        statsError.textContent = "Impossible de charger le classement pour le moment.";
+        statsError.textContent = t('stats.unableToLoadRanking', 'Unable to load the ranking right now.');
         statsError.classList.remove('d-none');
       }
       // Still attempt to render these sections even if stats fail (best effort)

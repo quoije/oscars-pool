@@ -501,7 +501,10 @@ router.post("/register", async (req, res) => {
       throw new Error("Le nom du chien doit être défini");
     }
     if (!registerVerification()) {
-      return res.status(400).json({ message: "Mauvais nom de chien" });
+      return res.status(400).json({
+        messageKey: 'auth.dogAnswerIncorrect',
+        message: 'Incorrect dog name.',
+      });
     }
 
     const existingUser = await User.findOne({ email: emailNorm });
@@ -515,7 +518,10 @@ router.post("/register", async (req, res) => {
     const user = new User({ name: nameNorm, email: emailNorm, password: hashedPassword, role: 0 });
     await user.save();
 
-    res.status(201).json({ message: "L'utilisateur s'est enregistré avec succès !" });
+    res.status(201).json({
+      messageKey: 'auth.registrationSuccess',
+      message: 'User registered successfully!',
+    });
   } catch (err) {
     return res.status(400).json({ message: err?.message || "Erreur interne" });
   }
@@ -527,19 +533,30 @@ router.post("/login", async (req, res) => {
 
   try {
     const user = await User.findOne({ email });
-    if (!user) return res.status(404).json({ message: "L'utilisateur n'a pas été trouvé" });
+    if (!user) {
+      return res.status(404).json({
+        messageKey: 'auth.userNotFound',
+        message: 'User not found',
+      });
+    }
 
     // If this account is in "temp password" mode and the temp password has expired, block login.
     if (user.mustChangePassword && user.tempPasswordExpiresAt && user.tempPasswordExpiresAt instanceof Date) {
       if (Date.now() > user.tempPasswordExpiresAt.getTime()) {
         return res.status(401).json({
-          message: "Le mot de passe temporaire a expiré. Demandez à un admin de réinitialiser votre mot de passe.",
+          messageKey: 'auth.tempPasswordExpired',
+          message: 'Temporary password expired. Ask an admin to reset your password.',
         });
       }
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(401).json({ message: "Informations d'identification non valides" });
+    if (!isMatch) {
+      return res.status(401).json({
+        messageKey: 'auth.invalidCredentials',
+        message: 'Invalid credentials',
+      });
+    }
 
     console.log("[debug] " + user.name + " logged in")
 
@@ -613,7 +630,7 @@ router.post("/admin/reset-temp-password", verifyToken, async (req, res) => {
     await user.save();
 
     return res.status(200).json({
-      message: "Mot de passe temporaire généré. L'utilisateur devra le changer à sa prochaine connexion.",
+      message: "Temporary password generated. The user must change it on next login.",
       tempPassword,
       expiresAt: expiresAt.toISOString(),
       user: { id: String(user._id), name: user.name, email: user.email },
@@ -697,7 +714,7 @@ router.post("/admin/create", verifyToken, async (req, res) => {
     await user.save();
 
     return res.status(201).json({
-      message: "Utilisateur créé. Mot de passe temporaire généré.",
+      message: "User created. Temporary password generated.",
       tempPassword,
       expiresAt: expiresAt.toISOString(),
       user: { id: String(user._id), name: user.name, email: user.email, admin: user.role === 69, mustChangePassword: true },

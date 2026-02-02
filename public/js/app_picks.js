@@ -2,9 +2,9 @@
   'use strict';
 
   function createPageLoader(options = {}) {
-    const title = String(options.title || 'Chargement…');
+    const title = String(options.title || t('common.loading', 'Loading…'));
     // Subtitle kept for backwards-compat with callers, but we no longer render text in the UI.
-    const subtitle = String(options.subtitle || 'Préparation de la page…');
+    const subtitle = String(options.subtitle || t('picks.preparingPage', 'Preparing page…'));
 
     let progress = 0;
     let removed = false;
@@ -120,6 +120,21 @@
     return { setProgress, setSubtitle, done, fail };
   }
 
+  function t(key, fallback, params) {
+    try {
+      if (window.i18n && typeof window.i18n.t === 'function') {
+        return window.i18n.t(key, params || {});
+      }
+    } catch (_) {}
+    let out = (typeof fallback === 'string') ? fallback : String(key);
+    if (params && typeof params === 'object') {
+      Object.keys(params).forEach((k) => {
+        out = out.replace(new RegExp(`\\{${k}\\}`, 'g'), String(params[k]));
+      });
+    }
+    return out;
+  }
+
   const token = localStorage.getItem('auth_token');
   if (!token) {
     window.location.href = '/';
@@ -198,7 +213,7 @@
       // Use active year if not set
       if (!currentYear) {
         currentYear = await fetchActiveYear();
-        document.title = `Pool Oscars (${currentYear}) - Mes picks`;
+        document.title = t('picks.pageTitleWithYear', 'Oscar Pool ({year}) - My picks', { year: currentYear });
       }
 
       if (pageLoader) pageLoader.setProgress(18);
@@ -225,10 +240,12 @@
       document.getElementById('current-year').textContent = currentYear;
       
       if (categories.length === 0) {
+        const noCats = t('picks.noCategoriesFound', 'No categories found for year {year}', { year: currentYear });
+        const adminHint = t('picks.adminMustImportCategories', 'An administrator must first import the categories.');
         document.getElementById('categories-container').innerHTML = `
           <div class="alert alert-warning">
-            Aucune catégorie trouvée pour l'année ${currentYear}. 
-            Un administrateur doit d'abord importer les catégories.
+            ${noCats}
+            ${adminHint}
           </div>
         `;
         if (pageLoader) pageLoader.done();
@@ -243,7 +260,7 @@
       if (pageLoader) pageLoader.setProgress(85);
     } catch (err) {
       console.error('Error fetching categories:', err);
-      showAlert('Erreur lors du chargement des catégories: ' + err.message, 'danger');
+      showAlert(t('picks.errorLoadingCategories', 'Error loading categories: {error}', { error: err.message }), 'danger');
       if (pageLoader) pageLoader.fail();
     }
   }
@@ -287,7 +304,7 @@
     if (!container) return;
     
     if (categories.length === 0) {
-      container.innerHTML = '<div class="text-center py-4 text-muted">Aucune catégorie disponible</div>';
+      container.innerHTML = `<div class="text-center py-4 text-muted">${t('picks.noCategoriesAvailable', 'No categories available')}</div>`;
       return;
     }
     
@@ -297,9 +314,9 @@
           <thead class="table-light">
             <tr>
               <th style="width: 50px;">#</th>
-              <th>Catégorie</th>
-              <th style="width: 200px;">Choix</th>
-              <th>Nommés</th>
+              <th>${t('picks.category', 'Category')}</th>
+              <th style="width: 200px;">${t('picks.choice', 'Choice')}</th>
+              <th>${t('picks.nominees', 'Nominees')}</th>
             </tr>
           </thead>
           <tbody>
@@ -314,7 +331,7 @@
                       <span class="selected-choice-badge badge bg-success">
                         <span>${selectedNominee}</span>
                       </span>
-                    ` : '<span class="text-muted fst-italic">Aucun choix</span>'}
+                    ` : `<span class="text-muted fst-italic">${t('picks.noChoice', 'No choice')}</span>`}
                   </td>
                   <td>
                     <div class="d-flex flex-wrap gap-2">
@@ -386,7 +403,7 @@
       } catch (err) {
         console.error('Auto-save failed:', err);
         // Show error alert only on failure
-        showAlert('Erreur lors de l\'enregistrement automatique: ' + err.message, 'danger');
+        showAlert(t('picks.errorAutoSaving', 'Error auto-saving: {error}', { error: err.message }), 'danger');
       } finally {
         isSaving = false;
       }
@@ -413,7 +430,7 @@
     
     // Skip confirmation dialog in silent mode (auto-save)
     if (!silent && picks.length < categories.length) {
-      if (!confirm(`Vous n'avez sélectionné que ${picks.length} sur ${categories.length} catégories. Voulez-vous enregistrer quand même?`)) {
+      if (!confirm(t('picks.incompleteSelection', `You have selected only ${picks.length} out of ${categories.length} categories. Do you want to save anyway?`, { selected: picks.length, total: categories.length }))) {
         return;
       }
     }
@@ -438,18 +455,18 @@
       
       const data = await res.json();
       if (!silent) {
-        showAlert('Vos choix ont été enregistrés avec succès!', 'success');
+        showAlert(t('picks.successSaved', 'Your picks have been saved successfully!'), 'success');
       }
     } catch (err) {
       console.error('Error submitting picks:', err);
-      showAlert('Erreur lors de l\'enregistrement: ' + err.message, 'danger');
+      showAlert(t('picks.errorSubmitting', 'Error submitting picks: {error}', { error: err.message }), 'danger');
     }
   }
 
   // Event listeners
   document.getElementById('load-my-picks')?.addEventListener('click', () => {
     loadMyPicks();
-    showAlert('Choix rechargés', 'info');
+    showAlert(t('picks.reloaded', 'Picks reloaded'), 'info');
   });
 
   // Winners & Scores functionality (admin only)
@@ -480,7 +497,7 @@
       await fetchScores();
     } catch (err) {
       console.error('Error fetching winners categories:', err);
-      showAlert('Erreur lors du chargement des catégories: ' + err.message, 'danger');
+      showAlert(t('picks.errorLoadingCategories', 'Error loading categories: {error}', { error: err.message }), 'danger');
     }
   }
 
@@ -489,7 +506,7 @@
     if (!container) return;
 
     if (winnersCategories.length === 0) {
-      container.innerHTML = '<div class="alert alert-warning">Aucune catégorie trouvée pour cette année.</div>';
+      container.innerHTML = `<div class="alert alert-warning">${t('picks.noCategoriesFound', 'No categories found for year {year}', { year: currentYear })}</div>`;
       return;
     }
 
@@ -506,9 +523,9 @@
           <thead class="table-light">
             <tr>
               <th style="width: 50px;">#</th>
-              <th>Catégorie</th>
-              <th style="width: 200px;">Sélection</th>
-              <th>Gagnant</th>
+              <th>${t('picks.categoryHeader', 'Category')}</th>
+              <th style="width: 200px;">${t('picks.selectionHeader', 'Selection')}</th>
+              <th>${t('picks.winnerHeader', 'Winner')}</th>
             </tr>
           </thead>
           <tbody>
@@ -559,13 +576,18 @@
             throw new Error(error.message || 'Failed to update winner');
           }
 
-          showAlert(winnerName ? 'Gagnant marqué avec succès' : 'Gagnant supprimé', 'success');
+          showAlert(
+            winnerName 
+              ? t('picks.winnerMarked', 'Winner marked successfully') 
+              : t('picks.winnerDeleted', 'Winner deleted'),
+            'success'
+          );
           await fetchWinnersCategories();
           // Auto-refresh scores after marking/clearing a winner (silent mode)
           await calculateScores(true);
         } catch (err) {
           console.error('Error updating winner:', err);
-          showAlert('Erreur: ' + err.message, 'danger');
+          showAlert(t('picks.errorUpdatingWinner', 'Error: {error}', { error: err.message }), 'danger');
         }
       });
     });
@@ -580,7 +602,7 @@
       const btn = document.getElementById('calculate-scores');
       if (btn) {
         btn.disabled = true;
-        btn.textContent = 'Calcul en cours...';
+        btn.textContent = t('picks.calculatingScores', 'Calculating scores…');
       }
 
       const res = await fetch('/api/picks/calculate-scores', {
@@ -598,7 +620,7 @@
         if (error.message && error.message.includes('No winners marked')) {
           if (!silent) {
             // Only show as info/warning, not error
-            showAlert('Aucun gagnant marqué. Les scores seront calculés une fois les gagnants définis.', 'info');
+            showAlert(t('picks.noWinnersMarked', 'No winners marked. Scores will be calculated once winners are defined.'), 'info');
           }
           // Still try to fetch existing scores
           await fetchScores();
@@ -609,19 +631,22 @@
 
       const data = await res.json();
       if (!silent) {
-        showAlert(`Scores calculés avec succès! ${data.scores.length} utilisateur(s) évalué(s).`, 'success');
+        showAlert(
+          t('picks.scoresCalculated', 'Scores calculated successfully! {count} user(s) evaluated.', { count: data.scores.length }),
+          'success'
+        );
       }
       await fetchScores();
     } catch (err) {
       console.error('Error calculating scores:', err);
       if (!silent) {
-        showAlert('Erreur: ' + err.message, 'danger');
+        showAlert(t('picks.errorCalculatingScores', 'Error: {error}', { error: err.message }), 'danger');
       }
     } finally {
       const btn = document.getElementById('calculate-scores');
       if (btn) {
         btn.disabled = false;
-        btn.textContent = 'Calculer les scores';
+        btn.textContent = t('picks.calculateScores', 'Calculate scores');
       }
     }
   }
@@ -653,7 +678,7 @@
       console.error('Error fetching scores:', err);
       const container = document.getElementById('scores-container');
       if (container) {
-        container.innerHTML = '<div class="text-danger">Erreur lors du chargement des scores.</div>';
+        container.innerHTML = `<div class="text-danger">${t('picks.errorLoadingScores', 'Error loading scores.')}</div>`;
       }
     }
   }
@@ -684,7 +709,7 @@
     }).sort((a, b) => b.actualScore - a.actualScore);
 
     if (validScores.length === 0) {
-      container.innerHTML = '<div class="text-muted">Aucun score disponible. Les utilisateurs doivent d\'abord soumettre leurs choix.</div>';
+      container.innerHTML = `<div class="text-muted">${t('picks.noScoresAvailable', 'No scores available. Users must first submit their picks.')}</div>`;
       return;
     }
 
@@ -694,7 +719,7 @@
           <thead class="table-light">
             <tr>
               <th style="width: 40px;">#</th>
-              <th>Utilisateur</th>
+              <th>${t('picks.userHeader', 'User')}</th>
               <th class="text-center" style="width: 80px;">Score</th>
               <th class="text-center" style="width: 70px;">Total</th>
               <th class="text-center" style="width: 100px;">Actions</th>
@@ -714,7 +739,7 @@
                   <td class="text-center text-muted small">${totalCategories}</td>
                   <td class="text-center">
                     <button class="btn btn-sm btn-outline-primary view-picks-btn" data-user-id="${score.userId}" data-user-name="${score.userName}" data-score-index="${index}">
-                      Détails
+                      ${t('picks.detailsButton', 'Details')}
                     </button>
                   </td>
                 </tr>
@@ -743,10 +768,10 @@
     const modalTitle = document.getElementById('userPicksModalLabel');
     const modalContent = document.getElementById('user-picks-modal-content');
 
-    modalTitle.textContent = `Choix de ${score.userName}`;
+    modalTitle.textContent = t('picks.userChoicesTitle', 'Picks for {user}', { user: score.userName });
 
     if (!score.pickDetails || score.pickDetails.length === 0) {
-      modalContent.innerHTML = '<div class="text-muted">Aucun détail disponible.</div>';
+      modalContent.innerHTML = `<div class="text-muted">${t('picks.noDetailsAvailable', 'No details available.')}</div>`;
       modal.show();
       return;
     }
@@ -763,11 +788,11 @@
       <div class="mb-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
           <div>
-            <h6 class="mb-1">Résumé</h6>
+            <h6 class="mb-1">${t('picks.summaryTitle', 'Summary')}</h6>
             <div class="text-muted small">
-              <span class="text-success"><strong>${correctPicks.length}</strong> correct(s)</span> | 
-              <span class="text-danger"><strong>${incorrectPicks.length}</strong> incorrect(s)</span> | 
-              <span class="text-muted"><strong>${score.pickDetails.length}</strong> total</span>
+              <span class="text-success"><strong>${correctPicks.length}</strong> ${t('picks.correctCountLabel', 'correct')}</span> | 
+              <span class="text-danger"><strong>${incorrectPicks.length}</strong> ${t('picks.incorrectCountLabel', 'incorrect')}</span> | 
+              <span class="text-muted"><strong>${score.pickDetails.length}</strong> ${t('picks.totalCountLabel', 'total')}</span>
             </div>
           </div>
           <div class="text-end">
@@ -781,7 +806,7 @@
         <div class="mb-4">
           <h6 class="text-success mb-3">
             <span class="badge bg-success me-2">✓</span>
-            Corrects (${correctPicks.length})
+            ${t('picks.correctSectionTitle', 'Correct ({count})', { count: correctPicks.length })}
           </h6>
           <div class="list-group">
             ${correctPicks.map(pick => `
@@ -804,7 +829,7 @@
         <div class="mb-4">
           <h6 class="text-danger mb-3">
             <span class="badge bg-danger me-2">✗</span>
-            Incorrects (${incorrectPicks.length})
+            ${t('picks.incorrectSectionTitle', 'Incorrect ({count})', { count: incorrectPicks.length })}
           </h6>
           <div class="list-group">
             ${incorrectPicks.map(pick => `
@@ -814,13 +839,13 @@
                     <strong>${pick.categoryNumber}. ${pick.categoryName}</strong>
                     <div class="mt-2">
                       <div class="mb-1">
-                        <span class="badge bg-danger">✗ Choix: ${pick.selectedNominee}</span>
+                        <span class="badge bg-danger">✗ ${t('picks.choiceLabel', 'Choice')}: ${pick.selectedNominee}</span>
                       </div>
                       ${pick.correctWinner ? `
                         <div>
-                          <span class="badge bg-success">✓ Gagnant: ${pick.correctWinner}</span>
+                          <span class="badge bg-success">✓ ${t('picks.winnerLabel', 'Winner')}: ${pick.correctWinner}</span>
                         </div>
-                      ` : '<div class="text-muted small">Aucun gagnant marqué</div>'}
+                      ` : `<div class="text-muted small">${t('picks.noWinnerMarkedShort', 'No winner marked')}</div>`}
                     </div>
                   </div>
                 </div>
@@ -832,7 +857,7 @@
 
       ${correctPicks.length === 0 && incorrectPicks.length === 0 ? `
         <div class="alert alert-info">
-          Aucun choix à afficher.
+          ${t('picks.noChoicesToShow', 'No picks to show.')}
         </div>
       ` : ''}
     `;
@@ -843,7 +868,7 @@
   // Event listeners for winners tab
   document.getElementById('refresh-winners')?.addEventListener('click', () => {
     fetchWinnersCategories();
-    showAlert('Données rafraîchies', 'info');
+    showAlert(t('picks.dataRefreshed', 'Data refreshed'), 'info');
   });
 
   // Load scores when scores tab is shown
@@ -867,19 +892,19 @@
   // Refresh scores button
   document.getElementById('refresh-scores')?.addEventListener('click', async () => {
     await fetchScores();
-    showAlert('Scores rafraîchis', 'info');
+    showAlert(t('picks.scoresRefreshed', 'Scores refreshed'), 'info');
   });
 
   // Initial load
   window.addEventListener('DOMContentLoaded', async function() {
     const pageLoader = createPageLoader({
-      title: 'Chargement des picks',
-      subtitle: 'Récupération des données…'
+      title: t('picks.loadingTitle', 'Loading picks'),
+      subtitle: t('picks.loadingSubtitle', 'Fetching data…')
     });
 
     try {
       currentYear = await fetchActiveYear();
-      document.title = `Pool Oscars (${currentYear}) - Mes choix`;
+      document.title = t('picks.pageTitleChoicesWithYear', 'Oscar Pool ({year}) - My picks', { year: currentYear });
       
       pageLoader.setProgress(12);
       await fetchCategories(pageLoader);

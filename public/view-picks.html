@@ -3,11 +3,29 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pool Oscars - Voir Tous les Choix</title>
+  <title data-i18n="viewPicks.title">Oscar Pool - View All Picks</title>
   <script src="./js/app_theme.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="./css/app.css" rel="stylesheet">
   <link rel="preload" as="image" href="img/logo_w.png">
+  <style>
+    /* Hide translatable content until translations are ready - prevents flash during page navigation */
+    body:not(.i18n-ready) [data-i18n] {
+      opacity: 0;
+      transition: opacity 0.1s ease-in;
+    }
+    body.i18n-ready [data-i18n] {
+      opacity: 1;
+    }
+    /* Fallback: show content after 2 seconds even if JS fails */
+    body:not(.i18n-ready) [data-i18n] {
+      animation: show-after-delay 0.1s 2s forwards;
+    }
+    @keyframes show-after-delay {
+      to { opacity: 1; }
+    }
+  </style>
+  <script src="./js/localization.js" defer></script>
   <script src="./js/app_header_boot.js" defer></script>
   <style>
     .navbar-custom {
@@ -58,16 +76,16 @@
     </button>
     <div class="collapse navbar-collapse" id="navbarNav">
       <div class="navbar-nav">
-        <a href="movies.html" class="nav-link btn btn-outline-light me-2">Films</a>
-        <a href="checklist.html" class="nav-link btn btn-outline-light me-2">Checklist</a>
-        <a href="user-stat.html" class="nav-link btn btn-outline-light me-2">Stats</a>
-        <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;">Mes picks</a>
-        <a href="control.html" class="nav-link btn btn-warning me-2">Admin</a>
-        <a href="view-picks.html" class="nav-link btn btn-info me-2 active">Voir Tous les Choix</a>
+        <a href="movies.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.films">Films</a>
+        <a href="checklist.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.checklist">Checklist</a>
+        <a href="user-stat.html" class="nav-link btn btn-outline-light me-2" data-i18n="nav.stats">Stats</a>
+        <a href="picks.html" class="nav-link btn btn-outline-light me-2" id="nav-link-picks" style="display: none;" data-i18n="nav.myPicks">My picks</a>
+        <a href="control.html" class="nav-link btn btn-warning me-2" data-i18n="nav.admin">Admin</a>
+        <a href="view-picks.html" class="nav-link btn btn-info me-2 active" data-i18n="nav.viewAllPicks">View All Picks</a>
       </div>
       <div class="d-flex ms-auto mt-2 mt-lg-0 align-items-center gap-2 navbar-user">
         <span id="user-name" class="navbar-text" data-user-name></span>
-        <button class="theme-toggle" type="button" data-theme-toggle role="switch" aria-checked="false" aria-label="Basculer le mode sombre">
+        <button class="theme-toggle" type="button" data-theme-toggle role="switch" aria-checked="false" data-i18n-aria-label="common.toggleDarkMode" aria-label="Toggle dark mode">
           <span class="theme-toggle-icon theme-toggle-icon-sun" aria-hidden="true">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="4"></circle>
@@ -88,44 +106,44 @@
             </svg>
           </span>
         </button>
-        <button id="log-off" class="btn btn-danger">Déconnexion</button>
+        <button id="log-off" class="btn btn-danger" data-i18n="nav.logout">Log out</button>
       </div>
     </div>
   </div>
 </nav>
 
 <div class="container mt-4 pb-5">
-  <h2>Voir Tous les Choix</h2>
-  
+  <h2 data-i18n="viewPicks.title">View All Picks</h2>
+
   <div id="alert-container"></div>
-  
+
   <div class="card shadow-sm mt-3 mb-4">
     <div class="card-body">
       <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
         <div>
-          <div class="fw-semibold">Année: <span id="current-year">—</span></div>
-          <div class="text-muted small">Vue d'ensemble de tous les choix des utilisateurs</div>
+          <div class="fw-semibold"><span data-i18n="picks.year">Year:</span> <span id="current-year">—</span></div>
+          <div class="text-muted small" data-i18n="viewPicks.overview">Overview of all user picks</div>
         </div>
         <div class="d-flex gap-2">
-          <button type="button" id="refresh-picks" class="btn btn-outline-secondary">Rafraîchir</button>
+          <button type="button" id="refresh-picks" class="btn btn-outline-secondary" data-i18n="common.refresh">Refresh</button>
         </div>
       </div>
       <div class="mt-3">
         <div class="text-muted small">
-          <span id="users-count">0</span> utilisateur(s) ont soumis leurs choix
+          <span id="users-count">0</span> <span data-i18n="viewPicks.usersSubmitted" data-i18n-params='{"count": ""}'>user(s) have submitted their picks</span>
         </div>
       </div>
     </div>
   </div>
 
   <div id="picks-container">
-    <div class="text-center py-4 text-muted">Chargement des choix…</div>
+    <div class="text-center py-4 text-muted" data-i18n="viewPicks.loadingPicks">Loading picks…</div>
   </div>
 </div>
 
 <!-- Footer Section  -->
 <footer>
-  <p id="footer-copy">Oscar Pool <span aria-hidden="true">·</span> <a id="copy" href="https://github.com/quoije/oscars-pool">quoije</a></p>
+  <p id="footer-copy"><span data-i18n="footer.oscarPool">Oscar Pool</span> <span aria-hidden="true">·</span> <a id="copy" href="https://github.com/quoije/oscars-pool">quoije</a></p>
   <p id="footer-text"></p>
 </footer>
 
@@ -135,4 +153,3 @@
 
 </body>
 </html>
-

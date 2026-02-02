@@ -1,7 +1,21 @@
+// i18n helper function
+function t(key, fallback = '', params = {}) {
+  if (window.i18n && typeof window.i18n.t === 'function') {
+    return window.i18n.t(key, params);
+  }
+  let result = fallback;
+  if (params && typeof params === 'object') {
+    Object.keys(params).forEach(k => {
+      result = result.replace(`{${k}}`, String(params[k]));
+    });
+  }
+  return result;
+}
+
 function createPageLoader(options = {}) {
-  const title = String(options.title || 'Chargement…');
+  const title = String(options.title || t('common.loading', 'Loading…'));
   // Subtitle kept for backwards-compat with callers, but we no longer render text in the UI.
-  const subtitle = String(options.subtitle || 'Préparation de la page…');
+  const subtitle = String(options.subtitle || t('common.preparingPage', 'Preparing page…'));
 
   let progress = 0;
   let removed = false;
@@ -147,8 +161,8 @@ async function waitForImagesIn(containerEl, onProgress) {
 
 window.addEventListener('DOMContentLoaded', async function () {
     const pageLoader = createPageLoader({
-      title: 'Chargement des films',
-      subtitle: 'Récupération des données…'
+      title: (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.loadingMovies') : 'Loading movies',
+      subtitle: (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.fetchingData') : 'Fetching data…'
     });
 
     function formatClock(seconds) {
@@ -272,7 +286,11 @@ window.addEventListener('DOMContentLoaded', async function () {
 
       if (avgEl) {
         if (avg && count > 0) {
-          avgEl.textContent = `Note utilisateurs ${avg.toFixed(1)}${count ? ` (${count})` : ''}`;
+          const avgLabel = `${avg.toFixed(1)}${count ? ` (${count})` : ''}`;
+          const translated = (window.i18n && typeof window.i18n.t === 'function')
+            ? window.i18n.t('movies.userRating', { rating: avgLabel })
+            : `User rating ${avgLabel}`;
+          avgEl.textContent = translated;
           avgEl.classList.remove('movie-rating-sub--empty');
         } else {
           avgEl.textContent = '';
@@ -335,7 +353,12 @@ window.addEventListener('DOMContentLoaded', async function () {
         if (lastUpdatedIso) {
           const d = new Date(lastUpdatedIso);
           if (!Number.isNaN(d.getTime())) {
-            lastUpdatedEl.textContent = d.toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+            const locale = (window.i18n && typeof window.i18n.getLanguage === 'function') ? window.i18n.getLanguage() : (document.documentElement.lang || 'en');
+            try {
+              lastUpdatedEl.textContent = d.toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' });
+            } catch (_) {
+              lastUpdatedEl.textContent = d.toLocaleString();
+            }
           } else {
             lastUpdatedEl.textContent = '—';
           }
@@ -347,7 +370,12 @@ window.addEventListener('DOMContentLoaded', async function () {
       const total = Number(summary?.totalMoviesCount) || 0;
       const watched = Number(summary?.watchedMoviesCount) || 0;
       const ratioPct = total > 0 ? ((watched / total) * 100).toFixed(1) : '0.0';
-      if (ratioEl) ratioEl.innerText = `Vu: ${watched} / ${total} (${ratioPct}%)`;
+      if (ratioEl) {
+        const txt = (window.i18n && typeof window.i18n.t === 'function')
+          ? window.i18n.t('movies.watchedRatio', { watched: watched, total: total, percent: ratioPct })
+          : `Watched: ${watched} / ${total} (${ratioPct}%)`;
+        ratioEl.innerText = txt;
+      }
     }
 
     const activeYear = await fetchActiveYear();
@@ -361,16 +389,18 @@ window.addEventListener('DOMContentLoaded', async function () {
     const fallbackDate = parseLocalNoonFromIsoDate(`${activeYear}-03-15`) || new Date(`March 15, ${activeYear} 12:00:00`);
     if (oscarDayMonthEl) {
       try {
-        oscarDayMonthEl.textContent = fallbackDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+        const locale = (window.i18n && typeof window.i18n.getLanguage === 'function') ? window.i18n.getLanguage() : (document.documentElement.lang || 'en');
+        oscarDayMonthEl.textContent = fallbackDate.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
       } catch (_) {
-        oscarDayMonthEl.textContent = '15 mars';
+        oscarDayMonthEl.textContent = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('checklist.march15') : 'March 15';
       }
     }
     if (timeLeftEl) {
       const currentDate = new Date();
       const timeDifference = fallbackDate - currentDate;
       const daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
-      timeLeftEl.textContent = `${daysLeft} jours`;
+      const daysLabel = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.daysLeft', { days: daysLeft }) : `${daysLeft} days`;
+      timeLeftEl.textContent = daysLabel;
     }
 
     fetchOscarEffectiveDate(activeYear).then((oscarEffectiveDate) => {
@@ -380,14 +410,16 @@ window.addEventListener('DOMContentLoaded', async function () {
 
       if (oscarDayMonthEl) {
         try {
-          oscarDayMonthEl.textContent = targetDate.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' });
+          const locale = (window.i18n && typeof window.i18n.getLanguage === 'function') ? window.i18n.getLanguage() : (document.documentElement.lang || 'en');
+          oscarDayMonthEl.textContent = targetDate.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
         } catch (_) {}
       }
       if (timeLeftEl) {
         const currentDate = new Date();
         const timeDifference = targetDate - currentDate;
         const daysLeft = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
-        timeLeftEl.textContent = `${daysLeft} jours`;
+        const daysLabel = (window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.daysLeft', { days: daysLeft }) : `${daysLeft} days`;
+        timeLeftEl.textContent = daysLabel;
       }
     }).catch(() => {});
 
@@ -473,8 +505,11 @@ window.addEventListener('DOMContentLoaded', async function () {
       const totalMoviesCount = movies.length;
       const watchedMoviesCount = watchedMoviesInYear.length;
       const ratioPct = totalMoviesCount > 0 ? ((watchedMoviesCount / totalMoviesCount) * 100).toFixed(1) : '0.0';
-      const ratioText = `Vu: ${watchedMoviesCount} / ${totalMoviesCount} (${ratioPct}%)`;
-      document.getElementById('watched-ratio').innerText = ratioText;
+      const ratioText = (window.i18n && typeof window.i18n.t === 'function')
+        ? window.i18n.t('movies.watchedRatio', { watched: watchedMoviesCount, total: totalMoviesCount, percent: ratioPct })
+        : `Watched: ${watchedMoviesCount} / ${totalMoviesCount} (${ratioPct}%)`;
+      const ratioEl = document.getElementById('watched-ratio');
+      if (ratioEl) ratioEl.innerText = ratioText;
 
       if (moviesList) moviesList.innerHTML = '';
 
@@ -501,6 +536,11 @@ window.addEventListener('DOMContentLoaded', async function () {
           Number.isFinite(userRatingAvg) && userRatingAvg > 0
             ? `${userRatingAvg.toFixed(1)}${userRatingCount ? ` (${userRatingCount})` : ''}`
             : '';
+        const avgHtml = userRatingText
+          ? ((window.i18n && typeof window.i18n.t === 'function')
+              ? window.i18n.t('movies.userRating', { rating: userRatingText })
+              : `User rating ${userRatingText}`)
+          : '';
         const userRatingOwn =
           Number.isFinite(userRating) && userRating > 0 ? `${userRating}/5` : '';
         const starsHtml = Array.from({ length: 5 }, (_, idx) => {
@@ -531,10 +571,13 @@ window.addEventListener('DOMContentLoaded', async function () {
               // Hide "resume/progress" once we're basically at the credits.
               // Backend uses 95% as the "credit roll" threshold too.
               if (pct < 95) {
+                const resumeText = (window.i18n && typeof window.i18n.t === 'function')
+                  ? window.i18n.t('movies.resumeAt', { time: `<span class="fw-semibold text-dark">${formatClock(time)}</span>` })
+                  : `Resume at <span class="fw-semibold text-dark">${formatClock(time)}</span>`;
                 progressHtml = `
                   <div class="mt-2">
                     <div class="d-flex justify-content-between align-items-center text-muted small">
-                      <span>Reprendre à <span class="fw-semibold text-dark">${formatClock(time)}</span></span>
+                      <span>${resumeText}</span>
                       <span>${pct.toFixed(0)}%</span>
                     </div>
                     <div class="progress" style="height: 6px;">
@@ -544,9 +587,12 @@ window.addEventListener('DOMContentLoaded', async function () {
                 `;
               }
             } else {
+              const resumeText = (window.i18n && typeof window.i18n.t === 'function')
+                ? window.i18n.t('movies.resumeAt', { time: `<span class="fw-semibold text-dark">${formatClock(time)}</span>` })
+                : `Resume at <span class="fw-semibold text-dark">${formatClock(time)}</span>`;
               progressHtml = `
                 <div class="mt-2 text-muted small">
-                  Reprendre à <span class="fw-semibold text-dark">${formatClock(time)}</span>
+                  ${resumeText}
                 </div>
               `;
             }
@@ -554,6 +600,12 @@ window.addEventListener('DOMContentLoaded', async function () {
         }
 
         const camBadge = movie?.cam ? '<span class="badge bg-warning text-dark position-absolute top-0 end-0 m-2 cam-badge">CAM</span>' : '';
+        const watchedBadge = isChecked
+          ? `<span class="badge bg-success position-absolute top-0 start-0 m-2 watched-badge">${(window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.watched') : 'WATCHED'}</span>`
+          : '';
+        const noSourceHtml = !isClickable
+          ? `<div class="text-muted small mb-1">${(window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.noSource') : 'No source'}</div>`
+          : '';
         const posterBlock = `
           <div class="text-center pt-3 px-3 position-relative movie-poster-wrap">
             ${camBadge}
@@ -566,7 +618,7 @@ window.addEventListener('DOMContentLoaded', async function () {
         movieDiv.setAttribute('data-imdb-id', movie.imdb_id);
         movieDiv.innerHTML = `
           <div class="card h-100 shadow-sm">
-            ${isChecked ? '<span class="badge bg-success position-absolute top-0 start-0 m-2 watched-badge">VISIONNÉ</span>' : ''}
+            ${watchedBadge}
             ${
               isClickable
                 ? `<a href="${playerUrl}" target="_self" rel="noopener noreferrer" class="text-decoration-none">
@@ -587,26 +639,26 @@ window.addEventListener('DOMContentLoaded', async function () {
                     </h5>
                     ${movie.runtime && movie.runtime !== 'N/A' ? `<div class="text-muted small mb-1">${formatRuntime(movie.runtime)}</div>` : ''}
                     <div class="movie-rating-block mt-1">
-                      <div class="movie-rating-sub movie-rating-avg${userRatingText ? '' : ' movie-rating-sub--empty'}" data-role="avg-rating">${userRatingText ? `Note utilisateurs ${userRatingText}` : ''}</div>
+                      <div class="movie-rating-sub movie-rating-avg${avgHtml ? '' : ' movie-rating-sub--empty'}" data-role="avg-rating">${avgHtml ? avgHtml : ''}</div>
                     </div>
                   </div>
                   <div class="movie-imdb-wrap">
                     <div class="movie-imdb-block">
                       ${movie.rating ? `<span>⭐ ${movie.rating}</span>` : ''}
-                      <a href="https://www.imdb.com/title/${movie.imdb_id}/" target="_blank" rel="noopener noreferrer" aria-label="Voir sur IMDb">
+                      <a href="https://www.imdb.com/title/${movie.imdb_id}/" target="_blank" rel="noopener noreferrer" aria-label="${(window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.viewOnImdb') : 'View on IMDb'}">
                         <span class="imdb-icon" aria-hidden="true">IMDb</span>
                       </a>
                     </div>
-                    <div class="movie-rating-stars" role="group" aria-label="Noter ce film" data-movie-id="${movieId}" data-current-rating="${Number.isFinite(userRating) ? userRating : ''}">
+                    <div class="movie-rating-stars" role="group" aria-label="${(window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('player.rateThisFilm') : 'Rate this film'}" data-movie-id="${movieId}" data-current-rating="${Number.isFinite(userRating) ? userRating : ''}">
                       ${starsHtml}
                     </div>
                   </div>
                 </div>
-                ${!isClickable ? '<div class="text-muted small mb-1">Aucune source</div>' : ''}
+                    ${noSourceHtml}
                 <div class="movie-info-box">
                   <details class="movie-info-categories">
                     <summary class="movie-info-summary">
-                      <span class="movie-info-summary-title">Catégories nominées</span>
+                      <span class="movie-info-summary-title">${(window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('movies.nominatedCategories') : 'Nominated categories'}</span>
                       <span class="movie-info-summary-arrow" aria-hidden="true">▾</span>
                     </summary>
                     <div class="movie-info-category">${movie.category}</div>
@@ -615,7 +667,7 @@ window.addEventListener('DOMContentLoaded', async function () {
                 </div>
               </div>
               <div class="mt-auto">
-                ${isChecked ? `<div class="text-muted small"><span class="fw-semibold text-dark">Regardé le:</span> ${watchedDate}</div>` : ''}
+                ${isChecked ? `<div class="text-muted small"><span class="fw-semibold text-dark">${(window.i18n && typeof window.i18n.t === 'function') ? window.i18n.t('checklist.watchedOn') : 'Watched on:'}</span> ${watchedDate}</div>` : ''}
                 ${progressHtml}
               </div>
             </div>
@@ -658,8 +710,8 @@ window.addEventListener('DOMContentLoaded', async function () {
       });
       pageLoader.done();
     } catch (e) {
-      setLoadError(moviesList, 'Impossible de charger la liste des films. Réessaie dans quelques instants.');
-      pageLoader.fail('Impossible de charger les films. Vérifie ta connexion puis réessaie.');
+      setLoadError(moviesList, t('movies.errorLoadingList', 'Unable to load movie list. Try again in a moment.'));
+      pageLoader.fail(t('movies.errorLoading', 'Unable to load movies. Check your connection and try again.'));
     }
 
     document.getElementById('log-off').addEventListener('click', function () {

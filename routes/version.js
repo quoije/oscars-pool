@@ -79,7 +79,8 @@ router.get("/", async (req, res) => {
     if (!active) {
       return res.status(200).json({
         version: getPackageVersion(),
-        message: "Version non configurée (définis-la dans Admin → Version).",
+        messageKey: 'footer.versionNotConfigured',
+        message: 'Version not configured (set it in Admin → Version).',
         author: "",
         date: nowFormatted(),
         configured: false,
@@ -103,7 +104,8 @@ router.get("/", async (req, res) => {
     // If DB is down, still return something useful.
     return res.status(200).json({
       version: getPackageVersion(),
-      message: "Version indisponible (DB).",
+      messageKey: 'footer.versionUnavailable',
+      message: 'Version unavailable (DB).',
       author: "",
       date: nowFormatted(),
       configured: false,

@@ -3,21 +3,37 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pool Oscars - Enregistrement</title>
+  <title data-i18n="auth.register">Oscar Pool - Register</title>
   <script src="./js/app_theme.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="./css/app.css" rel="stylesheet">
+  <style>
+    /* Hide translatable content until translations are ready - prevents flash during page navigation */
+    body:not(.i18n-ready) [data-i18n] {
+      opacity: 0;
+      transition: opacity 0.1s ease-in;
+    }
+    body.i18n-ready [data-i18n] {
+      opacity: 1;
+    }
+    /* Fallback: show content after 2 seconds even if JS fails */
+    body:not(.i18n-ready) [data-i18n] {
+      animation: show-after-delay 0.1s 2s forwards;
+    }
+    @keyframes show-after-delay {
+      to { opacity: 1; }
+    }
+    #dog {
+      width: 30%;
+      margin: 5px;
+      padding: 5px;
+      border-radius: 10%;
+    }
+  </style>
+  <script src="./js/localization.js" defer></script>
 </head>
-<style>
-  #dog {
-    width: 30%;
-    margin: 5px;
-    padding: 5px;
-    border-radius: 10%;
-  }
-</style>
 <body class="bg-light">
-<button class="theme-toggle theme-toggle--floating" type="button" data-theme-toggle role="switch" aria-checked="false" aria-label="Basculer le mode sombre">
+<button class="theme-toggle theme-toggle--floating" type="button" data-theme-toggle role="switch" aria-checked="false" data-i18n-aria-label="common.toggleDarkMode" aria-label="Toggle dark mode">
   <span class="theme-toggle-icon theme-toggle-icon-sun" aria-hidden="true">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="12" r="4"></circle>
@@ -43,41 +59,41 @@
   <!-- Setup needed banner (hidden by default) -->
   <div id="setup-needed-card" class="card p-4 d-none" style="max-width: 400px;">
     <div class="text-center mb-4">
-      <img src="img/logo.png" class="logo-invert" style="width: 80%;" alt="Pool Oscars">
+      <img src="img/logo.png" class="logo-invert" style="width: 80%;" alt="Oscar Pool">
     </div>
     <div class="alert alert-warning mb-3">
-      <strong>Configuration requise</strong><br>
-      L'application doit d'abord être configurée par un administrateur.
+      <strong data-i18n="auth.setupRequired">Setup required</strong><br>
+      <span data-i18n="auth.appMustBeConfigured">The application must first be configured by an administrator.</span>
     </div>
-    <a href="/" class="btn btn-primary w-100">Aller à la page de configuration</a>
+    <a href="/" class="btn btn-primary w-100" data-i18n="auth.goToSetup">Go to setup page</a>
   </div>
 
   <!-- Normal registration card -->
   <div id="register-card" class="card p-4" style="max-width: 400px;">
     <div class="text-center mb-4">
-      <img src="img/logo.png" class="logo-invert" style="width: 80%;" alt="Pool Oscars">
+      <img src="img/logo.png" class="logo-invert" style="width: 80%;" alt="Oscar Pool">
     </div>
     <form id="register-form">
       <div class="mb-3">
-        <label for="name" class="form-label">Nom</label>
+        <label for="name" class="form-label" data-i18n="auth.name">Name</label>
         <input type="text" class="form-control" id="name" required>
       </div>
       <div class="mb-3">
-        <label for="email" class="form-label">Courriel</label>
+        <label for="email" class="form-label" data-i18n="auth.email">Email</label>
         <input type="email" class="form-control" id="email" required>
       </div>
       <div class="mb-3">
-        <label for="password" class="form-label">Mot de passe</label>
+        <label for="password" class="form-label" data-i18n="auth.password">Password</label>
         <input type="password" class="form-control" id="password" required>
       </div>
       <div class="mb-3">
-        <label for="verifoof" class="form-label">Le nom du chien à Cath & Nath?</label>
+        <label for="verifoof" class="form-label" data-i18n="auth.dogQuestion">What is Cath & Nath's dog's name?</label>
         <img id="dog" src="img/doglmao.png">
         <input type="text" class="form-control" id="verifoof" required>
       </div>
-      <button type="submit" class="btn btn-primary w-100">Enregistrer</button>
+      <button type="submit" class="btn btn-primary w-100" data-i18n="auth.register">Register</button>
     </form>
-    <p class="mt-3 text-center">Déjà un compte? <a href="/">Connectez-vous</a></p>
+    <p class="mt-3 text-center"><span data-i18n="auth.hasAccount">Already have an account?</span> <a href="/" data-i18n="auth.signIn">Sign in</a></p>
   </div>
 </div>
 
@@ -86,15 +102,15 @@
   <div class="modal-dialog">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="responseModalLabel">Statut de l’enregistrement</h5>
+        <h5 class="modal-title" id="responseModalLabel" data-i18n="auth.registrationStatus">Registration status</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body" id="response-message">
         <!-- Response message will be inserted here -->
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
-        <button type="button" class="btn btn-primary" id="redirect-login">Retourner à la page d'accueil</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" data-i18n="common.close">Close</button>
+        <button type="button" class="btn btn-primary" id="redirect-login" data-i18n="auth.returnToHome">Return to home page</button>
       </div>
     </div>
   </div>
