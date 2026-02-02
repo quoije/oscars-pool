@@ -826,6 +826,34 @@ body.i18n-ready .navbar .btn {
     border-bottom: 1px solid var(--app-navbar-border);
   }
 
+  /* Hide nav button text and show blur line while i18n loads */
+  body:not(.i18n-ready) .navbar-custom .navbar-nav .nav-link.btn {
+    color: transparent !important;
+    position: relative;
+  }
+
+  body:not(.i18n-ready) .navbar-custom .navbar-nav .nav-link.btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 70%;
+    height: 1.2rem;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    filter: blur(3px);
+  }
+
+  /* Restore text after i18n loads */
+  body.i18n-ready .navbar-custom .navbar-nav .nav-link.btn {
+    color: inherit;
+  }
+
+  body.i18n-ready .navbar-custom .navbar-nav .nav-link.btn::before {
+    display: none;
+  }
+
   /* Navbar: show current page state */
   .navbar-custom .navbar-nav .nav-link.btn.is-current {
     background: rgba(255, 255, 255, 0.16);
