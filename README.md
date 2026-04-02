@@ -1,7 +1,10 @@
 ## Oscars Pool 2026
 Little nodejs + mongodb app that I hack together with ChatGPT and Cursor to keep track of watched movies for an incoming Oscars Pool with some friends.
 
-**Note:** The application interface now supports **English and French** via JSON locale bundles (default is English; the admin can force the site language from the Settings → Language tab).
+**Note:** 
+**WIP** This project still has bugs, some visual glitches and need some work.
+
+The application interface now supports **English and French** via JSON locale bundles (default is English; the admin can force the site language from the Settings → Language tab).
 
 **Disclaimer:** This was a fun, experimental project built with “AI slop” (Cursor, Claude and Copilot), so it may have security issues. For example, `python_video_server` uses the default token‑in‑URL approach to serve video files, which can leave user tokens in logs or browser history. There are ways to improve this, but at this point I’m blinder than Ray Charles.
 
